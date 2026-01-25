@@ -17,7 +17,10 @@
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsup",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest",
+    "test:run": "vitest --run",
+    "coverage": "vitest --run --coverage"
   },
   "dependencies": {
     "citty": "^0.1.6",
@@ -25,9 +28,11 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
+    "@vitest/coverage-v8": "^4.0.18",
     "tsup": "^8.0.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=18"
