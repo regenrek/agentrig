@@ -41,21 +41,62 @@ export function isFileish(spec: string) {
 }
 
 export function joinUrl(baseUrl: string, rel: string) {
-  // rel can be absolute URL
-  if (isUrl(rel)) return rel
-  // Ensure trailing slash for URL resolution
-  const b = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
-  return new URL(rel, b).toString()
+  // Normalize base so URL(rel, base) behaves like path-joining.
+  // This also catches protocol-relative URLs like "//evil.com/x" as absolute URLs.
+  const base = new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
+  const resolved = new URL(rel, base)
+  if (resolved.origin !== base.origin) {
+    throw new Error(`External URLs are not allowed for pack files: ${rel}`)
+  }
+  return resolved.toString()
+}
+
+const DEFAULT_FETCH_TIMEOUT_MS = 15000
+const MAX_RETRIES = 1
+const RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504])
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = DEFAULT_FETCH_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+class NonRetryableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NonRetryableError'
+  }
 }
 
 async function fetchJson<T>(url: string, headers?: Record<string, string>): Promise<T> {
-  const res = await fetch(url, {
-    headers: { accept: 'application/json', ...headers },
-  })
-  if (!res.ok) {
-    throw new Error(`Request failed (${res.status}) for ${url}`)
+  let attempt = 0
+  while (attempt <= MAX_RETRIES) {
+    try {
+      const res = await fetchWithTimeout(url, {
+        headers: { accept: 'application/json', ...headers },
+      })
+      if (res.ok) {
+        return (await res.json()) as T
+      }
+      if (!RETRY_STATUSES.has(res.status)) {
+        throw new NonRetryableError(`Request failed (${res.status}) for ${url}`)
+      }
+      if (attempt === MAX_RETRIES) {
+        throw new Error(`Request failed (${res.status}) for ${url}`)
+      }
+    } catch (error) {
+      if (error instanceof NonRetryableError) throw error
+      if (attempt === MAX_RETRIES) throw error
+    }
+    attempt += 1
+    const delayMs = 250 * 2 ** attempt
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
   }
-  return (await res.json()) as T
+  throw new Error(`Request failed after retries for ${url}`)
 }
 
 /**
@@ -208,7 +249,7 @@ export async function resolvePackFromMetaSpec(spec: string, cwd: string): Promis
 export async function readSourceFile(source: SourceBase, relPath: string): Promise<Uint8Array> {
   if (source.type === 'url') {
     const url = joinUrl(source.baseUrl, relPath)
-    const res = await fetch(url)
+    const res = await fetchWithTimeout(url, {})
     if (!res.ok) throw new Error(`Request failed (${res.status}) for ${url}`)
     return new Uint8Array(await res.arrayBuffer())
   }

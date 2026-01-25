@@ -72,8 +72,11 @@ describe('registry', () => {
     expect(joinUrl('https://example.com/registry/', 'core.json')).toBe(
       'https://example.com/registry/core.json'
     )
-    expect(joinUrl('https://example.com/registry/', 'https://other.com/a.json')).toBe(
-      'https://other.com/a.json'
+    expect(joinUrl('https://example.com/registry/', 'https://example.com/assets/a.json')).toBe(
+      'https://example.com/assets/a.json'
+    )
+    expect(() => joinUrl('https://example.com/registry/', 'https://other.com/a.json')).toThrow(
+      'External URLs are not allowed'
     )
   })
 

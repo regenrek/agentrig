@@ -14,6 +14,8 @@
     "test:run": "pnpm -C packages/cli test:run",
     "coverage": "pnpm -C packages/cli coverage",
     "build:cli": "pnpm -C packages/cli build",
+    "web:dev": "pnpm --filter @agentrig/web dev",
+    "web:build": "pnpm --filter @agentrig/web build",
     "dev:web": "pnpm -C apps/web dev",
     "build:web": "pnpm -C apps/web build",
     "dev": "pnpm -r dev",

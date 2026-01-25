@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { promises as fs } from 'node:fs'
-import { chmodIfPossible, ensureDir, pathExists, writeTextFile } from './fs'
+import { chmodIfPossible, ensureDir, pathExists } from './fs'
 import { sha256Hex } from './hash'
 import { renderTemplate } from './placeholders'
 import { isNamespacedPack } from './namespace'
@@ -150,9 +150,7 @@ export async function installPack(
 
     if (!opts.dryRun) {
       await ensureDir(path.dirname(targetAbs))
-      // write as utf-8 if it looks like text
-      const asText = new TextDecoder().decode(bytes)
-      await writeTextFile(targetAbs, asText)
+      await fs.writeFile(targetAbs, bytes)
 
       const mode = parseMode(f.mode)
       if (mode !== undefined) {
