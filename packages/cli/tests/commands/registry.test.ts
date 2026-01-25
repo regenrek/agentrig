@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import registryCommand from '../../src/commands/registry'
 import listCommand from '../../src/commands/registry/list'
 import addCommand from '../../src/commands/registry/add'
+import type { ResolvedConfig } from '../../src/lib/config'
 import { loadConfig, getProjectConfigPath } from '../../src/lib/config'
 import { ensureDir, readJsonFile, writeJsonFile } from '../../src/lib/fs'
 
@@ -17,21 +18,32 @@ vi.mock('../../src/lib/fs', () => ({
 }))
 
 describe('command:registry', () => {
+  const runRegistry = registryCommand.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+  const runList = listCommand.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+  const runAdd = addCommand.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
 
   it('shows usage for registry wrapper', async () => {
-    await registryCommand.run({ args: { help: false } })
+    await runRegistry({ args: { help: false } })
   })
 
   it('lists configured registries', async () => {
-    vi.mocked(loadConfig).mockResolvedValue({
+    const cfg: ResolvedConfig = {
+      skillsDir: '.codex/skills',
       registries: [{ name: 'default', url: 'https://registry.example.com' }],
-    })
+      rigs: {},
+      paths: {
+        projectConfigPath: '/repo/agentrig.config.json',
+        globalConfigPath: '/home/.agentrig/config.json',
+      },
+    }
+    vi.mocked(loadConfig).mockResolvedValue(cfg)
 
-    await listCommand.run({ args: { cwd: '/repo', help: false } })
+    await runList({ args: { cwd: '/repo', help: false } })
     expect(loadConfig).toHaveBeenCalledWith('/repo')
   })
 
@@ -42,7 +54,7 @@ describe('command:registry', () => {
       registries: [{ name: 'default', url: 'https://old.example.com' }],
     })
 
-    await addCommand.run({
+    await runAdd({
       args: {
         name: 'default',
         url: 'https://new.example.com',

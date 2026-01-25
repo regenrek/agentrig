@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import command from '../../src/commands/pack/claude-marketplace'
 
 describe('command:pack:claude-marketplace', () => {
+  const run = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
   let tempDir = ''
 
   afterEach(async () => {
@@ -34,7 +35,7 @@ describe('command:pack:claude-marketplace', () => {
 
     const outRoot = path.join(tempDir, 'out')
 
-    await command.run({
+    await run({
       args: {
         packsDir: packsRoot,
         out: outRoot,
@@ -43,7 +44,6 @@ describe('command:pack:claude-marketplace', () => {
         ownerEmail: 'owner@example.com',
         pluginPrefix: 'ag-',
         clean: true,
-        config: undefined,
         help: false,
       },
     })

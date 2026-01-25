@@ -15,6 +15,8 @@ vi.mock('../../src/lib/config', () => ({
 }))
 
 describe('command:init', () => {
+  const run = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -24,7 +26,7 @@ describe('command:init', () => {
     vi.mocked(getGlobalConfigPath).mockReturnValue('/home/.agentrig/config.json')
     vi.mocked(pathExists).mockResolvedValue(false)
 
-    await command.run({
+    await run({
       args: {
         cwd: '/repo',
         skillsDir: 'custom-skills',
@@ -50,12 +52,9 @@ describe('command:init', () => {
     vi.mocked(pathExists).mockResolvedValue(true)
 
     await expect(
-      command.run({
+      run({
         args: {
           cwd: '/repo',
-          skillsDir: undefined,
-          registry: undefined,
-          defaultRig: undefined,
           minimal: false,
           global: false,
           force: false,
@@ -69,11 +68,10 @@ describe('command:init', () => {
     vi.mocked(getProjectConfigPath).mockReturnValue('/repo/agentrig.config.json')
     vi.mocked(pathExists).mockResolvedValue(false)
 
-    await command.run({
+    await run({
       args: {
         cwd: '/repo',
         skillsDir: '.codex/skills',
-        registry: undefined,
         defaultRig: 'core',
         minimal: false,
         global: false,

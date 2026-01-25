@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import command from '../../src/commands/remove'
 import { loadManifest, saveManifest } from '../../src/lib/manifest'
 import { removePack } from '../../src/lib/install'
+import type { Manifest } from '../../src/lib/types'
 
 vi.mock('../../src/lib/manifest', () => ({
   loadManifest: vi.fn(),
@@ -12,17 +13,19 @@ vi.mock('../../src/lib/install', () => ({
 }))
 
 describe('command:remove', () => {
+  const run = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
 
   it('removes pack and saves manifest', async () => {
-    const manifest = { schemaVersion: 1, installed: {} }
+    const manifest: Manifest = { schemaVersion: 1, installed: {} }
     vi.mocked(loadManifest).mockResolvedValue(manifest)
     vi.mocked(removePack).mockResolvedValue({ removed: ['file'], kept: [], missing: [] })
 
-    await command.run({
+    await run({
       args: {
         name: 'core',
         cwd: '/repo',

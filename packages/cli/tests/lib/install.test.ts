@@ -161,7 +161,7 @@ describe('install', () => {
       description: 'Core pack',
       version: '1.0.0',
       files: [],
-    } as PackMeta
+    } as unknown as PackMeta
     currentSetup = await setupPack(meta, {})
     const manifest: Manifest = { schemaVersion: 1, installed: {} }
 

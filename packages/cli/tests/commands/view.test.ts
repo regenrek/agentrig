@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import command from '../../src/commands/view'
+import type { ResolvedConfig } from '../../src/lib/config'
 import { loadConfig } from '../../src/lib/config'
 import {
   resolvePackByName,
@@ -25,16 +26,24 @@ vi.mock('../../src/lib/trust', () => ({
 }))
 
 describe('command:view', () => {
+  const run = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
 
   it('prints JSON output for URL specs', async () => {
-    vi.mocked(loadConfig).mockResolvedValue({
+    const cfg: ResolvedConfig = {
+      skillsDir: '.codex/skills',
       registries: [],
-      namespacedRegistries: undefined,
-    })
+      rigs: {},
+      paths: {
+        projectConfigPath: '/repo/agentrig.config.json',
+        globalConfigPath: '/home/.agentrig/config.json',
+      },
+    }
+    vi.mocked(loadConfig).mockResolvedValue(cfg)
     vi.mocked(isUrl).mockReturnValue(true)
     const meta = {
       name: 'core',
@@ -52,11 +61,10 @@ describe('command:view', () => {
     vi.mocked(validateTargetPaths).mockReturnValue({ valid: true, disallowed: [] })
 
     const logSpy = vi.spyOn(console, 'log')
-    await command.run({
+    await run({
       args: {
         spec: 'https://example.com/core.json',
         cwd: '/repo',
-        registry: undefined,
         json: true,
         help: false,
       },
@@ -70,10 +78,17 @@ describe('command:view', () => {
   })
 
   it('prints human output for namespaced specs', async () => {
-    vi.mocked(loadConfig).mockResolvedValue({
+    const cfg: ResolvedConfig = {
+      skillsDir: '.codex/skills',
       registries: [],
       namespacedRegistries: { '@acme': 'https://acme/{name}.json' },
-    })
+      rigs: {},
+      paths: {
+        projectConfigPath: '/repo/agentrig.config.json',
+        globalConfigPath: '/home/.agentrig/config.json',
+      },
+    }
+    vi.mocked(loadConfig).mockResolvedValue(cfg)
     vi.mocked(isUrl).mockReturnValue(false)
     const meta = {
       name: 'pack',
@@ -92,11 +107,10 @@ describe('command:view', () => {
     vi.mocked(describeTrustTier).mockReturnValue('Unlisted source')
     vi.mocked(validateTargetPaths).mockReturnValue({ valid: false, disallowed: ['etc/passwd'] })
 
-    await command.run({
+    await run({
       args: {
         spec: '@acme/pack',
         cwd: '/repo',
-        registry: undefined,
         json: false,
         help: false,
       },

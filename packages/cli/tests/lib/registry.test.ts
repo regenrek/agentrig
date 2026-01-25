@@ -23,20 +23,16 @@ vi.mock('../../src/lib/fs', () => ({
   readJsonFile: vi.fn(),
 }))
 
-const okResponse = (data: unknown) =>
-  Promise.resolve({
-    ok: true,
-    status: 200,
-    json: async () => data,
-    arrayBuffer: async () => new TextEncoder().encode(JSON.stringify(data)).buffer,
+const okResponse = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' },
   })
 
 const errorResponse = (status = 404) =>
-  Promise.resolve({
-    ok: false,
+  new Response(JSON.stringify({}), {
     status,
-    json: async () => ({}),
-    arrayBuffer: async () => new Uint8Array().buffer,
+    headers: { 'content-type': 'application/json' },
   })
 
 describe('registry', () => {
@@ -83,7 +79,7 @@ describe('registry', () => {
 
   it('fetches directory index', async () => {
     const entries = [{ name: '@acme', url: 'https://acme/{name}.json', verified: true }]
-    vi.mocked(fetch).mockResolvedValueOnce(await okResponse(entries))
+    vi.mocked(fetch).mockResolvedValueOnce(okResponse(entries))
     await expect(fetchDirectoryIndex('https://example.com/index.json')).resolves.toEqual(entries)
   })
 
@@ -92,11 +88,11 @@ describe('registry', () => {
       { name: '@acme', url: 'https://acme/{name}.json', verified: true },
       { name: '@other', url: 'https://other/{name}.json', verified: false },
     ]
-    vi.mocked(fetch).mockResolvedValueOnce(await okResponse(entries))
+    vi.mocked(fetch).mockResolvedValueOnce(okResponse(entries))
     await expect(findRegistryInDirectory('@acme', 'https://example.com/index.json')).resolves.toEqual(
       entries[0]
     )
-    vi.mocked(fetch).mockResolvedValueOnce(await okResponse(entries))
+    vi.mocked(fetch).mockResolvedValueOnce(okResponse(entries))
     await expect(findRegistryInDirectory('@missing', 'https://example.com/index.json')).resolves.toBeNull()
   })
 
@@ -132,7 +128,7 @@ describe('registry', () => {
       version: '1.0.0',
       files: [],
     }
-    vi.mocked(fetch).mockResolvedValueOnce(await okResponse(meta))
+    vi.mocked(fetch).mockResolvedValueOnce(okResponse(meta))
 
     const result = await resolvePackFromNamespacedRegistry('@acme/pack', {
       '@acme': 'https://example.com/{name}.json',
@@ -169,7 +165,7 @@ describe('registry', () => {
         },
       ],
     }
-    vi.mocked(fetch).mockResolvedValueOnce(await okResponse(registryIndex))
+    vi.mocked(fetch).mockResolvedValueOnce(okResponse(registryIndex))
     await expect(readRegistryIndex('https://example.com/registry')).resolves.toEqual(registryIndex)
   })
 
@@ -182,8 +178,8 @@ describe('registry', () => {
       files: [],
     }
     vi.mocked(fetch)
-      .mockResolvedValueOnce(await errorResponse(404))
-      .mockResolvedValueOnce(await okResponse(meta))
+      .mockResolvedValueOnce(errorResponse(404))
+      .mockResolvedValueOnce(okResponse(meta))
 
     const result = await resolvePackByName(
       'pack',
@@ -200,7 +196,7 @@ describe('registry', () => {
   })
 
   it('throws when pack cannot be resolved', async () => {
-    vi.mocked(fetch).mockResolvedValue(await errorResponse(404))
+    vi.mocked(fetch).mockResolvedValue(errorResponse(404))
     await expect(resolvePackByName('pack', [{ name: 'broken', url: 'https://broken.example.com' }])).rejects.toThrow(
       'Unable to resolve pack "pack"'
     )
@@ -214,7 +210,7 @@ describe('registry', () => {
       version: '1.0.0',
       files: [],
     }
-    vi.mocked(fetch).mockResolvedValueOnce(await okResponse(meta))
+    vi.mocked(fetch).mockResolvedValueOnce(okResponse(meta))
     const result = await resolvePackFromMetaSpec('https://example.com/pack.json', '/repo')
     expect(result.meta).toEqual(meta)
     expect(result.source).toEqual({ type: 'url', baseUrl: 'https://example.com/' })
@@ -244,9 +240,7 @@ describe('registry', () => {
   })
 
   it('reads source files from URLs and filesystem', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      await okResponse({ content: 'hello' })
-    )
+    vi.mocked(fetch).mockResolvedValueOnce(okResponse({ content: 'hello' }))
     const urlData = await readSourceFile({ type: 'url', baseUrl: 'https://example.com/' }, 'file.json')
     expect(urlData).toBeInstanceOf(Uint8Array)
 

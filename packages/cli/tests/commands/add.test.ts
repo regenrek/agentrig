@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import command from '../../src/commands/add'
+import type { ResolvedConfig } from '../../src/lib/config'
 import { loadConfig } from '../../src/lib/config'
 import { loadManifest, saveManifest } from '../../src/lib/manifest'
 import { installPack } from '../../src/lib/install'
 import { describeTrustTier } from '../../src/lib/trust'
+import type { Manifest } from '../../src/lib/types'
 
 vi.mock('../../src/lib/config', () => ({
   loadConfig: vi.fn(),
@@ -20,28 +22,35 @@ vi.mock('../../src/lib/trust', () => ({
 }))
 
 describe('command:add', () => {
+  const run = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
 
   it('installs packs and saves the manifest', async () => {
-    vi.mocked(loadConfig).mockResolvedValue({
+    const cfg: ResolvedConfig = {
       skillsDir: '.codex/skills',
       registries: [{ name: 'default', url: 'https://registry.example.com' }],
       namespacedRegistries: { '@acme': 'https://acme/{name}.json' },
-    })
-    const manifest = { schemaVersion: 1, installed: {} }
+      rigs: {},
+      paths: {
+        projectConfigPath: '/repo/agentrig.config.json',
+        globalConfigPath: '/home/.agentrig/config.json',
+      },
+    }
+    vi.mocked(loadConfig).mockResolvedValue(cfg)
+    const manifest: Manifest = { schemaVersion: 1, installed: {} }
     vi.mocked(loadManifest).mockResolvedValue(manifest)
     vi.mocked(installPack).mockResolvedValue({ installed: ['a'], skipped: [], trustTier: 'listed' })
     vi.mocked(describeTrustTier).mockReturnValue('Community registry (listed in directory)')
 
-    await command.run({
+    await run({
       args: {
         spec: 'core',
         cwd: '/repo',
         registry: 'default',
-        skillsDir: undefined,
         force: false,
         dryRun: false,
         yes: false,
@@ -69,20 +78,24 @@ describe('command:add', () => {
   })
 
   it('skips manifest save during dry runs', async () => {
-    vi.mocked(loadConfig).mockResolvedValue({
+    const cfg: ResolvedConfig = {
       skillsDir: '.codex/skills',
       registries: [],
-      namespacedRegistries: undefined,
-    })
-    vi.mocked(loadManifest).mockResolvedValue({ schemaVersion: 1, installed: {} })
+      rigs: {},
+      paths: {
+        projectConfigPath: '/repo/agentrig.config.json',
+        globalConfigPath: '/home/.agentrig/config.json',
+      },
+    }
+    vi.mocked(loadConfig).mockResolvedValue(cfg)
+    const manifest: Manifest = { schemaVersion: 1, installed: {} }
+    vi.mocked(loadManifest).mockResolvedValue(manifest)
     vi.mocked(installPack).mockResolvedValue({ installed: ['a'], skipped: ['b'], trustTier: undefined })
 
-    await command.run({
+    await run({
       args: {
         spec: 'core',
         cwd: '/repo',
-        registry: undefined,
-        skillsDir: undefined,
         force: false,
         dryRun: true,
         yes: false,

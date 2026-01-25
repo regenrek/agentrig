@@ -6,6 +6,8 @@ import command from '../../src/commands/pack/init'
 import packCommand from '../../src/commands/pack'
 
 describe('command:pack:init', () => {
+  const runInit = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+  const runPack = packCommand.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
   let tempDir = ''
 
   afterEach(async () => {
@@ -33,12 +35,11 @@ describe('command:pack:init', () => {
     )
     await fs.writeFile(path.join(templateDir, '_gitignore'), 'dist\n', 'utf-8')
 
-    await command.run({
+    await runInit({
       args: {
         name: 'test-pack',
         template: `file:${templateRoot}`,
         dir: tempDir,
-        title: undefined,
         description: 'Test pack description',
         author: 'Me',
         force: false,
@@ -61,6 +62,6 @@ describe('command:pack:init', () => {
   })
 
   it('shows usage for pack wrapper', async () => {
-    await packCommand.run({ args: { help: false } })
+    await runPack({ args: { help: false } })
   })
 })

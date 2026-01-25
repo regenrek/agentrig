@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import command from '../../src/commands/pack/create'
 
 describe('command:pack:create', () => {
+  const run = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
   let tempDir = ''
 
   afterEach(async () => {
@@ -24,14 +25,10 @@ describe('command:pack:create', () => {
     await fs.writeFile(path.join(packDir, 'scripts', 'run.sh'), 'echo ok', 'utf-8')
     await fs.writeFile(path.join(packDir, 'README.md'), 'readme', 'utf-8')
 
-    await command.run({
+    await run({
       args: {
         dir: packDir,
-        name: undefined,
-        title: undefined,
-        description: undefined,
         version: '0.1.0',
-        out: undefined,
         force: false,
         help: false,
       },

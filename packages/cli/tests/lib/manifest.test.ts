@@ -43,7 +43,8 @@ describe('manifest', () => {
     const missing = await loadManifest('/repo')
     expect(missing).toEqual({ schemaVersion: 1, installed: {} })
 
-    vi.mocked(readJsonFile).mockResolvedValueOnce({ schemaVersion: 2 } as Manifest)
+    const invalid = { schemaVersion: 2, installed: {} } as unknown as Manifest
+    vi.mocked(readJsonFile).mockResolvedValueOnce(invalid)
     const invalid = await loadManifest('/repo')
     expect(invalid).toEqual({ schemaVersion: 1, installed: {} })
   })
