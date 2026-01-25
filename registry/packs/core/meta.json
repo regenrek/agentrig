@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agentrig.dev/schema/pack.json",
+  "kind": "agentrig:pack",
+  "name": "core-committer",
+  "title": "Committer skill",
+  "description": "Adds a committer skill with a safe commit helper script.",
+  "version": "0.1.0",
+  "author": "agentrig",
+  "tags": [
+    "git",
+    "workflow",
+    "core"
+  ],
+  "files": [
+    {
+      "path": "skills/committer/SKILL.md",
+      "target": "{{skillsDir}}/committer/SKILL.md"
+    },
+    {
+      "path": "skills/committer/commit.sh",
+      "target": "{{skillsDir}}/committer/commit.sh",
+      "mode": "755"
+    }
+  ]
+}

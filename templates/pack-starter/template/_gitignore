@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/settings.json
+
+# OS
+.DS_Store
+
+# agentrig runtime
+.agentrig/

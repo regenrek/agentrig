@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agentrig.ai/schema/pack.json",
+  "kind": "agentrig:pack",
+  "name": "__PACK_NAME__",
+  "title": "__PACK_TITLE__",
+  "description": "__PACK_DESCRIPTION__",
+  "version": "0.1.0",
+  "author": "__PACK_AUTHOR__",
+  "license": "MIT",
+  "tags": [],
+  "rigDependencies": [],
+  "components": {
+    "skills": ["__PACK_NAME__"],
+    "agents": [],
+    "hooks": false,
+    "mcp": false,
+    "lsp": false
+  },
+  "files": [
+    {
+      "path": "skills/__PACK_NAME__/SKILL.md",
+      "target": "{{skillsDir}}/__PACK_NAME__/SKILL.md"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "agentrig-workspace",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "registry:build": "tsx scripts/build-registry.ts",
+    "claude:marketplace:build": "pnpm -C packages/cli dev -- pack claude-marketplace",
+    "dev:cli": "pnpm -C packages/cli dev",
+    "build:cli": "pnpm -C packages/cli build",
+    "dev:web": "pnpm -C apps/web dev",
+    "build:web": "pnpm -C apps/web build",
+    "dev": "pnpm -r dev",
+    "build": "pnpm -r build",
+    "prepare": "lefthook install",
+    "security:check": "./scripts/secleak-check.sh",
+    "security:hooks": "node scripts/hooks/block-forbidden-staged-files.mjs"
+  },
+  "devDependencies": {
+    "lefthook": "^1.10.10",
+    "tsx": "^4.7.0",
+    "typescript": "^5.5.4"
+  }
+}

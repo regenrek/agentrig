@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install
+        run: pnpm install
+
+      - name: Build registry
+        run: pnpm registry:build
+
+      - name: Typecheck CLI
+        run: pnpm -C packages/cli typecheck
+
+      - name: Build CLI
+        run: pnpm -C packages/cli build
+
+      - name: Build web
+        run: pnpm -C apps/web build

@@ -1,0 +1,15 @@
+# Add subagent .md files here
+# Example: my-agent.md
+#
+# ---
+# name: my-agent
+# description: Description of what this agent does
+# tools:
+#   - "Read"
+#   - "Write"
+#   - "Shell"
+# ---
+#
+# # My Agent
+#
+# Instructions for the agent...

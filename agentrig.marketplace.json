@@ -1,0 +1,12 @@
+{
+  "name": "agentrig-community",
+  "owner": {
+    "name": "Agentrig"
+  },
+  "metadata": {
+    "description": "Agentrig packs exported as Claude Code plugins.",
+    "version": "1.0.0",
+    "pluginRoot": "./plugins"
+  },
+  "pluginPrefix": "agentrig-"
+}

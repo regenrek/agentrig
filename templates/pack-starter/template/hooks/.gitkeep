@@ -1,0 +1,15 @@
+# Add hooks.json here for deterministic tool hooks
+# Example hooks.json:
+#
+# [
+#   {
+#     "type": "pre_tool_call",
+#     "matcher": "Shell",
+#     "hooks": [
+#       {
+#         "command": "${CLAUDE_PLUGIN_ROOT}/scripts/validate-shell.sh",
+#         "timeout": 5000
+#       }
+#     ]
+#   }
+# ]

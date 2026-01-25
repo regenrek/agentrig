@@ -1,0 +1,34 @@
+{
+  "name": "agentrig",
+  "version": "0.1.0",
+  "description": "Compose and apply AI agent skills/workflows via packs and registries.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/regenrek/agentrig"
+  },
+  "type": "module",
+  "bin": {
+    "agentrig": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsup src/cli.ts --format esm --dts --sourcemap --clean --out-dir dist --banner:js=\"#!/usr/bin/env node\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "citty": "^0.1.6",
+    "giget": "^1.2.3"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

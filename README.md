@@ -153,6 +153,3 @@ agentrig init --minimal --defaultRig tauri-agentic
 ```
 
 `agentrig` merges `~/.agentrig/config.json` and `./agentrig.config.json` (project overrides global).
-
-# agentrig
-

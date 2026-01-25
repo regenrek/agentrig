@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agentrig.dev/schema/pack.json",
+  "kind": "agentrig:pack",
+  "name": "security-check",
+  "title": "Security check skill",
+  "description": "Adds a security check skill that runs lightweight checks before shipping.",
+  "version": "0.1.0",
+  "author": "agentrig",
+  "tags": [
+    "security",
+    "workflow",
+    "core"
+  ],
+  "files": [
+    {
+      "path": "skills/security-check/SKILL.md",
+      "target": "{{skillsDir}}/security-check/SKILL.md"
+    },
+    {
+      "path": "skills/security-check/security-check.sh",
+      "target": "{{skillsDir}}/security-check/security-check.sh",
+      "mode": "755"
+    }
+  ]
+}
