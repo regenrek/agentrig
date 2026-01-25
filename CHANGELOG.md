@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 ### Changed
-- **web**: Migrated from Solid.js to React and updated project structure.
+- refactor(web): migrate from Solid.js to React and update project structure
   - Removed Solid.js components and replaced with React components.
   - Updated package.json scripts to use Alchemy for development and deployment.
   - Adjusted TypeScript configuration for React compatibility.
