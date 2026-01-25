@@ -43,10 +43,10 @@ describe('manifest', () => {
     const missing = await loadManifest('/repo')
     expect(missing).toEqual({ schemaVersion: 1, installed: {} })
 
-    const invalid = { schemaVersion: 2, installed: {} } as unknown as Manifest
-    vi.mocked(readJsonFile).mockResolvedValueOnce(invalid)
-    const invalid = await loadManifest('/repo')
-    expect(invalid).toEqual({ schemaVersion: 1, installed: {} })
+    const invalidManifest = { schemaVersion: 2, installed: {} } as unknown as Manifest
+    vi.mocked(readJsonFile).mockResolvedValueOnce(invalidManifest)
+    const invalidResult = await loadManifest('/repo')
+    expect(invalidResult).toEqual({ schemaVersion: 1, installed: {} })
   })
 
   it('saves manifest and ensures directory exists', async () => {
