@@ -9,14 +9,14 @@
   },
   "type": "module",
   "bin": {
-    "agentrig": "./dist/cli.mjs"
+    "agentrig": "./dist/cli.js"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
-    "build": "tsup src/cli.ts --format esm --dts --sourcemap --clean --out-dir dist --banner:js=\"#!/usr/bin/env node\"",
+    "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -24,6 +24,7 @@
     "giget": "^1.2.3"
   },
   "devDependencies": {
+    "@types/node": "^25.0.10",
     "tsup": "^8.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.5.4"
