@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agentrig.dev/schema/pack.json",
+  "kind": "agentrig:pack",
+  "name": "solidjs",
+  "title": "SolidJS skill",
+  "description": "SolidJS patterns and guardrails for agentic coding.",
+  "version": "0.1.0",
+  "author": "agentrig",
+  "tags": [
+    "solidjs",
+    "frontend"
+  ],
+  "files": [
+    {
+      "path": "packs/solidjs/skills/solidjs/SKILL.md",
+      "target": "{{skillsDir}}/solidjs/SKILL.md",
+      "sha256": "5c4053bc43bd3098c7558aa9a2b9be48b841441e99d7461c04227dc07d46b3be"
+    }
+  ]
+}

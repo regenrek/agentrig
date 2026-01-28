@@ -74,7 +74,7 @@ async function main() {
   const repoRoot = path.resolve(__dirname, '..')
 
   const packsRoot = path.join(repoRoot, 'registry', 'packs')
-  const webPublicRegistryRoot = path.join(repoRoot, 'apps', 'web', 'public', 'registry')
+  const webPublicRegistryRoot = path.join(repoRoot, 'apps', 'docs', 'public', 'registry')
   const webPublicRegistryPacks = path.join(webPublicRegistryRoot, 'packs')
 
   if (!(await pathExists(packsRoot))) {

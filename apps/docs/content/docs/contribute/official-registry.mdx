@@ -1,0 +1,29 @@
+---
+title: Official registry workflow
+description: Add packs or registry entries to the official registry.
+icon: PackagePlus
+---
+
+# Official registry workflow
+
+Contributions are welcome! You can:
+
+- Add a pack under `registry/packs/<name>`
+- Add a registry to the directory at `apps/docs/public/directory/index.json`
+
+## Add a pack
+
+1. Create the pack folder and add `meta.json`.
+2. Run `pnpm registry:build` to update `apps/docs/public/registry`.
+3. Open a PR.
+
+## Add a registry to the directory
+
+Edit `apps/docs/public/directory/index.json` and add a new entry following the directory schema.
+
+This file is served by the docs app at `/directory/index.json`. Directory updates are Git-based (PR + deploy), not uploads.
+
+## Keep changes safe
+
+- Include hashes in `meta.json` (use `agentrig pack create`).
+- Keep targets inside allowed prefixes.

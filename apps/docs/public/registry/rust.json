@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agentrig.dev/schema/pack.json",
+  "kind": "agentrig:pack",
+  "name": "rust",
+  "title": "Rust skill",
+  "description": "Rust quality checks: fmt, clippy, tests.",
+  "version": "0.1.0",
+  "author": "agentrig",
+  "tags": [
+    "rust"
+  ],
+  "files": [
+    {
+      "path": "packs/rust/skills/rust/SKILL.md",
+      "target": "{{skillsDir}}/rust/SKILL.md",
+      "sha256": "ef38260e2405326f744139b98c83d49ef46532418eb119c8521aeab55f16c69f"
+    },
+    {
+      "path": "packs/rust/skills/rust/rust-check.sh",
+      "target": "{{skillsDir}}/rust/rust-check.sh",
+      "mode": "755",
+      "sha256": "36ce8e6c647490ffe9882f4fb4af72cd19d6149d1639007ddef55af3a4be45f5"
+    }
+  ]
+}

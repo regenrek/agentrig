@@ -1,0 +1,10 @@
+[
+  {
+    "name": "@agentrig",
+    "homepage": "https://agentrig.ai",
+    "url": "https://agentrig.ai/registry/{name}.json",
+    "description": "Official agentrig registry with core packs for AI agent skills and workflows.",
+    "verified": true,
+    "tags": ["official", "skills", "workflows"]
+  }
+]

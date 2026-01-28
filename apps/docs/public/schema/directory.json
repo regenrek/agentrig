@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentrig.ai/schema/directory.json",
+  "title": "agentrig Directory Index",
+  "description": "Schema for the community registry directory index",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["name", "url"],
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Namespace identifier (must start with @)",
+        "pattern": "^@[a-zA-Z0-9][a-zA-Z0-9-_]*$"
+      },
+      "homepage": {
+        "type": "string",
+        "format": "uri",
+        "description": "Homepage URL of the registry publisher"
+      },
+      "url": {
+        "type": "string",
+        "description": "Registry URL template with {name} placeholder",
+        "pattern": ".*\\{name\\}.*"
+      },
+      "description": {
+        "type": "string",
+        "description": "Brief description of the registry"
+      },
+      "logo": {
+        "type": "string",
+        "description": "SVG logo markup (optional)"
+      },
+      "verified": {
+        "type": "boolean",
+        "description": "Whether this registry has been verified",
+        "default": false
+      },
+      "tags": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Tags for categorization"
+      }
+    }
+  }
+}

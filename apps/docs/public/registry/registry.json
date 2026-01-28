@@ -1,0 +1,73 @@
+{
+  "$schema": "https://agentrig.dev/schema/registry.json",
+  "name": "agentrig",
+  "homepage": "https://agentrig.dev",
+  "generatedAt": "2026-01-27T18:38:07.869Z",
+  "items": [
+    {
+      "name": "core-committer",
+      "title": "Committer skill",
+      "description": "Adds a committer skill with a safe commit helper script.",
+      "version": "0.1.0",
+      "tags": [
+        "git",
+        "workflow",
+        "core"
+      ],
+      "meta": "core-committer.json"
+    },
+    {
+      "name": "go",
+      "title": "Go skill",
+      "description": "Go quality checks: fmt, vet, tests.",
+      "version": "0.1.0",
+      "tags": [
+        "go"
+      ],
+      "meta": "go.json"
+    },
+    {
+      "name": "rust",
+      "title": "Rust skill",
+      "description": "Rust quality checks: fmt, clippy, tests.",
+      "version": "0.1.0",
+      "tags": [
+        "rust"
+      ],
+      "meta": "rust.json"
+    },
+    {
+      "name": "security-check",
+      "title": "Security check skill",
+      "description": "Adds a security check skill that runs lightweight checks before shipping.",
+      "version": "0.1.0",
+      "tags": [
+        "security",
+        "workflow",
+        "core"
+      ],
+      "meta": "security-check.json"
+    },
+    {
+      "name": "solidjs",
+      "title": "SolidJS skill",
+      "description": "SolidJS patterns and guardrails for agentic coding.",
+      "version": "0.1.0",
+      "tags": [
+        "solidjs",
+        "frontend"
+      ],
+      "meta": "solidjs.json"
+    },
+    {
+      "name": "typescript",
+      "title": "TypeScript skill",
+      "description": "TypeScript patterns and guardrails for agentic coding.",
+      "version": "0.1.0",
+      "tags": [
+        "typescript"
+      ],
+      "meta": "typescript.json"
+    }
+  ]
+}

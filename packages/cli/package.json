@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/regenrek/agentrig"
+    "url": "https://github.com/agentrig/agentrig"
   },
   "type": "module",
   "bin": {

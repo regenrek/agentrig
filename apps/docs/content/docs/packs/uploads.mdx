@@ -1,0 +1,64 @@
+---
+title: Hosted uploads
+description: Upload packs to AgentRig and publish them to the hosted community registry.
+icon: Upload
+---
+
+# Hosted uploads
+
+AgentRig supports hosted pack uploads via the web UI at `/submit`.
+Approved uploads are published to the hosted community registry at `https://agentrig.ai/api/community`.
+
+## What gets published
+
+After approval:
+
+- The registry index includes your pack: `https://agentrig.ai/api/community/registry.json`
+- Your pack metadata is served at: `https://agentrig.ai/api/community/<pack>.json`
+- Pack files are downloadable via: `https://agentrig.ai/api/community/files?pack=...&version=...&path=...`
+
+## Upload requirements
+
+- Upload a ZIP archive.
+- `meta.json` is required at the archive root.
+- `README.md` is recommended (missing README produces a warning).
+
+## Limits (current policy)
+
+- ZIP size: up to 25 MiB.
+- Max files: 500.
+- Max per-file size (uncompressed): 5 MiB.
+- Max total unpacked size: 50 MiB.
+- Blocked extensions include common binary/executable formats (e.g. `.exe`, `.dylib`, `.so`, `.dmg`, `.pkg`, `.jar`).
+
+Targets in `meta.json` must stay within allowed prefixes:
+
+- `.codex/`
+- `.claude/`
+- `.cursor/`
+- `.agentrig/`
+- `scripts/`
+- `tools/`
+
+Only the most recent published version of a pack is retained.
+
+## Submission statuses
+
+The upload pipeline uses these statuses:
+
+- `pending_scan` → `scanning` → `pending_review` → `publishing` → `approved`
+- Terminal outcomes: `rejected`, `blocked`
+
+Scan status is tracked separately as `pass`, `warn`, or `fail`.
+
+## Security notes
+
+- Never upload secrets. Approved uploads are redistributed.
+- Scanning/review reduce risk, but do not guarantee safety. Review packs before installing.
+
+## Install from the hosted community registry
+
+```bash
+agentrig registry add community https://agentrig.ai/api/community
+agentrig add <pack-name> --registry community --yes
+```

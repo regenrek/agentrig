@@ -1,0 +1,46 @@
+---
+title: Repo setup
+description: Clone the monorepo and run the docs app + CLI.
+icon: Wrench
+---
+
+# Repo setup
+
+Use this guide if you want to contribute to the repo or run the official registry locally.
+
+## Requirements
+
+- Node.js 18+ (recommended: latest LTS)
+- pnpm 9+
+
+## Install dependencies
+
+```bash
+pnpm install
+```
+
+## Build the registry
+
+```bash
+pnpm registry:build
+```
+
+## Run the docs app
+
+```bash
+pnpm docs:dev
+```
+
+The docs app serves a local registry at `http://localhost:5173/registry`.
+
+## Run the CLI in dev mode
+
+```bash
+pnpm dev:cli -- init
+pnpm dev:cli -- list --available --registry http://localhost:5173/registry
+pnpm dev:cli -- add core-committer --registry http://localhost:5173/registry
+```
+
+<Callout title="Tip">
+For end-user installs, use the global CLI workflow in [Getting Started](/docs/getting-started) instead.
+</Callout>

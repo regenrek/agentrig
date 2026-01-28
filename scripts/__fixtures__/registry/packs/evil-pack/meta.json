@@ -1,0 +1,12 @@
+{
+  "name": "evil-pack",
+  "title": "Evil Pack",
+  "description": "Fixture pack for traversal tests",
+  "version": "1.0.0",
+  "files": [
+    {
+      "path": "../secret.txt",
+      "target": ".codex/skills/secret.txt"
+    }
+  ]
+}

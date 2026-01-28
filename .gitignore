@@ -1,0 +1,54 @@
+node_modules
+dist
+.DS_Store
+*.log
+coverage/
+
+# Environment files
+.env
+.env.*
+.envrc
+
+# agentrig runtime
+.agentrig/
+.codex/
+.claude/
+
+# Credentials (never commit)
+.aws/credentials
+.npmrc
+.netrc
+.git-credentials
+.docker/config.json
+
+# Private keys
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+id_rsa
+id_ed25519
+id_ecdsa
+id_dsa
+*.agekey
+
+# Infrastructure state
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+
+# Secrets files
+secrets.json
+tokens.json
+credentials.json
+service-account*.json
+
+# IDE/Editor local config
+.idea/
+.vscode/settings.json
+.vscode/launch.json
+
+# Local plans
+.plans/

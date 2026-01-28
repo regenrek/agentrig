@@ -3,7 +3,7 @@
 A monorepo that contains:
 
 - `agentrig` CLI (TypeScript, built with `citty`)
-- A simple web registry UI (Vite + Solid)
+- A docs site + registry browser (TanStack Start + Fumadocs)
 - A local registry data folder you can publish (pack `meta.json` + files)
 
 The goal is to make it easy to compose "skills" and "workflows" as packs, then apply them per-project without having to redeclare the same lists everywhere.
@@ -29,16 +29,16 @@ The CLI can install a pack from:
 pnpm install
 ```
 
-2) Build the local registry into the web app's `public/registry` directory:
+2) Build the local registry into the docs app's `public/registry` directory:
 
 ```bash
 pnpm registry:build
 ```
 
-3) Run the web UI (also serves the registry JSON and pack files):
+3) Run the docs site (also serves the registry JSON and pack files):
 
 ```bash
-pnpm dev:web
+pnpm docs:dev
 ```
 
 4) In another terminal, run the CLI:
@@ -55,11 +55,11 @@ The default install target directory is `.codex/skills` (configurable).
 
 The built registry output is:
 
-- `apps/web/public/registry/registry.json`
-- `apps/web/public/registry/<pack>.json`
-- `apps/web/public/registry/packs/<pack>/**` (the actual files)
+- `apps/docs/public/registry/registry.json`
+- `apps/docs/public/registry/<pack>.json`
+- `apps/docs/public/registry/packs/<pack>/**` (the actual files)
 
-You can deploy the web app anywhere that serves static files. The CLI only needs a base URL that contains `/registry.json`.
+You can deploy the docs site anywhere that serves static files. The CLI only needs a base URL that contains `/registry.json`.
 
 ## Export packs as a Claude Code plugin marketplace (Option A)
 
