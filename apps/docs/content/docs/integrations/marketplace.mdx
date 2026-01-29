@@ -1,0 +1,32 @@
+---
+title: Marketplace exports
+description: Configure and export plugin marketplaces.
+icon: Store
+---
+
+# Marketplace exports
+
+Use `agentrig pack claude-marketplace` to export packs as individual plugins.
+
+```bash
+agentrig pack claude-marketplace --packsDir registry/packs --out dist/claude-marketplace
+```
+
+## Optional config file
+
+Create `agentrig.marketplace.json` to customize output:
+
+```json
+{
+  "name": "agentrig-community",
+  "owner": { "name": "Agentrig", "email": "team@agentrig.ai" },
+  "metadata": {
+    "description": "Agentrig packs exported as Claude Code plugins.",
+    "version": "1.0.0",
+    "pluginRoot": "./plugins"
+  },
+  "pluginPrefix": "agentrig-"
+}
+```
+
+The exporter reads this file automatically when present.

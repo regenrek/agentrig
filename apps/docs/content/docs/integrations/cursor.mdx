@@ -1,0 +1,24 @@
+---
+title: Cursor integration
+description: Manage Cursor rules and helpers via packs.
+icon: Monitor
+---
+
+# Cursor integration
+
+Agentrig allows pack files to target `.cursor/` directories by default.
+This makes it easy to distribute Cursor rules, prompts, and tooling across projects.
+
+## Example
+
+```json
+{
+  "path": "cursor/rules.json",
+  "target": ".cursor/rules.json"
+}
+```
+
+## Best practices
+
+- Keep Cursor-specific files isolated in a pack.
+- Combine with rigs to apply the same Cursor setup across multiple repos.

@@ -1,0 +1,41 @@
+---
+title: registry
+description: Add or list registries in config.
+icon: Database
+---
+
+# `agentrig registry`
+
+Manage registries in your config file.
+
+## List registries
+
+```bash
+agentrig registry list
+```
+
+## Add or update a registry
+
+```bash
+agentrig registry add acme https://example.com/registry
+```
+
+Examples:
+
+```bash
+# Official
+agentrig registry add official https://agentrig.ai/registry
+
+# Community Packs (hosted)
+agentrig registry add community https://agentrig.ai/api/community
+
+# Self-hosted registry
+agentrig registry add acme https://example.com/registry
+```
+
+Options:
+
+- `--cwd <path>` - working directory.
+- `--global` - write to global config.
+
+The CLI updates `agentrig.config.json` or `~/.agentrig/config.json`.

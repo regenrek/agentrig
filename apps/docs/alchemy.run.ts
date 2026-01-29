@@ -21,7 +21,7 @@ export const website = await TanStackStart("website", {
   routes: app.stage === "prod" ? prodRoutes : undefined,
   adopt: true,
   dev: {
-    command: "vite dev --port 5173",
+    command: "vite dev --port 5174",
   },
 });
 

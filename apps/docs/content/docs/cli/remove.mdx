@@ -1,0 +1,22 @@
+---
+title: remove
+description: Remove an installed pack safely.
+icon: Trash2
+---
+
+# `agentrig remove`
+
+Remove a pack installed in `.agentrig/manifest.json`.
+
+```bash
+agentrig remove core-committer
+```
+
+## Options
+
+- `--cwd <path>` - working directory.
+
+## Safety
+
+Files are only deleted if their current hash matches the manifest.
+Changed files are kept and reported.

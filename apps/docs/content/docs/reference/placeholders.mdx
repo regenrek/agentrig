@@ -1,0 +1,15 @@
+---
+title: Placeholder reference
+description: Template variables supported by the installer.
+icon: Brackets
+---
+
+# Placeholder reference
+
+Placeholders are resolved in `files[].target` during install.
+
+| Placeholder | Description |
+| --- | --- |
+| `{{skillsDir}}` | Path to the skills directory (default `.codex/skills`). |
+
+Unrecognized placeholders are left in place to avoid accidental path rewrites.

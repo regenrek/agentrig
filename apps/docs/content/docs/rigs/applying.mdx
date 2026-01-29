@@ -1,0 +1,22 @@
+---
+title: Applying rigs
+description: Install a rig across a project.
+icon: Play
+---
+
+# Applying rigs
+
+Use `agentrig rig apply` to install all packs for a rig.
+
+```bash
+agentrig rig apply core
+```
+
+## Flags
+
+- `--registry <name|url>` - override registry for this apply.
+- `--skillsDir <path>` - override install directory.
+- `--force` - overwrite existing files.
+- `--prune` - remove packs not in the rig (default: true).
+
+The CLI prints a summary and updates `.agentrig/manifest.json`.

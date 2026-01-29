@@ -1,0 +1,15 @@
+---
+title: Configuration overview
+description: How agentrig config files work.
+icon: Settings
+---
+
+# Configuration overview
+
+Agentrig reads configuration from two locations:
+
+- **Global**: `~/.agentrig/config.json`
+- **Project**: `<repo>/agentrig.config.json`
+
+The CLI merges them with project settings taking precedence.
+Use `agentrig init` or edit the files directly.

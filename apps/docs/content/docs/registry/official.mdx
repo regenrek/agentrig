@@ -1,0 +1,27 @@
+---
+title: Official registry
+description: The default registry used by agentrig.
+icon: BadgeCheck
+---
+
+# Official registry
+
+The official registry is served from:
+
+```
+https://agentrig.ai/registry
+```
+
+It is treated as **trust tier: official** in the CLI.
+
+## What it contains
+
+- `registry.json` - the pack index
+- `<pack>.json` - individual pack metadata
+- `packs/<pack>/**` - the file contents referenced in each pack
+
+When running locally in this repo, the registry is served from `apps/docs/public/registry`.
+
+## CLI behavior
+
+The CLI automatically trusts the official registry and does not require confirmation prompts.

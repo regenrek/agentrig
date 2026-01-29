@@ -1,0 +1,33 @@
+---
+title: Config schema
+description: Fields for agentrig.config.json.
+icon: FileBraces
+---
+
+# Config schema
+
+```json
+{
+  "$schema": "https://agentrig.dev/schema/config.json",
+  "skillsDir": ".codex/skills",
+  "registries": [{ "name": "default", "url": "https://agentrig.ai/registry" }],
+  "namespacedRegistries": {
+    "@acme": "https://example.com/registry/{name}.json"
+  },
+  "rigs": {
+    "core": { "packs": ["core-committer"] }
+  },
+  "defaultRig": "core"
+}
+```
+
+## Fields
+
+| Field | Description |
+| --- | --- |
+| `skillsDir` | Install location for skills (default `.codex/skills`). |
+| `registries` | Legacy registry list (name + base URL). |
+| `namespacedRegistries` | Map of `@namespace` to URL templates or objects with `url`, `headers`, and `params`. |
+| `rigs` | Rig definitions (packs + extends). |
+| `defaultRig` | Default rig name. |
+| `$schema` | Optional JSON schema hint. |

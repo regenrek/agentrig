@@ -1,0 +1,52 @@
+---
+title: meta.json
+description: Pack metadata and install plan.
+icon: FileBraces
+---
+
+# meta.json
+
+`meta.json` defines a pack's identity and the files it installs.
+It also powers registry indexing and trust validation.
+
+```json
+{
+  "$schema": "https://agentrig.dev/schema/pack.json",
+  "kind": "agentrig:pack",
+  "name": "core-committer",
+  "title": "Committer skill",
+  "description": "Adds a committer skill with a safe commit helper script.",
+  "version": "0.1.0",
+  "author": "agentrig",
+  "tags": ["git", "workflow"],
+  "rigDependencies": ["security-check"],
+  "files": [
+    {
+      "path": "skills/committer/SKILL.md",
+      "target": "{{skillsDir}}/committer/SKILL.md"
+    }
+  ]
+}
+```
+
+## Field reference
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `name` | Yes | Pack identifier (`kebab-case`). |
+| `title` | Yes | Human-readable name. |
+| `description` | Yes | Short summary for registry listings. |
+| `version` | Yes | Semver version (`1.2.3`). |
+| `files` | Yes | Install plan (`path` + `target`). |
+| `$schema` | No | JSON schema URL for editor hints. |
+| `kind` | No | Defaults to `agentrig:pack`. |
+| `author` | No | Author or organization. |
+| `license` | No | SPDX identifier. |
+| `tags` | No | Keywords for filtering. |
+| `rigDependencies` | No | Packs installed before this one. |
+| `components` | No | Claude plugin metadata. |
+
+<Callout title="Schemas">
+The CLI currently generates `$schema` using `https://agentrig.dev/schema/pack.json`.
+Hosted schemas are also served from `/schema/pack.json` on the web app.
+</Callout>

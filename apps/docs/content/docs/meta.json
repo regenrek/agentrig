@@ -1,0 +1,22 @@
+{
+  "pages": [
+    "index",
+    "---Core---",
+    "getting-started",
+    "packs",
+    "registry",
+    "rigs",
+    "---CLI---",
+    "cli",
+    "---Configuration---",
+    "configuration",
+    "---Integrations---",
+    "integrations",
+    "---Guides---",
+    "guides",
+    "---Contribute---",
+    "contribute",
+    "---Reference---",
+    "reference"
+  ]
+}
