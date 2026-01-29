@@ -12,7 +12,7 @@ on:
 
 jobs:
   update-tap:
-    if: ${{ secrets.HOMEBREW_TAP_APP_ID != '' && secrets.HOMEBREW_TAP_APP_PRIVATE_KEY != '' }}
+    if: ${{ vars.HOMEBREW_TAP_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     concurrency:
       group: homebrew-tap-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
