@@ -4,7 +4,7 @@
 
 ## [0.1.1] - 2026-01-29
 ### Added
-- Release automation (npm Trusted Publishing via OIDC; optional Homebrew tap updates).
+- Release automation (npm Trusted Publishing via OIDC).
 - Security workflows (secret scanning) and Dependabot updates.
 
 ### Fixed
