@@ -1,18 +1,59 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.output/
+.tanstack/
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Logs
 *.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
 coverage/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Vitest cache
+.vitest/
 
 # Environment files
 .env
 .env.*
 .envrc
 
+# Generated fumadocs files
+.source/
+
+# Generated TanStack Router
+src/routeTree.gen.ts
+apps/docs/src/routeTree.gen.ts
+
+# Alchemy runtime/state
+.alchemy/
+
+# Cloudflare Wrangler cache
+.wrangler/
+
 # agentrig runtime
 .agentrig/
 .codex/
 .claude/
+
+# Local plans
+.plans/
+
+# IDE/Editor local config
+.idea/
+.vscode/settings.json
+.vscode/launch.json
 
 # Credentials (never commit)
 .aws/credentials
@@ -44,11 +85,3 @@ secrets.json
 tokens.json
 credentials.json
 service-account*.json
-
-# IDE/Editor local config
-.idea/
-.vscode/settings.json
-.vscode/launch.json
-
-# Local plans
-.plans/

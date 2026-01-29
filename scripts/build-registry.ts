@@ -1,6 +1,6 @@
-\
 import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -22,6 +22,7 @@ type PackMeta = {
   author?: string
   license?: string
   tags?: string[]
+  topics?: Record<string, string[]>
   rigDependencies?: string[]
   files: PackFile[]
 }
@@ -29,6 +30,8 @@ type PackMeta = {
 function sha256(buf: Buffer) {
   return createHash('sha256').update(buf).digest('hex')
 }
+
+const PACK_NAME_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/
 
 async function pathExists(p: string) {
   try {
@@ -39,19 +42,40 @@ async function pathExists(p: string) {
   }
 }
 
-async function copyDir(src: string, dest: string) {
-  await fs.mkdir(dest, { recursive: true })
-  const entries = await fs.readdir(src, { withFileTypes: true })
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name)
-    const destPath = path.join(dest, entry.name)
-    if (entry.isDirectory()) {
-      await copyDir(srcPath, destPath)
-    } else if (entry.isFile()) {
-      await fs.mkdir(path.dirname(destPath), { recursive: true })
-      await fs.copyFile(srcPath, destPath)
-    }
+function isSafeRelativePath(value: string) {
+  if (!value) return false
+  if (value.startsWith('/') || value.startsWith('\\\\')) return false
+  if (/^[a-zA-Z]:[\\/]/.test(value)) return false
+  const normalized = value.replace(/\\/g, '/')
+  if (
+    normalized === '..' ||
+    normalized === '.' ||
+    normalized.startsWith('../') ||
+    normalized.startsWith('./') ||
+    normalized.endsWith('/..') ||
+    normalized.includes('/../')
+  ) {
+    return false
   }
+  return true
+}
+
+function assertPackName(name: string, packDir: string) {
+  if (!PACK_NAME_REGEX.test(name)) {
+    throw new Error(`Invalid pack name in ${packDir}: ${name}`)
+  }
+}
+
+function resolveSafePath(root: string, relativePath: string, label: string) {
+  if (!isSafeRelativePath(relativePath)) {
+    throw new Error(`Invalid ${label}: ${relativePath}`)
+  }
+  const resolvedRoot = path.resolve(root)
+  const resolvedPath = path.resolve(resolvedRoot, relativePath)
+  if (!resolvedPath.startsWith(resolvedRoot + path.sep)) {
+    throw new Error(`Path traversal blocked for ${label}: ${relativePath}`)
+  }
+  return resolvedPath
 }
 
 function assertPackMeta(meta: any, packDir: string): asserts meta is PackMeta {
@@ -68,26 +92,82 @@ function assertPackMeta(meta: any, packDir: string): asserts meta is PackMeta {
   }
 }
 
-async function main() {
-  const __filename = fileURLToPath(import.meta.url)
-  const __dirname = path.dirname(__filename)
-  const repoRoot = path.resolve(__dirname, '..')
+type BuildRegistryOptions = {
+  repoRoot: string
+  packsRoot?: string
+  outputRoot?: string
+}
 
-  const packsRoot = path.join(repoRoot, 'registry', 'packs')
-  const webPublicRegistryRoot = path.join(repoRoot, 'apps', 'docs', 'public', 'registry')
+function isSubpath(root: string, candidate: string) {
+  const relative = path.relative(root, candidate)
+  if (!relative) return false
+  return !relative.startsWith('..') && !path.isAbsolute(relative)
+}
+
+function assertSafeOutputRoot(repoRoot: string, outputRoot: string) {
+  const resolvedRepoRoot = path.resolve(repoRoot)
+  const resolvedOutputRoot = path.resolve(outputRoot)
+  const filesystemRoot = path.parse(resolvedOutputRoot).root
+  if (resolvedOutputRoot === filesystemRoot) {
+    throw new Error(`Refusing to delete filesystem root: ${resolvedOutputRoot}`)
+  }
+
+  const defaultOutputRoot = path.join(
+    resolvedRepoRoot,
+    'apps',
+    'docs',
+    'public',
+    'registry',
+  )
+  if (resolvedOutputRoot === defaultOutputRoot) return
+
+  const tmpRoot = path.resolve(os.tmpdir())
+  if (isSubpath(tmpRoot, resolvedOutputRoot)) return
+
+  throw new Error(
+    `Unsafe outputRoot: ${resolvedOutputRoot}. Must be ${defaultOutputRoot} or within ${tmpRoot}`,
+  )
+}
+
+async function assertNoSymlinkInRelativePath(
+  root: string,
+  relativePath: string,
+  label: string,
+) {
+  const normalized = relativePath.replace(/\\/g, '/')
+  const segments = normalized.split('/').filter(Boolean)
+  let current = root
+  for (const segment of segments) {
+    current = path.join(current, segment)
+    const stat = await fs.lstat(current)
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Symlink blocked for ${label}: ${relativePath}`)
+    }
+  }
+}
+
+export async function buildRegistry({ repoRoot, packsRoot, outputRoot }: BuildRegistryOptions) {
+  const resolvedRepoRoot = path.resolve(repoRoot)
+  const resolvedPacksRoot = packsRoot
+    ? path.resolve(packsRoot)
+    : path.join(resolvedRepoRoot, 'registry', 'packs')
+  const webPublicRegistryRoot = outputRoot
+    ? path.resolve(outputRoot)
+    : path.join(resolvedRepoRoot, 'apps', 'docs', 'public', 'registry')
+  assertSafeOutputRoot(resolvedRepoRoot, webPublicRegistryRoot)
   const webPublicRegistryPacks = path.join(webPublicRegistryRoot, 'packs')
 
-  if (!(await pathExists(packsRoot))) {
-    throw new Error(`Missing packs directory: ${packsRoot}`)
+  if (!(await pathExists(resolvedPacksRoot))) {
+    throw new Error(`Missing packs directory: ${resolvedPacksRoot}`)
   }
 
   // clean output
   await fs.rm(webPublicRegistryRoot, { recursive: true, force: true })
   await fs.mkdir(webPublicRegistryPacks, { recursive: true })
 
-  const packDirs = (await fs.readdir(packsRoot, { withFileTypes: true }))
+  const packDirs = (await fs.readdir(resolvedPacksRoot, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
-    .map((e) => path.join(packsRoot, e.name))
+    .map((e) => path.join(resolvedPacksRoot, e.name))
 
   const items: Array<{
     name: string
@@ -95,6 +175,7 @@ async function main() {
     description: string
     version: string
     tags?: string[]
+    topics?: Record<string, string[]>
     meta: string
   }> = []
 
@@ -107,21 +188,16 @@ async function main() {
     assertPackMeta(meta, packDir)
 
     const packName = meta.name
+    assertPackName(packName, packDir)
     const outPackDir = path.join(webPublicRegistryPacks, packName)
+    const readmePath = path.join(packDir, 'README.md')
 
-    // Copy pack files (excluding meta.json) into web public
-    await fs.mkdir(outPackDir, { recursive: true })
-    const entries = await fs.readdir(packDir, { withFileTypes: true })
-    for (const entry of entries) {
-      if (entry.name === 'meta.json') continue
-      const src = path.join(packDir, entry.name)
-      const dest = path.join(outPackDir, entry.name)
-      if (entry.isDirectory()) {
-        await copyDir(src, dest)
-      } else if (entry.isFile()) {
-        await fs.copyFile(src, dest)
-      }
+    if (!(await pathExists(readmePath))) {
+      throw new Error(`Missing README.md for pack "${packName}": ${readmePath}`)
     }
+
+    await fs.mkdir(outPackDir, { recursive: true })
+    await fs.copyFile(readmePath, path.join(outPackDir, 'README.md'))
 
     // Build compiled registry item json
     const compiled: PackMeta = {
@@ -131,11 +207,16 @@ async function main() {
     }
 
     for (const f of meta.files) {
-      const srcFileOnDisk = path.join(packDir, f.path)
-      if (!(await pathExists(srcFileOnDisk))) {
+      const srcFileOnDisk = resolveSafePath(packDir, f.path, `pack file path for ${packName}`)
+      await assertNoSymlinkInRelativePath(packDir, f.path, `pack file path for ${packName}`)
+      const srcStat = await fs.lstat(srcFileOnDisk).catch(() => null)
+      if (!srcStat || !srcStat.isFile()) {
         throw new Error(`Pack "${packName}" references missing file: ${srcFileOnDisk}`)
       }
       const buf = await fs.readFile(srcFileOnDisk)
+      const destFile = resolveSafePath(outPackDir, f.path, `output path for ${packName}`)
+      await fs.mkdir(path.dirname(destFile), { recursive: true })
+      await fs.copyFile(srcFileOnDisk, destFile)
 
       compiled.files.push({
         ...f,
@@ -154,6 +235,7 @@ async function main() {
       description: meta.description,
       version: meta.version,
       tags: meta.tags,
+      topics: meta.topics,
       meta: `${packName}.json`,
     })
   }
@@ -174,6 +256,13 @@ async function main() {
 
   console.log(`Built registry with ${items.length} pack(s)`)
   console.log(`Output: ${webPublicRegistryRoot}`)
+}
+
+async function main() {
+  const __filename = fileURLToPath(import.meta.url)
+  const __dirname = path.dirname(__filename)
+  const repoRoot = path.resolve(__dirname, '..')
+  await buildRegistry({ repoRoot })
 }
 
 main().catch((err) => {

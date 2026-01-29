@@ -13,12 +13,12 @@
   ],
   "files": [
     {
-      "path": "skills/committer/SKILL.md",
-      "target": "{{skillsDir}}/committer/SKILL.md"
+      "path": "skills/pr-commiter/SKILL.md",
+      "target": "{{skillsDir}}/pr-commiter/SKILL.md"
     },
     {
-      "path": "skills/committer/commit.sh",
-      "target": "{{skillsDir}}/committer/commit.sh",
+      "path": "skills/pr-commiter/scripts/pr-commiter.sh",
+      "target": "{{skillsDir}}/pr-commiter/scripts/pr-commiter.sh",
       "mode": "755"
     }
   ]
