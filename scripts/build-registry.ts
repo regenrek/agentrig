@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { pathToFileURL } from 'node:url'
 
 type PackFile = {
   path: string
@@ -265,7 +266,19 @@ async function main() {
   await buildRegistry({ repoRoot })
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+function isDirectRun(): boolean {
+  const argv1 = process.argv[1]
+  if (!argv1) return false
+  try {
+    return import.meta.url === pathToFileURL(argv1).href
+  } catch {
+    return false
+  }
+}
+
+if (isDirectRun()) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}
