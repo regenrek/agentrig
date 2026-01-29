@@ -1,0 +1,51 @@
+# Forbidden file patterns for agentrig
+# Each line is a regex pattern. Files matching any pattern are blocked from commits.
+# Lines starting with # are comments.
+
+# Local runtime directories
+(^|/)\.agentrig/
+(^|/)\.codex/
+(^|/)\.claude/
+
+# Environment files
+(^|/)\.env$
+(^|/)\.env\.
+(^|/)\.envrc$
+
+# Credential files
+(^|/)\.aws/credentials$
+(^|/)\.npmrc$
+(^|/)\.netrc$
+(^|/)\.git-credentials$
+(^|/)\.docker/config\.json$
+
+# Private keys
+\.pem$
+\.key$
+\.p12$
+\.jks$
+\.keystore$
+(^|/)id_rsa$
+(^|/)id_ed25519$
+(^|/)id_ecdsa$
+(^|/)id_dsa$
+\.agekey$
+
+# Infrastructure state
+\.tfstate($|\.|/)
+\.tfplan$
+\.tfvars$
+
+# Secrets and tokens
+(^|/)secrets\.json$
+(^|/)tokens\.json$
+(^|/)credentials\.json$
+(^|/)service-account.*\.json$
+
+# macOS metadata
+\.DS_Store$
+
+# Editor/IDE local files
+(^|/)\.idea/
+(^|/)\.vscode/settings\.json$
+(^|/)\.vscode/launch\.json$
