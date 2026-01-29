@@ -1,0 +1,60 @@
+---
+title: add
+description: Install a pack into the current project.
+icon: CloudDownload
+---
+
+# `agentrig add`
+
+Install a pack by name, namespace, URL, or file path.
+
+```bash
+agentrig add core-committer
+agentrig add @acme/tauri-rust
+agentrig add ./path/to/meta.json
+```
+
+## Examples
+
+Install from Community Packs (hosted):
+
+```bash
+agentrig registry add community https://agentrig.ai/api/community
+agentrig add <pack-name> --registry community --yes
+```
+
+Install from a self-hosted registry:
+
+```bash
+agentrig registry add acme https://example.com/registry
+agentrig add <pack-name> --registry acme --yes
+```
+
+Install from a namespaced registry (requires config):
+
+```json
+{
+  "namespacedRegistries": {
+    "@acme": "https://example.com/registry/{name}.json"
+  }
+}
+```
+
+```bash
+agentrig add @acme/tauri-rust
+```
+
+## Options
+
+- `--cwd <path>` - working directory.
+- `--registry <name|url>` - registry override.
+- `--skillsDir <path>` - install target.
+- `--force` - overwrite existing files.
+- `--dryRun` - print the plan only.
+- `--yes` - skip confirmation for unlisted sources.
+
+## Behavior
+
+- Validates target paths and file hashes.
+- Installs `rigDependencies` before the pack itself.
+- Records installs in `.agentrig/manifest.json`.

@@ -1,0 +1,33 @@
+---
+title: pack
+description: Pack utilities for scaffolding and exports.
+icon: PackagePlus
+---
+
+# `agentrig pack`
+
+Pack utilities help you scaffold and export packs.
+
+## init
+
+```bash
+agentrig pack init my-pack
+```
+
+Options: `--template`, `--dir`, `--title`, `--description`, `--author`, `--force`.
+
+## create
+
+```bash
+agentrig pack create . --out meta.json
+```
+
+Scans a directory, hashes files, and writes `meta.json`.
+
+## claude-marketplace
+
+```bash
+agentrig pack claude-marketplace --packsDir registry/packs --out dist/claude-marketplace
+```
+
+Exports each pack as a Claude Code plugin and generates `.claude-plugin/marketplace.json`.

@@ -1,0 +1,24 @@
+---
+title: Registry overview
+description: How registries and the directory work.
+icon: Globe
+---
+
+# Registry overview
+
+Agentrig uses a shadcn-style registry format: a root `registry.json` index plus per-pack JSON files.
+
+## Three related pieces
+
+- **Official registry** - hosted at `https://agentrig.ai/registry`.
+- **Community Packs (hosted)** - packs uploaded via `/submit`, published at `https://agentrig.ai/api/community`.
+- **Directory** - a curated list of registries (namespaces) at `https://agentrig.ai/directory/index.json`.
+
+The CLI can install packs from:
+
+- The official registry
+- The hosted community registry (`https://agentrig.ai/api/community`)
+- Namespaced registries you configure (`@namespace/pack`)
+- Direct URLs or local file paths
+
+Use the pages in this section to set up your own registry and get listed.

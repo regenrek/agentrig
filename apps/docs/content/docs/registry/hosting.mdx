@@ -1,0 +1,40 @@
+---
+title: Hosting a registry
+description: Serve registry.json and pack files from any static host.
+icon: Server
+---
+
+# Hosting a registry
+
+A registry is a static folder that contains:
+
+```
+registry.json
+<pack>.json
+packs/<pack>/**
+```
+
+## Minimum requirements
+
+- `registry.json` at the registry root.
+- One JSON file per pack (`<pack>.json`).
+- All files referenced by `meta.json` at the paths specified by each `files[].path` entry.
+
+## Example
+
+```
+https://example.com/registry/
+  registry.json
+  core-committer.json
+  packs/
+    core-committer/
+      skills/committer/SKILL.md
+```
+
+## Test locally
+
+Start any static server at the registry root and install from it:
+
+```bash
+agentrig add core-committer --registry https://example.com/registry
+```

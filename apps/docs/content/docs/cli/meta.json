@@ -1,0 +1,6 @@
+{
+  "title": "CLI Reference",
+  "description": "Commands and flags",
+  "icon": "Terminal",
+  "pages": ["index", "init", "add", "remove", "list", "view", "rig", "registry", "pack"]
+}

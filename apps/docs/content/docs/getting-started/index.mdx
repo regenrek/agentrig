@@ -1,0 +1,77 @@
+---
+title: Getting started
+description: Install the CLI and run your first pack.
+icon: Rocket
+---
+
+# Getting started
+
+This guide walks you through installing agentrig, initializing config, and installing your first pack.
+
+<Steps>
+  <Step>
+    <h3>Install the CLI</h3>
+    <p>Install agentrig globally so it is available in any repo.</p>
+
+    ```bash
+    npm install -g agentrig
+    # or
+    pnpm add -g agentrig
+    ```
+  </Step>
+  <Step>
+    <h3>Initialize config</h3>
+    <p>Create the default config files in your project (and optionally global config).</p>
+
+    ```bash
+    agentrig init --registry https://agentrig.ai/registry
+    # or
+    agentrig init --global --registry https://agentrig.ai/registry
+    ```
+  </Step>
+  <Step>
+    <h3>Add a pack</h3>
+    <p>Install a pack from the official registry.</p>
+
+    ```bash
+    agentrig add core-committer
+    ```
+  </Step>
+  <Step>
+    <h3>Apply it (optional)</h3>
+    <p>Apply the rig to write files into your repo.</p>
+
+    ```bash
+    agentrig rig apply
+    ```
+  </Step>
+</Steps>
+
+## Notes
+
+- The official registry lives at `https://agentrig.ai/registry`.
+- `agentrig init` defaults to a local dev registry URL in this monorepo. Use `--registry https://agentrig.ai/registry` unless you are developing AgentRig itself.
+- To use a different registry, pass `--registry <name|url>` to `agentrig add`.
+- Packs install under `.codex/skills` by default.
+
+## Other first-class install paths
+
+### Community Packs (hosted)
+
+Install from the hosted community registry (packs uploaded via `/submit`):
+
+```bash
+agentrig registry add community https://agentrig.ai/api/community
+agentrig add <pack-name> --registry community --yes
+```
+
+### Self-hosted registry
+
+Install from a registry you host (static hosting works):
+
+```bash
+agentrig registry add acme https://example.com/registry
+agentrig add <pack-name> --registry acme --yes
+```
+
+Next, learn how to install the CLI in more environments or set it up for development. For repo contributors, see [Contribute](/docs/contribute).

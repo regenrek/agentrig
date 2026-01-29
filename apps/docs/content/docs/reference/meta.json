@@ -1,0 +1,6 @@
+{
+  "title": "Reference",
+  "description": "Schemas and specification details",
+  "icon": "BookOpen",
+  "pages": ["index", "meta-json-schema", "registry-json-schema", "manifest-schema", "placeholders"]
+}

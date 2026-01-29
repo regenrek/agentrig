@@ -1,0 +1,25 @@
+---
+title: Project config
+description: Repo-specific overrides and defaults.
+icon: Folder
+---
+
+# Project config
+
+Project config lives at:
+
+```
+<repo>/agentrig.config.json
+```
+
+Use it for repo-specific registries, rigs, or overrides.
+
+```json
+{
+  "skillsDir": ".codex/skills",
+  "registries": [{ "name": "default", "url": "https://agentrig.ai/registry" }],
+  "defaultRig": "core"
+}
+```
+
+Project config overrides global config when keys overlap.

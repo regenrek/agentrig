@@ -159,6 +159,7 @@ export type PackMeta = {
   author?: string
   license?: string
   tags?: string[]
+  topics?: Record<string, string[]>
   rigDependencies?: string[]
   files: PackFile[]
   /** Claude plugin components included in this pack */

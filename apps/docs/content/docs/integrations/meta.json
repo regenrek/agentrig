@@ -1,0 +1,6 @@
+{
+  "title": "Integrations",
+  "description": "Claude, marketplace exports, and editor support",
+  "icon": "Plug",
+  "pages": ["index", "claude-code", "marketplace", "cursor"]
+}

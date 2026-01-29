@@ -1,0 +1,43 @@
+---
+title: Claude Code
+description: Export packs for Claude Code marketplace.
+icon: Sparkles
+---
+
+# Claude Code integration
+
+Agentrig can export packs as Claude Code plugins so they are installable via the Claude marketplace UI.
+
+## Build the marketplace
+
+```bash
+pnpm claude:marketplace:build
+```
+
+This generates:
+
+```
+dist/claude-marketplace/
+  .claude-plugin/marketplace.json
+  plugins/
+    agentrig-<pack>/
+      .claude-plugin/plugin.json
+      skills/...
+      commands/...
+      agents/...
+```
+
+## Install in Claude Code
+
+```text
+/plugin marketplace add ./dist/claude-marketplace
+/plugin install agentrig-core-committer@agentrig-community
+```
+
+## Using commands and skills
+
+Claude plugins expose commands and skills under the plugin name, for example:
+
+```text
+/agentrig-core-committer:committer
+```

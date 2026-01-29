@@ -1,0 +1,6 @@
+{
+  "title": "Rigs",
+  "description": "Compose and apply sets of packs",
+  "icon": "Layers",
+  "pages": ["index", "defining", "extending", "applying"]
+}

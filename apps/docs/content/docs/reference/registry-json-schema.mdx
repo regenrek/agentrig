@@ -1,0 +1,26 @@
+---
+title: Registry schema
+description: JSON schema for registry.json.
+icon: FileBraces
+---
+
+# Registry schema
+
+The registry schema is served at:
+
+```
+https://agentrig.ai/schema/registry.json
+```
+
+Required fields:
+
+- `name`
+- `items[]` with `name`, `title`, `description`, and `meta`
+
+Optional fields:
+
+- `homepage`
+- `generatedAt`
+- `version`, `tags`
+
+This schema powers the registry index consumed by `agentrig list --available`.

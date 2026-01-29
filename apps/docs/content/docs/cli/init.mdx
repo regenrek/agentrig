@@ -1,0 +1,33 @@
+---
+title: init
+description: Create a project or global config.
+icon: FilePlus
+---
+
+# `agentrig init`
+
+Create an `agentrig.config.json` or global config.
+
+```bash
+agentrig init
+```
+
+## Options
+
+- `--cwd <path>` - working directory (defaults to current directory).
+- `--skillsDir <path>` - install target (default: `.codex/skills`).
+- `--registry <url>` - default registry URL.
+- `--defaultRig <name>` - default rig name.
+- `--minimal` - write a minimal project config.
+- `--global` - write to `~/.agentrig/config.json`.
+- `--force` - overwrite existing config.
+
+## Notes
+
+When `--minimal` is not set, the CLI writes default rigs (`core`, `tauri-agentic`, `tui`, `website`).
+
+In this monorepo, `agentrig init` defaults `--registry` to a local dev URL. For normal usage, set it explicitly:
+
+```bash
+agentrig init --registry https://agentrig.ai/registry
+```

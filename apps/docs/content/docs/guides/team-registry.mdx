@@ -1,0 +1,33 @@
+---
+title: Run a team registry
+description: Host a private registry for your org.
+icon: Users
+---
+
+# Run a team registry
+
+Teams can host their own registries and publish packs under a namespace.
+
+## 1. Host the registry
+
+Publish the `registry.json`, `<pack>.json`, and `packs/<pack>/**` files on a static host.
+
+## 2. Configure the namespace
+
+```json
+{
+  "namespacedRegistries": {
+    "@acme": "https://acme.example/registry/{name}.json"
+  }
+}
+```
+
+## 3. Install packs
+
+```bash
+agentrig add @acme/infra-safety
+```
+
+## 4. (Optional) Get listed
+
+Submit your namespace to the directory so others can find your registry.

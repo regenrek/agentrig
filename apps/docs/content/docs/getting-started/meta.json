@@ -1,0 +1,6 @@
+{
+  "title": "Getting Started",
+  "description": "Install agentrig and ship your first pack",
+  "icon": "Rocket",
+  "pages": ["index", "installation", "first-pack", "concepts"]
+}

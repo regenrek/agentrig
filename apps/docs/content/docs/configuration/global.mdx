@@ -1,0 +1,22 @@
+---
+title: Global config
+description: Store shared rigs and registries.
+icon: Globe
+---
+
+# Global config
+
+The global config lives at:
+
+```
+~/.agentrig/config.json
+```
+
+Use it to store shared registries and rigs across all projects.
+
+```bash
+agentrig init --global
+```
+
+Global config is merged with project config at runtime.
+Project values always override global values.

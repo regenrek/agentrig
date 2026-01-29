@@ -1,0 +1,44 @@
+---
+title: Your first pack
+description: Scaffold a pack and generate meta.json.
+icon: Box
+---
+
+# Your first pack
+
+A pack is a folder with `meta.json` and the files you want to install.
+Use the CLI to scaffold and generate metadata.
+
+## Scaffold the pack
+
+```bash
+agentrig pack init hello-skills
+```
+
+This creates a folder like:
+
+```
+hello-skills/
+  meta.json
+  skills/hello-skills/SKILL.md
+  README.md
+```
+
+## Add files
+
+Add skills, scripts, hooks, agents, or MCP config under the pack directory.
+Then regenerate `meta.json`:
+
+```bash
+agentrig pack create . --out meta.json
+```
+
+## Test locally
+
+Install your pack directly from the local path:
+
+```bash
+agentrig add ./hello-skills/meta.json
+```
+
+Next, learn about pack metadata and placeholders.

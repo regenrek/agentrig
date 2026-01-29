@@ -1,0 +1,25 @@
+---
+title: Pack schema
+description: JSON schema for pack meta.json.
+icon: FileBraces
+---
+
+# Pack schema
+
+The pack schema is served at:
+
+```
+https://agentrig.ai/schema/pack.json
+```
+
+It validates:
+
+- `name`, `title`, `description`, `version`
+- `files[]` entries with `path`, `target`, optional `mode` + `sha256`
+- optional `author`, `license`, `tags`, `rigDependencies`
+
+Use `$schema` in your `meta.json` for editor hints:
+
+```json
+{ "$schema": "https://agentrig.dev/schema/pack.json" }
+```

@@ -1,0 +1,32 @@
+---
+title: Manifest format
+description: .agentrig/manifest.json structure.
+icon: FileSpreadsheet
+---
+
+# Manifest format
+
+The CLI tracks installed packs in `.agentrig/manifest.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "installed": {
+    "core-committer": {
+      "name": "core-committer",
+      "version": "0.1.0",
+      "source": "registry:default",
+      "installedAt": "2025-01-01T00:00:00.000Z",
+      "files": [
+        {
+          "target": ".codex/skills/committer/SKILL.md",
+          "sha256": "...",
+          "mode": "755"
+        }
+      ]
+    }
+  }
+}
+```
+
+The manifest enables safe removal by verifying file hashes.

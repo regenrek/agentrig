@@ -1,0 +1,41 @@
+---
+title: Create a skill pack
+description: Build a pack that ships reusable skills.
+icon: WandSparkles
+---
+
+# Create a skill pack
+
+This guide walks through creating a new pack for a reusable skill.
+
+## 1. Scaffold
+
+```bash
+agentrig pack init my-skill-pack
+```
+
+## 2. Add skill files
+
+Place your skill under `skills/<skill-name>/SKILL.md` and any supporting scripts alongside it.
+
+## 3. Generate meta.json
+
+```bash
+agentrig pack create . --out meta.json
+```
+
+## 4. Test locally
+
+Install your pack directly from the local path:
+
+```bash
+agentrig add ./my-skill-pack/meta.json
+```
+
+## 5. Publish
+
+Publish to your own registry or contribute to the official registry. See [Publishing packs](/docs/packs/publishing).
+
+<Callout title="Contributing to the official registry?">
+See [Contribute](/docs/contribute/official-registry) for the repo workflow and `pnpm registry:build`.
+</Callout>

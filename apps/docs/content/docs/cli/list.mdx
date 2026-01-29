@@ -1,0 +1,26 @@
+---
+title: list
+description: List installed packs or available registry packs.
+icon: List
+---
+
+# `agentrig list`
+
+List installed packs (default) or available packs in registries.
+
+```bash
+agentrig list
+agentrig list --available
+```
+
+## Options
+
+- `--installed` - list installed packs (default: true).
+- `--available` - list packs available in registries.
+- `--registry <name|url>` - registry override.
+- `--cwd <path>` - working directory.
+
+## Output
+
+Installed packs are read from `.agentrig/manifest.json`.
+Available packs are fetched from `registry.json` for each registry.

@@ -1,0 +1,37 @@
+---
+title: Pack structure
+description: Recommended directories and optional components.
+icon: FolderTree
+---
+
+# Pack structure
+
+Packs are flexible; the required files are `meta.json` and `README.md`.
+The rest of the tree can include any files you want installed.
+
+## Common layout
+
+```
+pack-name/
+  meta.json
+  skills/
+    <skill-name>/
+      SKILL.md
+      scripts/
+  scripts/
+  agents/
+  commands/
+  hooks/
+    hooks.json
+  .mcp.json
+  .lsp.json
+```
+
+## Notes
+
+- **skills/** maps to `{{skillsDir}}` by default during install.
+- **scripts/** and other folders install exactly where `meta.json` targets specify.
+- **hooks/**, **agents/**, **commands/** are used when exporting to Claude marketplace.
+- **.mcp.json** and **.lsp.json** enable MCP/LSP bundles in Claude exports.
+
+Use `agentrig pack create` to scan a directory and generate a matching `meta.json`.
