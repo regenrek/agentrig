@@ -236,11 +236,11 @@ function createGithubRelease(repoRoot: string, version: string) {
   if (!hasGhCLI()) return;
   const tag = `v${version}`;
   const title = `${CLI_NAME} ${tag}`;
-  let notes = changelogSection(repoRoot, version);
+  let notes: string | undefined = changelogSection(repoRoot, version) ?? undefined;
 
   if (!notes) {
     const alt = process.env.GH_NOTES_REF || "0.1";
-    notes = changelogSection(repoRoot, alt) || undefined;
+    notes = changelogSection(repoRoot, alt) ?? undefined;
   }
 
   const tmp = path.join(os.tmpdir(), `release-notes-${version}.md`);
