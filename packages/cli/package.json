@@ -23,7 +23,7 @@
     "coverage": "vitest --run --coverage"
   },
   "dependencies": {
-    "citty": "^0.1.6",
+    "citty": "^0.2.0",
     "giget": "^1.2.3"
   },
   "devDependencies": {
