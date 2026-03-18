@@ -2,7 +2,15 @@ import os from 'node:os'
 import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentRigConfig } from '../../src/lib/types'
-import { getGlobalConfigPath, getProjectConfigPath, loadConfig, writeGlobalConfig, writeProjectConfig } from '../../src/lib/config'
+import {
+  getGlobalAgentRigDir,
+  getGlobalAuthPath,
+  getGlobalConfigPath,
+  getProjectConfigPath,
+  loadConfig,
+  writeGlobalConfig,
+  writeProjectConfig,
+} from '../../src/lib/config'
 import { ensureDir, readJsonFile, writeJsonFile } from '../../src/lib/fs'
 
 vi.mock('../../src/lib/fs', () => ({
@@ -18,7 +26,9 @@ describe('config', () => {
 
   it('builds config paths', () => {
     const homedirSpy = vi.spyOn(os, 'homedir').mockReturnValue('/home/tester')
+    expect(getGlobalAgentRigDir()).toBe('/home/tester/.agentrig')
     expect(getGlobalConfigPath()).toBe('/home/tester/.agentrig/config.json')
+    expect(getGlobalAuthPath()).toBe('/home/tester/.agentrig/auth.json')
     expect(getProjectConfigPath('/repo')).toBe('/repo/agentrig.config.json')
     homedirSpy.mockRestore()
   })

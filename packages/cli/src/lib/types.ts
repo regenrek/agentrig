@@ -184,3 +184,45 @@ export type Manifest = {
   schemaVersion: 1
   installed: Record<string, InstalledPack>
 }
+
+export type CliAuthIdentity = {
+  userId: string
+  email?: string
+  name?: string
+}
+
+export type CliAuthSession = CliAuthIdentity & {
+  baseUrl: string
+  accessToken: string
+  expiresAt: number
+}
+
+export type CliLoginStart = {
+  requestId: string
+  publicCode: string
+  exchangeSecret: string
+  expiresAt: number
+  verificationUrl: string
+}
+
+export type CliLoginExchange =
+  | {
+      status: 'pending'
+      expiresAt: number
+    }
+  | {
+      status: 'expired'
+      expiresAt: number
+    }
+  | {
+      status: 'approved'
+      accessToken: string
+      expiresAt: number
+      user: CliAuthIdentity
+    }
+
+export type CliWhoAmI = {
+  userId: string
+  email?: string | null
+  name?: string | null
+}

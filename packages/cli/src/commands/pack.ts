@@ -1,4 +1,5 @@
 import { defineCommand, showUsage } from 'citty'
+import { shouldShowParentUsage } from '../lib/command'
 
 const command = defineCommand({
   meta: {
@@ -13,9 +14,9 @@ const command = defineCommand({
     create: () => import('./pack/create').then((m) => m.default),
     'claude-marketplace': () => import('./pack/claude-marketplace').then((m) => m.default),
   },
-  run({ args }) {
+  run({ args, rawArgs }) {
     if (args.help) return showUsage(command)
-    return showUsage(command)
+    if (shouldShowParentUsage(rawArgs)) return showUsage(command)
   },
 })
 

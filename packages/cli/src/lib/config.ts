@@ -27,10 +27,18 @@ function mergeNamespacedRegistries(
 ): Record<string, NamespacedRegistryConfig> | undefined {
   if (!globalRegs && !projectRegs) return undefined
   return { ...(globalRegs ?? {}), ...(projectRegs ?? {}) }
+  }
+
+export function getGlobalAgentRigDir() {
+  return path.join(os.homedir(), '.agentrig')
 }
 
 export function getGlobalConfigPath() {
-  return path.join(os.homedir(), '.agentrig', 'config.json')
+  return path.join(getGlobalAgentRigDir(), 'config.json')
+}
+
+export function getGlobalAuthPath() {
+  return path.join(getGlobalAgentRigDir(), 'auth.json')
 }
 
 export function getProjectConfigPath(cwd: string) {
