@@ -226,3 +226,33 @@ export type CliWhoAmI = {
   email?: string | null
   name?: string | null
 }
+
+export type PackUploadPolicySnapshot = {
+  maxZipBytes: number
+  maxFileBytes: number
+  maxTotalBytes: number
+  maxFiles: number
+  allowedContentTypes: string[]
+  blockedExtensions: string[]
+  allowedFileExtensions: string[]
+  allowedFilenames: string[]
+  allowedTargetPrefixes: string[]
+  publishedVersionRetention: number
+}
+
+export type PackBundle = {
+  directory: string
+  bundlePath: string
+  fileName: string
+  meta: PackMeta
+  zipBytes: Uint8Array
+  temporary: boolean
+}
+
+export type PackPublishValidationResult = {
+  meta: PackMeta
+  fileCount: number
+  totalBytes: number
+  zipBytes: number
+  warnings: string[]
+}

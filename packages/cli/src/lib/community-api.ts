@@ -1,4 +1,9 @@
-import type { CliLoginExchange, CliLoginStart, CliWhoAmI } from './types'
+import type {
+  CliLoginExchange,
+  CliLoginStart,
+  CliWhoAmI,
+  PackUploadPolicySnapshot,
+} from './types'
 
 const DEFAULT_COMMUNITY_BASE_URL = 'https://agentrig.ai'
 const DEFAULT_FETCH_TIMEOUT_MS = 15000
@@ -157,6 +162,13 @@ export async function whoAmI(baseUrl: string, accessToken: string) {
 export async function logout(baseUrl: string, accessToken: string) {
   await request<void>(baseUrl, '/api/cli/auth/logout', {
     method: 'POST',
+    accessToken,
+    maxRetries: 0,
+  })
+}
+
+export async function getPackUploadPolicy(baseUrl: string, accessToken: string) {
+  return await request<PackUploadPolicySnapshot>(baseUrl, '/api/cli/packs/policy', {
     accessToken,
     maxRetries: 0,
   })

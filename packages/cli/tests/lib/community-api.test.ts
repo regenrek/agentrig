@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CommunityApiError,
   exchangeCliLogin,
+  getPackUploadPolicy,
   logout,
   resolveCommunityBaseUrl,
   startCliLogin,
@@ -109,6 +110,42 @@ describe('community api', () => {
         }),
       })
     )
+  })
+
+  it('fetches the pack upload policy for authenticated users', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          maxZipBytes: 1,
+          maxFileBytes: 2,
+          maxTotalBytes: 3,
+          maxFiles: 4,
+          allowedContentTypes: ['application/zip'],
+          blockedExtensions: ['.exe'],
+          allowedFileExtensions: ['.md'],
+          allowedFilenames: ['README.md'],
+          allowedTargetPrefixes: ['.codex/'],
+          publishedVersionRetention: 10,
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }
+      )
+    )
+
+    await expect(getPackUploadPolicy('https://agentrig.ai', 'token-1')).resolves.toEqual({
+      maxZipBytes: 1,
+      maxFileBytes: 2,
+      maxTotalBytes: 3,
+      maxFiles: 4,
+      allowedContentTypes: ['application/zip'],
+      blockedExtensions: ['.exe'],
+      allowedFileExtensions: ['.md'],
+      allowedFilenames: ['README.md'],
+      allowedTargetPrefixes: ['.codex/'],
+      publishedVersionRetention: 10,
+    })
   })
 
   it('raises status-aware errors', async () => {

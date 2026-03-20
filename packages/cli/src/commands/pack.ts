@@ -12,6 +12,7 @@ const command = defineCommand({
   subCommands: {
     init: () => import('./pack/init').then((m) => m.default),
     create: () => import('./pack/create').then((m) => m.default),
+    bundle: () => import('./pack/bundle').then((m) => m.default),
     'claude-marketplace': () => import('./pack/claude-marketplace').then((m) => m.default),
   },
   run({ args, rawArgs }) {
