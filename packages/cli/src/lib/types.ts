@@ -256,3 +256,31 @@ export type PackPublishValidationResult = {
   zipBytes: number
   warnings: string[]
 }
+
+export type PackUploadUrlResponse = {
+  uploadUrl: string
+}
+
+export type PackSubmissionCreateResponse = {
+  submissionId: string
+}
+
+export type PackSubmissionStatus = {
+  _id: string
+  fileName: string
+  status: string
+  scanStatus: string
+  scanErrors?: string[]
+  scanWarnings?: string[]
+  reviewStatus?: string
+  reviewNote?: string
+  packMeta?: unknown
+  packName?: string
+  packVersion?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export type PackSubmissionListResponse = {
+  submissions: PackSubmissionStatus[]
+}

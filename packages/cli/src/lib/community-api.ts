@@ -2,6 +2,10 @@ import type {
   CliLoginExchange,
   CliLoginStart,
   CliWhoAmI,
+  PackSubmissionListResponse,
+  PackSubmissionCreateResponse,
+  PackSubmissionStatus,
+  PackUploadUrlResponse,
   PackUploadPolicySnapshot,
 } from './types'
 
@@ -172,4 +176,88 @@ export async function getPackUploadPolicy(baseUrl: string, accessToken: string) 
     accessToken,
     maxRetries: 0,
   })
+}
+
+export async function getPackUploadUrl(baseUrl: string, accessToken: string) {
+  const result = await request<PackUploadUrlResponse>(baseUrl, '/api/cli/packs/upload-url', {
+    method: 'POST',
+    accessToken,
+    maxRetries: 0,
+  })
+  return result.uploadUrl
+}
+
+export async function uploadPackBundle(uploadUrl: string, zipBytes: Uint8Array) {
+  const response = await fetchWithTimeout(
+    uploadUrl,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/zip',
+      },
+      body: Buffer.from(zipBytes),
+    },
+    DEFAULT_FETCH_TIMEOUT_MS
+  )
+
+  if (!response.ok) {
+    throw new CommunityApiError(await readErrorMessage(response), response.status)
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>
+  const storageId = typeof payload.storageId === 'string' ? payload.storageId.trim() : ''
+  if (!storageId) {
+    throw new Error('Upload response did not include a storageId')
+  }
+  return storageId
+}
+
+export async function createPackSubmission(
+  baseUrl: string,
+  accessToken: string,
+  payload: {
+    storageId: string
+    fileName: string
+    fileSize: number
+    contentType: string
+  }
+) {
+  const result = await request<PackSubmissionCreateResponse>(baseUrl, '/api/cli/packs/submissions', {
+    method: 'POST',
+    accessToken,
+    body: payload,
+    maxRetries: 0,
+  })
+  return result.submissionId
+}
+
+export async function getPackSubmissionStatus(
+  baseUrl: string,
+  accessToken: string,
+  submissionId: string
+) {
+  return await request<PackSubmissionStatus>(
+    baseUrl,
+    `/api/cli/packs/submissions/${encodeURIComponent(submissionId)}`,
+    {
+      accessToken,
+      maxRetries: 0,
+    }
+  )
+}
+
+export async function listPackSubmissions(
+  baseUrl: string,
+  accessToken: string,
+  limit = 20
+) {
+  const response = await request<PackSubmissionListResponse>(
+    baseUrl,
+    `/api/cli/packs/submissions?limit=${encodeURIComponent(String(limit))}`,
+    {
+      accessToken,
+      maxRetries: 0,
+    }
+  )
+  return response.submissions
 }

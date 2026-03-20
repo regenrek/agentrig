@@ -13,6 +13,8 @@ const command = defineCommand({
     init: () => import('./pack/init').then((m) => m.default),
     create: () => import('./pack/create').then((m) => m.default),
     bundle: () => import('./pack/bundle').then((m) => m.default),
+    publish: () => import('./pack/publish').then((m) => m.default),
+    status: () => import('./pack/status').then((m) => m.default),
     'claude-marketplace': () => import('./pack/claude-marketplace').then((m) => m.default),
   },
   run({ args, rawArgs }) {

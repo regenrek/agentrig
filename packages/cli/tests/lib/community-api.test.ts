@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CommunityApiError,
+  createPackSubmission,
   exchangeCliLogin,
+  getPackSubmissionStatus,
   getPackUploadPolicy,
+  getPackUploadUrl,
+  listPackSubmissions,
   logout,
   resolveCommunityBaseUrl,
   startCliLogin,
+  uploadPackBundle,
   whoAmI,
 } from '../../src/lib/community-api'
 
@@ -161,5 +166,85 @@ describe('community api', () => {
       status: 401,
       message: 'Unauthorized',
     })
+  })
+
+  it('creates upload sessions and fetches submission status', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ uploadUrl: 'https://upload.example.com' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ storageId: 'storage-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ submissionId: 'submission-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            _id: 'submission-1',
+            fileName: 'demo-pack.zip',
+            status: 'pending_scan',
+            scanStatus: 'pending',
+            createdAt: 1,
+            updatedAt: 2,
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+      )
+
+    await expect(getPackUploadUrl('https://agentrig.ai', 'token-1')).resolves.toBe(
+      'https://upload.example.com'
+    )
+    await expect(uploadPackBundle('https://upload.example.com', new Uint8Array([1, 2]))).resolves.toBe(
+      'storage-1'
+    )
+    await expect(
+      createPackSubmission('https://agentrig.ai', 'token-1', {
+        storageId: 'storage-1',
+        fileName: 'demo-pack.zip',
+        fileSize: 2,
+        contentType: 'application/zip',
+      })
+    ).resolves.toBe('submission-1')
+    await expect(
+      getPackSubmissionStatus('https://agentrig.ai', 'token-1', 'submission-1')
+    ).resolves.toMatchObject({
+      _id: 'submission-1',
+      status: 'pending_scan',
+    })
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          submissions: [
+            {
+              _id: 'submission-1',
+              fileName: 'demo-pack.zip',
+              status: 'pending_scan',
+              scanStatus: 'pending',
+              createdAt: 1,
+              updatedAt: 2,
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }
+      )
+    )
+    await expect(listPackSubmissions('https://agentrig.ai', 'token-1', 20)).resolves.toHaveLength(1)
   })
 })
