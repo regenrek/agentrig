@@ -4,7 +4,7 @@ import { shouldShowParentUsage } from '../lib/command'
 const command = defineCommand({
   meta: {
     name: 'pack',
-    description: 'Pack utilities (init, create, export).',
+    description: 'Pack utilities (init, create, bundle, publish, status).',
   },
   args: {
     help: { type: 'boolean', alias: 'h', description: 'Show help', default: false },

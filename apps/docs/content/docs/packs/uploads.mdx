@@ -1,13 +1,39 @@
 ---
 title: Hosted uploads
-description: Upload packs to AgentRig and publish them to the hosted community registry.
+description: Publish packs to AgentRig and the hosted community registry.
 icon: Upload
 ---
 
 # Hosted uploads
 
-AgentRig supports hosted pack uploads via the web UI at `/submit`.
-Approved uploads are published to the hosted community registry at `https://agentrig.ai/api/community`.
+Use the AgentRig CLI to submit packs for review and publication:
+
+```bash
+agentrig login
+agentrig pack publish .
+```
+
+`agentrig pack publish` bundles your pack, validates it against the hosted upload policy, uploads the ZIP, and creates a review submission. The command exits once the submission has been created successfully and prints the submission id.
+
+To check review progress later:
+
+```bash
+agentrig pack status
+```
+
+You can also pass a submission id directly:
+
+```bash
+agentrig pack status <submission-id>
+```
+
+If you want to inspect the ZIP locally without submitting it, use:
+
+```bash
+agentrig pack bundle .
+```
+
+The web submission UI at `/submit` uses the same backend pipeline. Approved uploads are published to the hosted community registry at `https://agentrig.ai/api/community`.
 
 ## What gets published
 
@@ -22,6 +48,7 @@ After approval:
 - Upload a ZIP archive.
 - `meta.json` is required at the archive root.
 - `README.md` is recommended (missing README produces a warning).
+- `agentrig pack publish` can keep the generated ZIP on disk with `--keep-bundle`.
 
 ## Limits (current policy)
 
