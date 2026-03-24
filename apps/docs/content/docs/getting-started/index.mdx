@@ -1,17 +1,41 @@
 ---
 title: Getting started
-description: Install the CLI and run your first pack.
+description: Why teams use agentrig to make AI help more useful, repeatable, and easier to share.
 icon: Rocket
 ---
 
 # Getting started
 
-This guide walks you through installing agentrig, initializing config, and installing your first pack.
+Agentrig helps you turn isolated AI habits into a shared way of working.
+Instead of every person reinventing prompts, tools, and repo setup from scratch, you can keep what works, reuse it, and roll it out across projects.
+
+## Why people use it
+
+- Get to useful AI help faster without rebuilding your setup in every repo.
+- Spend less time repeating instructions, preferred tools, and team conventions.
+- Start from proven workflows instead of trial and error.
+- Carry the same working setup from project to project.
+- Improve your setup once, then share it with everyone who needs it.
+
+## What it gives your team
+
+- Faster onboarding for new teammates.
+- More consistent outputs across repos and contributors.
+- An easier way to spread good practices without long setup docs.
+- Shared defaults without forcing everyone into a rigid workflow.
+- A cleaner path from "one person found something that works" to "the whole team can use it."
+
+## Start small
+
+You do not need to redesign your whole workflow on day one.
+A common first step is to install agentrig, try one useful pack in one real repo, and keep only what helps.
+
+## Try it
 
 <Steps>
   <Step>
-    <h3>Install the CLI</h3>
-    <p>Install agentrig globally so it is available in any repo.</p>
+    <h3>Install agentrig</h3>
+    <p>Make agentrig available in any repo so you can reuse the same setup wherever you work.</p>
 
     ```bash
     npm install -g agentrig
@@ -20,8 +44,8 @@ This guide walks you through installing agentrig, initializing config, and insta
     ```
   </Step>
   <Step>
-    <h3>Initialize config</h3>
-    <p>Create the default config files in your project (and optionally global config).</p>
+    <h3>Connect to the official registry</h3>
+    <p>Create the default config so agentrig knows where to pull shared packs from.</p>
 
     ```bash
     agentrig init --registry https://agentrig.ai/registry
@@ -30,8 +54,8 @@ This guide walks you through installing agentrig, initializing config, and insta
     ```
   </Step>
   <Step>
-    <h3>Add a pack</h3>
-    <p>Install a pack from the official registry.</p>
+    <h3>Add one useful pack</h3>
+    <p>Start with a pack that solves a real problem for you instead of trying to model everything at once.</p>
 
     ```bash
     agentrig add core-committer
@@ -39,7 +63,7 @@ This guide walks you through installing agentrig, initializing config, and insta
   </Step>
   <Step>
     <h3>Apply it (optional)</h3>
-    <p>Apply the rig to write files into your repo.</p>
+    <p>If the pack writes files into your repo, apply it and see the setup land in a real project.</p>
 
     ```bash
     agentrig rig apply
@@ -47,31 +71,8 @@ This guide walks you through installing agentrig, initializing config, and insta
   </Step>
 </Steps>
 
-## Notes
+## Where to go next
 
-- The official registry lives at `https://agentrig.ai/registry`.
-- `agentrig init` defaults to a local dev registry URL in this monorepo. Use `--registry https://agentrig.ai/registry` unless you are developing AgentRig itself.
-- To use a different registry, pass `--registry <name|url>` to `agentrig add`.
-- Packs install under `.codex/skills` by default.
-
-## Other first-class install paths
-
-### Community Packs (hosted)
-
-Install from the hosted community registry (packs uploaded via `/submit`):
-
-```bash
-agentrig registry add community https://agentrig.ai/api/community
-agentrig add <pack-name> --registry community --yes
-```
-
-### Self-hosted registry
-
-Install from a registry you host (static hosting works):
-
-```bash
-agentrig registry add acme https://example.com/registry
-agentrig add <pack-name> --registry acme --yes
-```
-
-Next, learn how to install the CLI in more environments or set it up for development. For repo contributors, see [Contribute](/contribute).
+- Want the fastest setup path? Start with [Installation](/getting-started/installation) and then [Your first pack](/getting-started/first-pack).
+- Want to understand the technical model behind packs, registries, and rigs? Read [Core concepts](/getting-started/concepts).
+- Contributing to AgentRig itself? See [Contribute](/contribute).
