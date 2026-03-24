@@ -14,11 +14,10 @@ const app = await alchemy("agentrig-docs", {
 });
 
 const prodDomains = ["docs.agentrig.ai"];
-const prodRoutes = prodDomains.map((domain) => `${domain}/*`);
 
 export const website = await TanStackStart("website", {
   name: `agentrig-docs-${app.stage}`,
-  routes: app.stage === "prod" ? prodRoutes : undefined,
+  domains: app.stage === "prod" ? prodDomains : undefined,
   adopt: true,
   dev: {
     command: "vite dev --port 5174",
