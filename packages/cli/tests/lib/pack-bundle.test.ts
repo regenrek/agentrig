@@ -101,4 +101,75 @@ describe('pack bundle', () => {
 
     await fs.rm(outside, { force: true })
   })
+
+  it('rejects symlinked directories in publish paths', async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agentrig-pack-bundle-'))
+    await fs.writeFile(
+      path.join(tempDir, 'meta.json'),
+      JSON.stringify(
+        {
+          name: 'demo-pack',
+          title: 'Demo Pack',
+          description: 'Example pack',
+          version: '1.2.3',
+          files: [
+            {
+              path: 'skills/demo/SKILL.md',
+              target: '.codex/skills/demo/SKILL.md',
+            },
+          ],
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    )
+
+    const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agentrig-pack-bundle-outside-'))
+    await fs.mkdir(path.join(outsideDir, 'demo'), { recursive: true })
+    await fs.writeFile(path.join(outsideDir, 'demo', 'SKILL.md'), 'secret', 'utf-8')
+    await fs.symlink(outsideDir, path.join(tempDir, 'skills'))
+
+    await expect(createPackBundle({ dir: tempDir, policy })).rejects.toThrow(
+      'Symlinks are not allowed in publish bundles: skills/demo/SKILL.md'
+    )
+
+    await fs.rm(outsideDir, { recursive: true, force: true })
+  })
+
+  it('rejects symlinked README.md files', async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agentrig-pack-bundle-'))
+    await fs.mkdir(path.join(tempDir, 'skills', 'demo'), { recursive: true })
+    await fs.writeFile(
+      path.join(tempDir, 'meta.json'),
+      JSON.stringify(
+        {
+          name: 'demo-pack',
+          title: 'Demo Pack',
+          description: 'Example pack',
+          version: '1.2.3',
+          files: [
+            {
+              path: 'skills/demo/SKILL.md',
+              target: '.codex/skills/demo/SKILL.md',
+            },
+          ],
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    )
+    await fs.writeFile(path.join(tempDir, 'skills', 'demo', 'SKILL.md'), 'skill body', 'utf-8')
+
+    const outside = path.join(tempDir, '..', `readme-${Date.now()}.md`)
+    await fs.writeFile(outside, '# secret\n', 'utf-8')
+    await fs.symlink(outside, path.join(tempDir, 'README.md'))
+
+    await expect(createPackBundle({ dir: tempDir, policy })).rejects.toThrow(
+      'Symlinks are not allowed in publish bundles: README.md'
+    )
+
+    await fs.rm(outside, { force: true })
+  })
 })

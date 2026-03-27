@@ -51,6 +51,7 @@ describe('command:pack:publish', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.mocked(resolveCommunityBaseUrl).mockReturnValue('https://agentrig.ai')
     vi.mocked(loadAuthSession).mockResolvedValue({
       baseUrl: 'https://agentrig.ai',
@@ -133,5 +134,19 @@ describe('command:pack:publish', () => {
   it('keeps the bundle when requested', async () => {
     await run({ args: { dir: '/repo', help: false, 'keep-bundle': true } })
     expect(console.log).toHaveBeenCalledWith('Bundle kept at: /tmp/demo-pack-1.2.3.zip')
+  })
+
+  it('succeeds when submission status is temporarily unavailable', async () => {
+    vi.mocked(getPackSubmissionStatus).mockRejectedValue(new Error('Service unavailable'))
+
+    await run({ args: { dir: '/repo', help: false, 'keep-bundle': false } })
+
+    expect(console.log).toHaveBeenCalledWith('Submission: submission-1')
+    expect(console.log).toHaveBeenCalledWith('Status: unavailable right now')
+    expect(console.log).toHaveBeenCalledWith('submitted, waiting for review')
+    expect(console.warn).toHaveBeenCalledWith(
+      'Unable to fetch submission status right now: Service unavailable'
+    )
+    expect(getPackSubmissionStatus).toHaveBeenCalledTimes(3)
   })
 })

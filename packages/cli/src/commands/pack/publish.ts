@@ -17,6 +17,39 @@ import {
   validatePackBundle,
 } from '../../lib/pack-publish-validation'
 
+const STATUS_LOOKUP_MAX_ATTEMPTS = 3
+const STATUS_LOOKUP_RETRY_MS = 50
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function tryLoadSubmissionStatus(
+  baseUrl: string,
+  accessToken: string,
+  submissionId: string
+) {
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= STATUS_LOOKUP_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await getPackSubmissionStatus(baseUrl, accessToken, submissionId)
+    } catch (error) {
+      lastError = error
+      if (attempt < STATUS_LOOKUP_MAX_ATTEMPTS) {
+        await sleep(STATUS_LOOKUP_RETRY_MS * attempt)
+      }
+    }
+  }
+
+  console.warn(
+    `Unable to fetch submission status right now: ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`
+  )
+  return null
+}
+
 const command = defineCommand({
   meta: {
     name: 'publish',
@@ -79,10 +112,14 @@ const command = defineCommand({
         fileSize: bundle.zipBytes.length,
         contentType: 'application/zip',
       })
-      const submission = await getPackSubmissionStatus(baseUrl, session.accessToken, submissionId)
 
       console.log(`Submission: ${submissionId}`)
-      console.log(`Status: ${submission.status}`)
+      const submission = await tryLoadSubmissionStatus(baseUrl, session.accessToken, submissionId)
+      if (submission) {
+        console.log(`Status: ${submission.status}`)
+      } else {
+        console.log('Status: unavailable right now')
+      }
       console.log('submitted, waiting for review')
       console.log(`Check status: agentrig pack status ${submissionId}`)
       if (args['keep-bundle']) {
