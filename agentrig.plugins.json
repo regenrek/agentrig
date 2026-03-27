@@ -1,0 +1,16 @@
+{
+  "pluginPrefix": "agentrig-",
+  "owner": {
+    "name": "Agentrig"
+  },
+  "providers": {
+    "claude": {
+      "marketplaceName": "agentrig-community",
+      "metadata": {
+        "description": "Agentrig workflow packs exported as provider-native plugins.",
+        "version": "1.0.0",
+        "pluginRoot": "./plugins"
+      }
+    }
+  }
+}
