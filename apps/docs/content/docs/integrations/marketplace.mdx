@@ -70,3 +70,15 @@ agentrig pack plugin uninstall --agent codex --pack my-pack
 The install command always prints a preflight summary before writing anything.
 In interactive terminals, it can prompt for provider, pack, and scope.
 In non-interactive runs, pass `--pack <folder>` or `--all`.
+
+## Tracked installs and safe cleanup
+
+AgentRig's plugin workflow is designed to stay auditable and reversible.
+
+- installs are recorded in an AgentRig-managed ledger
+- uninstall only targets installs that AgentRig previously recorded
+- tracked files are removed only when their hashes still match what AgentRig installed
+- modified files are kept instead of being deleted
+- provider-specific cleanup tries to preserve unrelated or pre-existing entries where possible
+
+This is part of the core concept behind AgentRig integrations: they should feel native in Claude Code, Codex, and Cursor without turning into hidden plugin or config bloat that is hard to unwind later.
