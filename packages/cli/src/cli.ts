@@ -1,11 +1,11 @@
-#!/usr/bin/env node
 import { defineCommand, runMain, showUsage } from 'citty'
+import packageJson from '../package.json'
 import { shouldShowParentUsage } from './lib/command'
 
 const main = defineCommand({
   meta: {
     name: 'agentrig',
-    version: '0.1.0',
+    version: packageJson.version,
     description: 'Compose and apply skills/workflows via packs and registries.',
   },
   args: {
