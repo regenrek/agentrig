@@ -4,16 +4,24 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile } from '../fs'
-import type { PackMeta } from '../types'
+import { sha256Hex } from '../hash'
+import type {
+  PackMeta,
+  PluginInstallRecord,
+  PluginInstalledFile,
+  PluginInstallScopeSelectorName,
+} from '../types'
 
 const execFile = promisify(execFileCallback)
 
 export const PLUGIN_PROVIDER_IDS = ['claude', 'codex', 'cursor'] as const
 export const PLUGIN_INSTALL_SCOPES = ['personal', 'workspace'] as const
+export const PLUGIN_INSTALL_SCOPE_SELECTORS = ['auto', 'personal', 'workspace'] as const
 
 export type PluginProviderId = (typeof PLUGIN_PROVIDER_IDS)[number]
 export type PluginProviderSelector = PluginProviderId | 'all'
 export type PluginInstallScope = (typeof PLUGIN_INSTALL_SCOPES)[number]
+export type PluginInstallScopeSelector = PluginInstallScopeSelectorName
 
 export type PluginOwner = {
   name: string
@@ -97,11 +105,29 @@ export type ProviderExportResult = {
   plugins: PackEntry[]
 }
 
+export type ProviderInstallPreview = {
+  provider: PluginProviderId
+  scope: PluginInstallScope
+  locations: string[]
+  actions: string[]
+}
+
 export type ProviderInstallResult = {
   provider: PluginProviderId
+  scope: PluginInstallScope
   installed: string[]
   skipped: string[]
   locations: string[]
+  ledgerEntries: PluginInstallRecord[]
+}
+
+export type ProviderUninstallResult = {
+  provider: PluginProviderId
+  removed: string[]
+  kept: string[]
+  missing: string[]
+  locations: string[]
+  clearedRecordIds: string[]
 }
 
 export type PluginExportOptions = {
@@ -121,16 +147,54 @@ export type PluginExportOptions = {
 export type ExternalCommandRunner = (command: string, args: string[]) => Promise<void>
 
 export type PluginInstallOptions = PluginExportOptions & {
-  scope?: PluginInstallScope
+  scope?: PluginInstallScopeSelector
   force?: boolean
   dryRun?: boolean
   commandRunner?: ExternalCommandRunner
 }
 
+export type PreparedProviderInstall = {
+  provider: PluginProviderId
+  scope: PluginInstallScope
+  preview: ProviderInstallPreview
+}
+
+export type PreparedPluginInstall = {
+  cwd: string
+  cfg: ResolvedPluginConfig
+  packsRoot: string
+  packs: PackEntry[]
+  baseOut: string
+  out?: string
+  clean: boolean
+  force: boolean
+  dryRun: boolean
+  requestedScope: PluginInstallScopeSelector
+  providers: PreparedProviderInstall[]
+  commandRunner: ExternalCommandRunner
+  exportOptions: PluginExportOptions
+}
+
+export type PluginUninstallOptions = {
+  cwd: string
+  dryRun?: boolean
+  commandRunner?: ExternalCommandRunner
+}
+
+export type ProviderInstallPreviewContext = {
+  cwd: string
+  outRoot: string
+  cfg: ResolvedPluginConfig
+  packs: PackEntry[]
+  scope: PluginInstallScope
+}
+
 export type PluginProviderAdapter = {
   id: PluginProviderId
   exportMarketplace(args: ProviderExportContext): Promise<ProviderExportResult>
+  previewInstall(args: ProviderInstallPreviewContext): ProviderInstallPreview
   install(args: ProviderInstallContext): Promise<ProviderInstallResult>
+  uninstall(args: ProviderUninstallContext): Promise<ProviderUninstallResult>
 }
 
 export type ProviderExportContext = {
@@ -144,9 +208,24 @@ export type ProviderInstallContext = {
   result: ProviderExportResult
   cfg: ResolvedPluginConfig
   scope: PluginInstallScope
+  requestedScope: PluginInstallScopeSelector
   force: boolean
   dryRun: boolean
   runner: ExternalCommandRunner
+}
+
+export type ProviderUninstallContext = {
+  cwd: string
+  entries: PluginInstallRecord[]
+  remainingEntries: PluginInstallRecord[]
+  dryRun: boolean
+  runner: ExternalCommandRunner
+}
+
+export type FileRemovalSummary = {
+  removed: string[]
+  kept: string[]
+  missing: string[]
 }
 
 type CopyEntrySpec =
@@ -160,6 +239,7 @@ const nonEmptyStringSchema = z.string().trim().min(1)
 const optionalStringSchema = nonEmptyStringSchema.optional()
 const pluginProviderIdSchema = z.enum(PLUGIN_PROVIDER_IDS)
 const pluginInstallScopeSchema = z.enum(PLUGIN_INSTALL_SCOPES)
+const pluginInstallScopeSelectorSchema = z.enum(PLUGIN_INSTALL_SCOPE_SELECTORS)
 const pluginProviderSelectorSchema = z.union([pluginProviderIdSchema, z.literal('all')])
 const pluginMetadataSchema = z.looseObject({
   description: optionalStringSchema,
@@ -189,11 +269,13 @@ const cursorMarketplaceConfigSchema = z.looseObject({
 const pluginConfigFileSchema = z.looseObject({
   pluginPrefix: optionalStringSchema,
   owner: pluginOwnerSchema.optional(),
-  providers: z.looseObject({
-    claude: claudeMarketplaceConfigSchema.optional(),
-    codex: codexMarketplaceConfigSchema.optional(),
-    cursor: cursorMarketplaceConfigSchema.optional(),
-  }).optional(),
+  providers: z
+    .looseObject({
+      claude: claudeMarketplaceConfigSchema.optional(),
+      codex: codexMarketplaceConfigSchema.optional(),
+      cursor: cursorMarketplaceConfigSchema.optional(),
+    })
+    .optional(),
   name: optionalStringSchema,
   metadata: pluginMetadataSchema.optional(),
 })
@@ -244,6 +326,14 @@ export function isPluginProviderId(value: string): value is PluginProviderId {
 export function resolvePluginProviders(target: PluginProviderSelector) {
   if (target === 'all') return [...PLUGIN_PROVIDER_IDS]
   return [target]
+}
+
+export function resolveInstallScope(
+  provider: PluginProviderId,
+  requestedScope: PluginInstallScopeSelector = 'auto'
+): PluginInstallScope {
+  if (requestedScope !== 'auto') return requestedScope
+  return provider === 'cursor' ? 'personal' : 'workspace'
 }
 
 export function toPosixPath(value: string) {
@@ -478,22 +568,115 @@ export async function buildPackEntries(
   return packs.sort((left, right) => left.pluginName.localeCompare(right.pluginName))
 }
 
-export async function copyInstalledPlugin(sourceDir: string, destinationDir: string, force: boolean) {
+async function walkFiles(rootDir: string, currentDir = rootDir): Promise<string[]> {
+  const entries = await fs.readdir(currentDir, { withFileTypes: true })
+  const files: string[] = []
+
+  for (const entry of entries) {
+    const nextPath = path.join(currentDir, entry.name)
+    if (entry.isDirectory()) {
+      files.push(...(await walkFiles(rootDir, nextPath)))
+      continue
+    }
+    if (entry.isFile()) {
+      files.push(path.relative(rootDir, nextPath))
+    }
+  }
+
+  return files.sort()
+}
+
+export async function copyInstalledPlugin(
+  sourceDir: string,
+  destinationDir: string,
+  force: boolean
+): Promise<{ changed: boolean; files: PluginInstalledFile[] }> {
   const exists = await pathExists(destinationDir)
   if (exists && !force) {
-    return false
+    return { changed: false, files: [] }
   }
 
   if (exists && force) {
     await fs.rm(destinationDir, { recursive: true, force: true })
   }
 
-  await ensureDir(path.dirname(destinationDir))
-  await fs.cp(sourceDir, destinationDir, {
-    recursive: true,
-    force: true,
-  })
-  return true
+  const relativeFiles = await walkFiles(sourceDir)
+  await ensureDir(destinationDir)
+
+  const files: PluginInstalledFile[] = []
+  for (const relativeFile of relativeFiles) {
+    const sourcePath = path.join(sourceDir, relativeFile)
+    const destinationPath = path.join(destinationDir, relativeFile)
+    const bytes = await fs.readFile(sourcePath)
+    await ensureDir(path.dirname(destinationPath))
+    await fs.writeFile(destinationPath, bytes)
+    files.push({
+      path: destinationPath,
+      sha256: sha256Hex(bytes),
+    })
+  }
+
+  return {
+    changed: true,
+    files,
+  }
+}
+
+async function pruneEmptyDirectories(rootDir: string, filePaths: string[], dryRun: boolean) {
+  const candidateDirs = new Set<string>()
+  for (const filePath of filePaths) {
+    let currentDir = path.dirname(filePath)
+    while (currentDir.startsWith(rootDir)) {
+      candidateDirs.add(currentDir)
+      if (currentDir === rootDir) break
+      currentDir = path.dirname(currentDir)
+    }
+  }
+
+  const orderedDirs = [...candidateDirs].sort((left, right) => right.length - left.length)
+  for (const directory of orderedDirs) {
+    if (!(await pathExists(directory))) continue
+    const contents = await fs.readdir(directory)
+    if (contents.length > 0) continue
+    if (!dryRun) {
+      await fs.rmdir(directory)
+    }
+  }
+}
+
+export async function removeInstalledFiles(
+  rootDir: string,
+  files: PluginInstalledFile[],
+  dryRun: boolean
+): Promise<FileRemovalSummary> {
+  const removed: string[] = []
+  const kept: string[] = []
+  const missing: string[] = []
+
+  for (const file of files) {
+    if (!(await pathExists(file.path))) {
+      missing.push(file.path)
+      continue
+    }
+
+    const buf = await fs.readFile(file.path)
+    const actual = sha256Hex(buf)
+    if (actual !== file.sha256) {
+      kept.push(file.path)
+      continue
+    }
+
+    if (!dryRun) {
+      await fs.rm(file.path, { force: true })
+    }
+    removed.push(file.path)
+  }
+
+  if (kept.length === 0) {
+    await pruneEmptyDirectories(rootDir, files.map((file) => file.path), dryRun)
+  }
+
+  return { removed, kept, missing }
 }
 
 export async function defaultCommandRunner(command: string, args: string[]) {
@@ -511,14 +694,24 @@ export async function defaultCommandRunner(command: string, args: string[]) {
 }
 
 export function parsePluginProviderSelector(value?: string): PluginProviderSelector {
-  const normalized = value?.trim().toLowerCase() || 'all'
+  const normalized = value?.trim().toLowerCase()
+  if (!normalized) {
+    throw new Error('Provider must be specified.')
+  }
   const parsed = pluginProviderSelectorSchema.safeParse(normalized)
   if (parsed.success) return parsed.data
   throw new Error(`Unsupported provider: ${value}`)
 }
 
+export function parsePluginInstallScopeSelector(value?: string): PluginInstallScopeSelector {
+  const normalized = value?.trim().toLowerCase() || 'auto'
+  const parsed = pluginInstallScopeSelectorSchema.safeParse(normalized)
+  if (parsed.success) return parsed.data
+  throw new Error(`Unsupported scope: ${value}`)
+}
+
 export function parsePluginInstallScope(value?: string): PluginInstallScope {
-  const normalized = value?.trim().toLowerCase() || 'personal'
+  const normalized = value?.trim().toLowerCase() || 'workspace'
   const parsed = pluginInstallScopeSchema.safeParse(normalized)
   if (parsed.success) return parsed.data
   throw new Error(`Unsupported scope: ${value}`)

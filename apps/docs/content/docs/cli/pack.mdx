@@ -37,10 +37,14 @@ Options: `--agent`, `--packsDir`, `--out`, `--config`, `--marketplaceName`, `--o
 ## plugin install
 
 ```bash
-agentrig pack plugin install --agent all --scope personal
+agentrig pack plugin install --agent cursor --pack my-pack --scope workspace
 ```
 
 Builds plugin output and installs it into the selected provider surfaces.
+In interactive terminals, the CLI prompts for provider and pack selection.
+In non-interactive runs, pass an explicit `--pack` or use `--all`.
+
+`--scope auto` remains the default selector. For Cursor, `auto` still resolves to `personal`; use `--scope workspace` to install into the repo-local AgentRig convention at `.cursor/plugins/local/`.
 
 Options: `--agent`, `--packsDir`, `--out`, `--config`, `--marketplaceName`, `--ownerName`, `--ownerEmail`, `--pluginPrefix`, `--pack`, `--scope`, `--force`, `--dryRun`, `--clean`.
 

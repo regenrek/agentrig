@@ -1,7 +1,10 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { ensureDir, readJsonFile, writeJsonFile } from '../fs'
+import { getPluginInstallRecordId } from '../plugin-install-ledger'
+import type { CodexPluginInstallRecord } from '../types'
 import type {
+  FileRemovalSummary,
   PackEntry,
   PackFeatures,
   PluginInstallScope,
@@ -23,6 +26,7 @@ import {
   detectPackFeatures,
   normalizeManifestDescription,
   pluginAuthor,
+  removeInstalledFiles,
 } from './shared'
 
 async function copyCodexPlugin(packDir: string, pluginDir: string) {
@@ -100,6 +104,59 @@ function resolveCodexInstallPaths(cwd: string, scope: PluginInstallScope) {
   }
 }
 
+function buildMarketplaceContainer(
+  cfg: ProviderExportContext['cfg'],
+  rawMarketplace: unknown,
+  relativePluginRoot: string
+) {
+  const fallback = buildCodexMarketplaceManifest(cfg, [], relativePluginRoot)
+  if (!rawMarketplace || typeof rawMarketplace !== 'object' || Array.isArray(rawMarketplace)) {
+    return {
+      raw: {} as Record<string, unknown>,
+      name: fallback.name,
+      interface: fallback.interface,
+      plugins: [] as unknown[],
+    }
+  }
+
+  const marketplace = rawMarketplace as Record<string, unknown>
+  return {
+    raw: marketplace,
+    name: typeof marketplace.name === 'string' && marketplace.name.trim() ? marketplace.name.trim() : fallback.name,
+    interface:
+      marketplace.interface && typeof marketplace.interface === 'object'
+        ? marketplace.interface
+        : fallback.interface,
+    plugins: Array.isArray(marketplace.plugins) ? [...marketplace.plugins] : [],
+  }
+}
+
+function matchesMarketplaceEntry(candidate: unknown, expected: CodexMarketplacePlugin) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return false
+  }
+
+  const candidateRecord = candidate as {
+    name?: unknown
+    source?: { source?: unknown; path?: unknown }
+  }
+  return (
+    candidateRecord.name === expected.name &&
+    candidateRecord.source?.source === expected.source.source &&
+    candidateRecord.source?.path === expected.source.path
+  )
+}
+
+function summarizePluginRemoval(removal: FileRemovalSummary, marketplaceOutcome: 'removed' | 'missing' | 'kept') {
+  if (removal.kept.length > 0 || marketplaceOutcome === 'kept') {
+    return 'kept' as const
+  }
+  if (removal.removed.length > 0 || marketplaceOutcome === 'removed') {
+    return 'removed' as const
+  }
+  return 'missing' as const
+}
+
 export const codexProvider: PluginProviderAdapter = {
   id: 'codex',
   async exportMarketplace({ outRoot, cfg, packs }) {
@@ -127,23 +184,36 @@ export const codexProvider: PluginProviderAdapter = {
       plugins: packs,
     }
   },
-  async install({ cwd, result, cfg, scope, force, dryRun }) {
+  previewInstall({ cwd, packs, scope }) {
+    const { pluginRoot, marketplacePath } = resolveCodexInstallPaths(cwd, scope)
+    return {
+      provider: 'codex',
+      scope,
+      locations: [pluginRoot, marketplacePath, ...packs.map((pack) => path.join(pluginRoot, pack.pluginName))],
+      actions: [
+        ...packs.map((pack) => `copy ${pack.pluginName} -> ${path.join(pluginRoot, pack.pluginName)}`),
+        `update ${marketplacePath}`,
+      ],
+    }
+  },
+  async install({ cwd, result, cfg, scope, requestedScope, force, dryRun }) {
     const installed: string[] = []
     const skipped: string[] = []
+    const ledgerEntries: CodexPluginInstallRecord[] = []
     const { pluginRoot, marketplacePath, relativePluginRoot } = resolveCodexInstallPaths(cwd, scope)
     const pluginSourceRoot = path.join(result.outRoot, 'plugins')
 
     const rawMarketplace = await readJsonFile<unknown>(marketplacePath)
-    const marketplace = rawMarketplace
-      ? codexMarketplaceManifestSchema.parse(rawMarketplace)
-      : buildCodexMarketplaceManifest(cfg, [], relativePluginRoot)
-
-    const existingPlugins: CodexMarketplacePlugin[] = [...marketplace.plugins]
+    const marketplace = buildMarketplaceContainer(cfg, rawMarketplace, relativePluginRoot)
+    const existingPlugins: unknown[] = [...marketplace.plugins]
 
     for (const pack of result.plugins) {
       const sourceDir = path.join(pluginSourceRoot, pack.pluginName)
       const destinationDir = path.join(pluginRoot, pack.pluginName)
-      const changed = dryRun ? true : await copyInstalledPlugin(sourceDir, destinationDir, force)
+      const copyResult = dryRun
+        ? { changed: true, files: [] }
+        : await copyInstalledPlugin(sourceDir, destinationDir, force)
+      const changed = copyResult.changed
       if (changed) {
         installed.push(pack.pluginName)
       } else {
@@ -163,31 +233,124 @@ export const codexProvider: PluginProviderAdapter = {
         category: cfg.providers.codex.category,
       })
 
-      const index = existingPlugins.findIndex((item) => item.name === pack.pluginName)
+      const index = existingPlugins.findIndex(
+        (item) =>
+          Boolean(item) &&
+          typeof item === 'object' &&
+          !Array.isArray(item) &&
+          (item as { name?: string }).name === pack.pluginName
+      )
       if (index >= 0) {
         existingPlugins[index] = entry
       } else {
         existingPlugins.push(entry)
+      }
+
+      if (changed) {
+        ledgerEntries.push({
+          id: getPluginInstallRecordId('codex', scope, pack.pluginName),
+          provider: 'codex',
+          requestedScope,
+          scope,
+          packName: pack.meta.name,
+          packVersion: pack.meta.version,
+          pluginName: pack.pluginName,
+          sourceLocation: sourceDir,
+          targetPaths: [destinationDir, marketplacePath],
+          installedAt: new Date().toISOString(),
+          files: copyResult.files,
+          metadata: {
+            pluginPath: destinationDir,
+            marketplacePath,
+            marketplaceEntry: entry,
+          },
+        })
       }
     }
 
     if (!dryRun) {
       await writeJsonFile(
         marketplacePath,
-        codexMarketplaceManifestSchema.parse({
-        name:
-          marketplace.name.trim() || cfg.providers.codex.marketplaceName,
-        interface: marketplace.interface,
-        plugins: existingPlugins,
-        })
+        {
+          ...marketplace.raw,
+          name: marketplace.name,
+          interface: marketplace.interface,
+          plugins: existingPlugins,
+        }
       )
     }
 
     return {
       provider: 'codex',
+      scope,
       installed,
       skipped,
       locations: [pluginRoot, marketplacePath],
+      ledgerEntries,
+    }
+  },
+  async uninstall({ entries, dryRun }) {
+    const removed: string[] = []
+    const kept: string[] = []
+    const missing: string[] = []
+    const clearedRecordIds: string[] = []
+    const locations = [...new Set(entries.flatMap((entry) => entry.targetPaths))]
+
+    for (const entry of entries) {
+      if (entry.provider !== 'codex') continue
+
+      const removal = await removeInstalledFiles(entry.metadata.pluginPath, entry.files, dryRun)
+      let marketplaceOutcome: 'removed' | 'missing' | 'kept' = 'missing'
+      if (removal.kept.length > 0) {
+        marketplaceOutcome = 'kept'
+      }
+      const rawMarketplace = await readJsonFile<unknown>(entry.metadata.marketplacePath)
+
+      if (marketplaceOutcome === 'kept') {
+        // Keep marketplace state untouched when any tracked plugin file was modified.
+      } else if (!rawMarketplace || typeof rawMarketplace !== 'object' || Array.isArray(rawMarketplace)) {
+        marketplaceOutcome = 'missing'
+      } else {
+        const marketplace = rawMarketplace as Record<string, unknown>
+        const plugins = Array.isArray(marketplace.plugins) ? [...marketplace.plugins] : null
+        if (!plugins) {
+          marketplaceOutcome = 'kept'
+        } else {
+          const index = plugins.findIndex((plugin) => matchesMarketplaceEntry(plugin, entry.metadata.marketplaceEntry))
+          if (index < 0) {
+            marketplaceOutcome = 'missing'
+          } else {
+            marketplaceOutcome = 'removed'
+            if (!dryRun) {
+              plugins.splice(index, 1)
+              await writeJsonFile(entry.metadata.marketplacePath, {
+                ...marketplace,
+                plugins,
+              })
+            }
+          }
+        }
+      }
+
+      const outcome = summarizePluginRemoval(removal, marketplaceOutcome)
+      if (outcome === 'removed') {
+        removed.push(entry.pluginName)
+        clearedRecordIds.push(entry.id)
+      } else if (outcome === 'missing') {
+        missing.push(entry.pluginName)
+        clearedRecordIds.push(entry.id)
+      } else {
+        kept.push(entry.pluginName)
+      }
+    }
+
+    return {
+      provider: 'codex',
+      removed,
+      kept,
+      missing,
+      locations,
+      clearedRecordIds,
     }
   },
 }

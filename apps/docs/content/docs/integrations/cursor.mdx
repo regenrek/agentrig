@@ -6,8 +6,7 @@ icon: Monitor
 
 # Cursor integration
 
-Agentrig allows pack files to target `.cursor/` directories by default.
-This makes it easy to distribute Cursor rules, prompts, and tooling across projects.
+Agentrig can export packs as local Cursor plugins so you can distribute rules, prompts, agents, MCP config, and related tooling in one installable bundle.
 
 ## Export Cursor plugins
 
@@ -20,10 +19,21 @@ This generates a multi-plugin Cursor marketplace repo with `.cursor-plugin/marke
 ## Install local Cursor plugins
 
 ```bash
-agentrig pack plugin install --agent cursor --scope personal
+agentrig pack plugin install --agent cursor --pack my-pack --scope personal
 ```
 
 This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor after installing.
+
+## Install project-local Cursor plugins
+
+```bash
+agentrig pack plugin install --agent cursor --pack my-pack --scope workspace
+```
+
+This copies each generated plugin into `<cwd>/.cursor/plugins/local/`.
+Workspace scope is an AgentRig project-local convention so the plugin stays inside the repo instead of your global Cursor profile.
+
+If you omit `--scope`, `auto` still resolves Cursor installs to `personal` for now.
 
 ## Example
 

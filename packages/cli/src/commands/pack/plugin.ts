@@ -12,6 +12,7 @@ const command = defineCommand({
   subCommands: {
     export: () => import('./plugin-export').then((m) => m.default),
     install: () => import('./plugin-install').then((m) => m.default),
+    uninstall: () => import('./plugin-uninstall').then((m) => m.default),
   },
   run({ args, rawArgs }) {
     if (args.help) return showUsage(command)
