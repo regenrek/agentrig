@@ -24,8 +24,8 @@
     "security:hooks": "node scripts/hooks/block-forbidden-staged-files.mjs"
   },
   "devDependencies": {
-    "lefthook": "^1.10.10",
+    "lefthook": "^2.1.4",
     "tsx": "^4.7.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.9.3"
   }
 }

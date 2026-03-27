@@ -24,17 +24,17 @@
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.8.23",
-    "citty": "^0.1.6",
-    "giget": "^1.2.3",
+    "citty": "^0.2.1",
+    "giget": "^3.2.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^25.0.10",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.2",
     "tsup": "^8.0.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.5.4",
-    "vitest": "^4.0.18"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
   },
   "engines": {
     "node": ">=18"
