@@ -10,6 +10,8 @@ At its core, AgentRig gives you three layers: packs as the building blocks, rigs
 
 This repo includes the `agentrig` CLI, the docs and registry site, and a publishable pack registry.
 
+![How Agentrig standardizes and reuses AI workflows across projects and tools](public/agentrig_explanation.jpg)
+
 > Warning: Agentrig is under active development. Expect breaking changes, evolving behavior, and rough edges. Use it at your own risk.
 
 ## Why AgentRig
@@ -60,6 +62,15 @@ The default pack install target directory is `.codex/skills` (configurable).
 ## Plugin export
 
 If you want your packs to be installable as local plugins, agentrig can export each pack as a provider-native plugin for Claude Code, Codex, Cursor, or all three at once.
+
+### How plugin export and install works
+
+![How AgentRig converts packs into native plugins and tracks installs safely](public/agentrig_plugin.jpeg)
+
+- Start with an AgentRig pack as the portable source of truth for prompts, assets, scripts, MCP config, and other workflow files.
+- `agentrig pack plugin export` converts that pack into each provider's native plugin marketplace layout for Claude Code, Codex, or Cursor.
+- `agentrig pack plugin install` installs the native output into the provider-specific target location instead of inventing a separate runtime format.
+- AgentRig records install state in its ledger so uninstall can remove only tracked files, preserve user-modified files, and keep plugin cleanup auditable.
 
 Export all supported providers:
 
@@ -137,6 +148,14 @@ registry/packs/<your-pack>/
 ```
 
 They'll be copied into exported provider plugins when that provider supports them.
+
+## Registry model
+
+This project follows the same shape as the shadcn registry concept:
+
+- A `registry.json` index at the registry root
+- Per-item JSON documents under `r/<name>.json`
+- Item JSON references file paths instead of inlining file content
 
 ## Documentation
 

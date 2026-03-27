@@ -8,6 +8,15 @@ icon: Store
 
 Use `agentrig pack plugin export` to export packs as individual plugins for Claude, Codex, Cursor, or all three at once.
 
+## How plugin export and install works
+
+![How AgentRig converts packs into native plugins and tracks installs safely](/agentrig_plugin.jpeg)
+
+- Start with an AgentRig pack as the portable source of truth for prompts, assets, scripts, MCP config, and other workflow files.
+- `agentrig pack plugin export` converts that pack into each provider's native plugin marketplace layout for Claude, Codex, or Cursor.
+- `agentrig pack plugin install` installs the native output into the provider-specific target location instead of inventing a separate runtime format.
+- AgentRig records install state in its ledger so uninstall can remove only tracked files, preserve user-modified files, and keep plugin cleanup auditable.
+
 ```bash
 agentrig pack plugin export --agent all --packsDir registry/packs --out dist/plugins
 ```
