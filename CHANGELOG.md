@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-27
+
 ### Added
 - CLI browser auth commands: `agentrig login`, `agentrig logout`, and `agentrig whoami`.
 - Hosted pack submission flows: `agentrig pack bundle`, `agentrig pack publish`, and `agentrig pack status`.
