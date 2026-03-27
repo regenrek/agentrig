@@ -9,6 +9,22 @@ icon: Monitor
 Agentrig allows pack files to target `.cursor/` directories by default.
 This makes it easy to distribute Cursor rules, prompts, and tooling across projects.
 
+## Export Cursor plugins
+
+```bash
+agentrig pack plugin export --agent cursor --packsDir registry/packs --out dist/cursor-marketplace
+```
+
+This generates a multi-plugin Cursor marketplace repo with `.cursor-plugin/marketplace.json` plus one plugin directory per pack.
+
+## Install local Cursor plugins
+
+```bash
+agentrig pack plugin install --agent cursor --scope personal
+```
+
+This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor after installing.
+
 ## Example
 
 ```json

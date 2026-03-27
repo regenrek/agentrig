@@ -46,7 +46,7 @@ agentrig pack create . --out meta.json
 ### Export for Claude Marketplace
 
 ```bash
-agentrig pack claude-marketplace .
+agentrig pack plugin export --agent claude --packsDir . --out dist/claude-marketplace
 ```
 
 ## License

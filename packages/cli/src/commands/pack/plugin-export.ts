@@ -1,14 +1,23 @@
-import { defineCommand, showUsage } from 'citty'
 import path from 'node:path'
 import process from 'node:process'
-import { exportPluginProviders, formatProviderSummary } from '../../lib/plugin-providers'
+import { defineCommand, showUsage } from 'citty'
+import {
+  exportPluginProviders,
+  formatProviderSummary,
+  parsePluginProviderSelector,
+} from '../../lib/plugin-providers'
 
 const command = defineCommand({
   meta: {
-    name: 'claude-marketplace',
-    description: 'Export packs as a Claude Code plugin marketplace (Option A: many small plugins).',
+    name: 'export',
+    description: 'Export pack plugins for one provider or all supported providers.',
   },
   args: {
+    agent: {
+      type: 'string',
+      description: 'Provider to export for: claude, codex, cursor, or all',
+      default: 'all',
+    },
     packsDir: {
       type: 'string',
       description: 'Directory containing pack folders (each with meta.json).',
@@ -16,12 +25,15 @@ const command = defineCommand({
     },
     out: {
       type: 'string',
-      description: 'Output directory for the marketplace.',
-      default: 'dist/claude-marketplace',
+      description: 'Output directory. Defaults to dist/<provider>-marketplace or dist/plugins for all.',
+    },
+    config: {
+      type: 'string',
+      description: 'Optional config file (defaults to agentrig.plugins.json or agentrig.marketplace.json).',
     },
     marketplaceName: {
       type: 'string',
-      description: 'Marketplace identifier (kebab-case).',
+      description: 'Override the marketplace identifier for the selected provider(s).',
     },
     ownerName: {
       type: 'string',
@@ -34,16 +46,15 @@ const command = defineCommand({
     pluginPrefix: {
       type: 'string',
       description: 'Prefix applied to plugin names to avoid collisions.',
-      default: 'agentrig-',
+    },
+    pack: {
+      type: 'string',
+      description: 'Export a single pack by folder name instead of every pack.',
     },
     clean: {
       type: 'boolean',
       description: 'Remove the output directory before exporting.',
       default: true,
-    },
-    config: {
-      type: 'string',
-      description: 'Optional JSON config file (defaults to agentrig.marketplace.json if present).',
     },
     help: {
       type: 'boolean',
@@ -56,22 +67,25 @@ const command = defineCommand({
     if (args.help) return showUsage(command)
 
     const cwd = process.cwd()
-    const [result] = await exportPluginProviders({
+    const provider = parsePluginProviderSelector(args.agent)
+    const results = await exportPluginProviders({
       cwd,
-      agent: 'claude',
+      agent: provider,
       packsDir: args.packsDir,
-      out: path.resolve(cwd, args.out),
+      out: args.out ? path.resolve(cwd, args.out) : undefined,
       configPath: args.config,
       marketplaceName: args.marketplaceName,
       ownerName: args.ownerName,
       ownerEmail: args.ownerEmail,
       pluginPrefix: args.pluginPrefix,
       clean: args.clean,
+      pack: args.pack,
     })
 
-    console.log(formatProviderSummary(result))
-    console.log(`Marketplace: ${result.marketplaceName}`)
-    console.log(`Plugins dir: ${path.join(result.outRoot, 'plugins')}`)
+    for (const result of results) {
+      console.log(formatProviderSummary(result))
+      console.log(`Marketplace: ${result.marketplaceName}`)
+    }
   },
 })
 

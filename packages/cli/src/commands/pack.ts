@@ -15,6 +15,7 @@ const command = defineCommand({
     bundle: () => import('./pack/bundle').then((m) => m.default),
     publish: () => import('./pack/publish').then((m) => m.default),
     status: () => import('./pack/status').then((m) => m.default),
+    plugin: () => import('./pack/plugin').then((m) => m.default),
     'claude-marketplace': () => import('./pack/claude-marketplace').then((m) => m.default),
   },
   run({ args, rawArgs }) {

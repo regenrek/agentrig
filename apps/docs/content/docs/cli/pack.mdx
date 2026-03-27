@@ -24,10 +24,30 @@ agentrig pack create . --out meta.json
 
 Scans a directory, hashes files, and writes `meta.json`.
 
+## plugin export
+
+```bash
+agentrig pack plugin export --agent all --packsDir registry/packs --out dist/plugins
+```
+
+Exports each pack as a plugin for `claude`, `codex`, `cursor`, or `all`.
+
+Options: `--agent`, `--packsDir`, `--out`, `--config`, `--marketplaceName`, `--ownerName`, `--ownerEmail`, `--pluginPrefix`, `--pack`, `--clean`.
+
+## plugin install
+
+```bash
+agentrig pack plugin install --agent all --scope personal
+```
+
+Builds plugin output and installs it into the selected provider surfaces.
+
+Options: `--agent`, `--packsDir`, `--out`, `--config`, `--marketplaceName`, `--ownerName`, `--ownerEmail`, `--pluginPrefix`, `--pack`, `--scope`, `--force`, `--dryRun`, `--clean`.
+
 ## claude-marketplace
 
 ```bash
 agentrig pack claude-marketplace --packsDir registry/packs --out dist/claude-marketplace
 ```
 
-Exports each pack as a Claude Code plugin and generates `.claude-plugin/marketplace.json`.
+Compatibility alias for `agentrig pack plugin export --agent claude`.

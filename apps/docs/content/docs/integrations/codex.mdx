@@ -1,0 +1,44 @@
+---
+title: Codex
+description: Export and install packs as local Codex plugins.
+icon: Bot
+---
+
+# Codex integration
+
+Agentrig can export packs as Codex plugins and wire them into a local Codex marketplace.
+
+## Export a Codex marketplace
+
+```bash
+agentrig pack plugin export --agent codex --packsDir registry/packs --out dist/codex-marketplace
+```
+
+This generates:
+
+```text
+dist/codex-marketplace/
+  .agents/plugins/marketplace.json
+  plugins/
+    agentrig-<pack>/
+      .codex-plugin/plugin.json
+      skills/...
+      .mcp.json
+      .app.json
+```
+
+## Install for your user
+
+```bash
+agentrig pack plugin install --agent codex --scope personal
+```
+
+This copies plugins into `~/.codex/plugins/` and updates `~/.agents/plugins/marketplace.json`.
+
+## Install for the current repo
+
+```bash
+agentrig pack plugin install --agent codex --scope workspace
+```
+
+This writes a repo-local marketplace at `.agents/plugins/marketplace.json` and copies plugins into `./plugins/`.
