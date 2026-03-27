@@ -1,6 +1,6 @@
 {
   "title": "Integrations",
-  "description": "Claude, marketplace exports, and editor support",
+  "description": "Claude, Codex, Cursor, and plugin marketplace exports",
   "icon": "Plug",
-  "pages": ["index", "claude-code", "marketplace", "cursor"]
+  "pages": ["index", "claude-code", "codex", "marketplace", "cursor"]
 }

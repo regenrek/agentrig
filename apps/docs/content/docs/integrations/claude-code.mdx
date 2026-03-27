@@ -11,7 +11,7 @@ Agentrig can export packs as Claude Code plugins so they are installable via the
 ## Build the marketplace
 
 ```bash
-pnpm claude:marketplace:build
+agentrig pack plugin export --agent claude --packsDir registry/packs --out dist/claude-marketplace
 ```
 
 This generates:
@@ -29,10 +29,13 @@ dist/claude-marketplace/
 
 ## Install in Claude Code
 
-```text
-/plugin marketplace add ./dist/claude-marketplace
-/plugin install agentrig-core-committer@agentrig-community
+```bash
+agentrig pack plugin install --agent claude
 ```
+
+Agentrig uses the native `claude plugin marketplace add` and `claude plugin install` commands under the hood.
+
+If you prefer the old export-only command, `agentrig pack claude-marketplace` still works as a compatibility alias.
 
 ## Using commands and skills
 

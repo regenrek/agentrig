@@ -1,12 +1,20 @@
 # agentrig
 
-A monorepo that contains:
+![Agentrig banner](public/banner_opt.png)
 
-- `agentrig` CLI (TypeScript, built with `citty`)
-- A docs site + registry browser (TanStack Start + Fumadocs)
-- A local registry data folder you can publish (pack `meta.json` + files)
+**Composable AI workflow packs for Claude Code, Codex, and Cursor.**
 
-The goal is to make it easy to compose "skills" and "workflows" as packs, then apply them per-project without having to redeclare the same lists everywhere.
+Agentrig helps you package the prompts, skills, rules, commands, hooks, MCP config, and agent setup that already work for your team, then reuse them across projects without copy-pasting them repo by repo.
+
+This repo includes the `agentrig` CLI, the docs and registry site, and a publishable pack registry.
+
+## Features
+
+- `Pack-based workflows`: Define reusable packs with `meta.json` plus the files you want to distribute.
+- `Registry distribution`: Install packs from a hosted registry, a direct URL, or a local file.
+- `Rig composition`: Group packs into named rigs so projects can opt into a consistent setup.
+- `Multi-provider plugins`: Export the same pack as a native plugin for Claude Code, Codex, and Cursor.
+- `Docs + browser`: Ship a docs site and registry browser alongside the CLI.
 
 ## What is a pack?
 
@@ -21,27 +29,15 @@ The CLI can install a pack from:
 - A direct `meta.json` URL
 - A direct local `meta.json` path
 
-## Quick start (this repo)
-
-1) Install deps:
+## Quickstart
 
 ```bash
 pnpm install
-```
-
-2) Build the local registry into the docs app's `public/registry` directory:
-
-```bash
 pnpm registry:build
-```
-
-3) Run the docs site (also serves the registry JSON and pack files):
-
-```bash
 pnpm docs:dev
 ```
 
-4) In another terminal, run the CLI:
+In another terminal:
 
 ```bash
 pnpm dev:cli -- init
@@ -49,7 +45,35 @@ pnpm dev:cli -- list --available --registry http://localhost:5173/registry
 pnpm dev:cli -- add core-committer --registry http://localhost:5173/registry
 ```
 
-The default install target directory is `.codex/skills` (configurable).
+The default pack install target directory is `.codex/skills` (configurable).
+
+## Repo workflow
+
+1. `Install dependencies`
+
+```bash
+pnpm install
+```
+
+2. `Build the local registry into the docs app's public output`
+
+```bash
+pnpm registry:build
+```
+
+3. `Run the docs site, which also serves registry JSON and pack files`
+
+```bash
+pnpm docs:dev
+```
+
+4. `Use the CLI against the local registry`
+
+```bash
+pnpm dev:cli -- init
+pnpm dev:cli -- list --available --registry http://localhost:5173/registry
+pnpm dev:cli -- add core-committer --registry http://localhost:5173/registry
+```
 
 ## Publish your registry
 
@@ -61,45 +85,52 @@ The built registry output is:
 
 You can deploy the docs site anywhere that serves static files. The CLI only needs a base URL that contains `/registry.json`.
 
-## Export packs as a Claude Code plugin marketplace (Option A)
+## Plugin export
 
-If you want your packs to be installable via Claude Code's marketplace UI (`/plugin`), you can export each pack as its own Claude plugin, and generate a marketplace catalog.
+If you want your packs to be installable as local plugins, agentrig can export each pack as a provider-native plugin for Claude Code, Codex, Cursor, or all three at once.
 
-Build the marketplace output:
+Build every supported provider:
 
 ```bash
-pnpm claude:marketplace:build
+pnpm plugins:build
 ```
 
-This generates a self-contained marketplace folder at:
+Or export a single provider directly:
 
-```
-dist/claude-marketplace/
-  .claude-plugin/marketplace.json
-  plugins/
-    agentrig-<pack>/
-      .claude-plugin/plugin.json
-      skills/...
-      commands/... (if present in the pack)
-      agents/... (if present in the pack)
+```bash
+agentrig pack plugin export --agent claude --packsDir registry/packs --out dist/claude-marketplace
+agentrig pack plugin export --agent codex --packsDir registry/packs --out dist/codex-marketplace
+agentrig pack plugin export --agent cursor --packsDir registry/packs --out dist/cursor-marketplace
 ```
 
-Test locally in Claude Code:
+This generates provider-native outputs such as:
 
 ```text
-/plugin marketplace add ./dist/claude-marketplace
-/plugin install agentrig-core-committer@agentrig-community
+dist/plugins/
+  claude/
+    .claude-plugin/marketplace.json
+    plugins/agentrig-<pack>/
+  codex/
+    .agents/plugins/marketplace.json
+    plugins/agentrig-<pack>/
+  cursor/
+    .cursor-plugin/marketplace.json
+    plugins/agentrig-<pack>/
 ```
 
-Then use the plugin's namespaced commands/skills (for example):
+Install into local providers:
 
-```text
-/agentrig-core-committer:committer
+```bash
+agentrig pack plugin install --agent all --scope personal
 ```
 
-You can customize the marketplace name, owner, and plugin prefix in `agentrig.marketplace.json`.
+For Claude, agentrig calls the native `claude plugin marketplace add` and `claude plugin install` commands.
+For Codex, it updates a local marketplace manifest and copies plugins into `~/.codex/plugins/` or `./plugins/`.
+For Cursor, it copies plugins into `~/.cursor/plugins/local/`.
 
-## Contributing a pack
+You can customize marketplace names, owners, and prefixes in `agentrig.plugins.json`. The older `agentrig.marketplace.json` file is still supported for Claude-only settings.
+
+## Create a pack
 
 Create a new folder:
 
@@ -110,13 +141,13 @@ registry/packs/<your-pack>/
   skills/<skill-name>/<scripts>
 ```
 
-Then run:
+Then rebuild the registry:
 
 ```bash
 pnpm registry:build
 ```
 
-If your pack also needs Claude commands or agents, add these folders at the pack root:
+If your pack also needs provider-specific plugin components, add these folders at the pack root:
 
 ```
 registry/packs/<your-pack>/
@@ -124,11 +155,17 @@ registry/packs/<your-pack>/
     <command>.md
   agents/
     <agent>.md
+  rules/
+    <rule>.mdc
+  hooks/
+    hooks.json
+  .mcp.json
+  .app.json
 ```
 
-They'll be copied into the exported Claude plugin automatically.
+They'll be copied into exported provider plugins when that provider supports them.
 
-## Registry format inspiration
+## Registry model
 
 This project follows the same shape as the shadcn registry concept:
 
@@ -138,7 +175,7 @@ This project follows the same shape as the shadcn registry concept:
 
 
 
-## DRY setup across many projects
+## Shared setup across projects
 
 You can keep shared rigs and registries in a global config:
 

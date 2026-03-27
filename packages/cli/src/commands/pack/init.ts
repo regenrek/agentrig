@@ -320,7 +320,7 @@ const command = defineCommand({
       console.log(`  cd ${packName}`)
       console.log('  # Edit skills/ and meta.json')
       console.log('  agentrig pack create . --out meta.json  # Regenerate meta.json')
-      console.log('  agentrig pack claude-marketplace .      # Export for Claude marketplace')
+      console.log('  agentrig pack plugin export --agent all --packsDir . --out dist/plugins')
     } finally {
       // Cleanup temp dir if used
       if (tempDir) {

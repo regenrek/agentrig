@@ -6,27 +6,42 @@ icon: Store
 
 # Marketplace exports
 
-Use `agentrig pack claude-marketplace` to export packs as individual plugins.
+Use `agentrig pack plugin export` to export packs as individual plugins for Claude, Codex, Cursor, or all three at once.
 
 ```bash
-agentrig pack claude-marketplace --packsDir registry/packs --out dist/claude-marketplace
+agentrig pack plugin export --agent all --packsDir registry/packs --out dist/plugins
+```
+
+This generates:
+
+```text
+dist/plugins/
+  claude/
+  codex/
+  cursor/
 ```
 
 ## Optional config file
 
-Create `agentrig.marketplace.json` to customize output:
+Create `agentrig.plugins.json` to customize output:
 
 ```json
 {
-  "name": "agentrig-community",
+  "pluginPrefix": "agentrig-",
   "owner": { "name": "Agentrig", "email": "team@agentrig.ai" },
-  "metadata": {
-    "description": "Agentrig packs exported as Claude Code plugins.",
-    "version": "1.0.0",
-    "pluginRoot": "./plugins"
+  "providers": {
+    "claude": {
+      "marketplaceName": "agentrig-community"
+    },
+    "codex": {
+      "marketplaceName": "agentrig-local",
+      "displayName": "Agentrig Local"
+    },
+    "cursor": {
+      "marketplaceName": "agentrig-marketplace"
+    }
   },
-  "pluginPrefix": "agentrig-"
 }
 ```
 
-The exporter reads this file automatically when present.
+The exporter reads this file automatically when present. For backward compatibility, `agentrig.marketplace.json` is still supported for Claude-only settings.
