@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-03-27
+
+### Fixed
+- Fixed the published CLI entrypoint so `agentrig --help` and other commands no longer crash after global installation with newer Node.js releases.
+- Synced the top-level CLI command metadata version with `packages/cli/package.json` so help output reports the shipped version correctly.
+
 ## [0.2.1] - 2026-03-27
 
 ### Changed
