@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-27
+
+### Changed
+- Refreshed CLI dependencies, including `giget` and `citty`, plus updated Vitest and Node type tooling.
+- Updated docs app UI and platform dependencies, including `@base-ui/react`, `lucide-react`, `motion`, `tailwind-merge`, and Iconify packages.
+- Aligned the docs Cloudflare toolchain with newer `@cloudflare/vite-plugin` requirements by adding current `wrangler` and `workerd` dev dependencies.
+
+### Fixed
+- Removed the deprecated `tar@6.2.1` path that surfaced during `npm install -g agentrig@latest`.
+- Restored a passing docs production build after the dependency refresh by bringing the Cloudflare/Vite-side tooling back into a compatible set.
+
 ## [0.2.0] - 2026-03-27
 
 ### Added
