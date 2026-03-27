@@ -12,7 +12,7 @@ export function baseOptions(): BaseLayoutProps {
       title: "Agentrig",
       url: "/",
     },
-    githubUrl: "https://github.com/agentrig/agentrig",
+    githubUrl: "https://github.com/regenrek/agentrig",
     links: [],
   };
 }

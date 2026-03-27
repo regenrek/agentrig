@@ -6,6 +6,19 @@ icon: Plug
 
 # Integrations
 
-Agentrig packs can target editor-specific directories and export to external plugin marketplaces.
+Agentrig packs can target editor-specific directories and export to provider-native plugin formats.
 
-This section covers integrations for Claude Code, Codex, marketplace exports, and editor tooling like Cursor.
+This section covers:
+
+- `Claude Code`: export and install Claude marketplace plugins
+- `Codex`: export, install, and uninstall local Codex plugins for personal or workspace scope
+- `Cursor`: export, install, and uninstall local Cursor plugins for personal or workspace scope
+- `Marketplace exports`: shared config and output structure for multi-provider plugin exports
+
+The generic plugin workflow is:
+
+```bash
+agentrig pack plugin export --agent <provider|all>
+agentrig pack plugin install --agent <provider> --pack <pack>
+agentrig pack plugin uninstall --agent <provider> --pack <pack>
+```

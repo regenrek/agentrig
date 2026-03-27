@@ -1,7 +1,15 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { ensureDir, writeJsonFile } from '../fs'
-import type { PackEntry, PackFeatures, PluginOwner, PluginProviderAdapter, ProviderExportContext } from './shared'
+import { getPluginInstallRecordId } from '../plugin-install-ledger'
+import type { CursorPluginInstallRecord } from '../types'
+import type {
+  PackEntry,
+  PackFeatures,
+  PluginOwner,
+  PluginProviderAdapter,
+  ProviderExportContext,
+} from './shared'
 import {
   cursorMarketplaceManifestSchema,
   cursorPluginManifestSchema,
@@ -14,7 +22,15 @@ import {
   detectPackFeatures,
   normalizeManifestDescription,
   pluginAuthor,
+  removeInstalledFiles,
 } from './shared'
+
+function resolveCursorInstallRoot(cwd: string, scope: 'personal' | 'workspace') {
+  if (scope === 'workspace') {
+    return path.join(cwd, '.cursor', 'plugins', 'local')
+  }
+  return path.join(homedir(), '.cursor', 'plugins', 'local')
+}
 
 async function copyCursorPlugin(packDir: string, pluginDir: string) {
   await copyEntries(packDir, pluginDir, [
@@ -103,32 +119,94 @@ export const cursorProvider: PluginProviderAdapter = {
       plugins: packs,
     }
   },
-  async install({ result, scope, force, dryRun }) {
-    if (scope !== 'personal') {
-      throw new Error('Cursor local installs currently support only --scope personal')
+  previewInstall({ cwd, packs, scope }) {
+    const pluginRoot = resolveCursorInstallRoot(cwd, scope)
+    return {
+      provider: 'cursor',
+      scope,
+      locations: [pluginRoot, ...packs.map((pack) => path.join(pluginRoot, pack.pluginName))],
+      actions: packs.map((pack) => `copy ${pack.pluginName} -> ${path.join(pluginRoot, pack.pluginName)}`),
     }
-
+  },
+  async install({ cwd, result, scope, requestedScope, force, dryRun }) {
     const installed: string[] = []
     const skipped: string[] = []
-    const pluginRoot = path.join(homedir(), '.cursor', 'plugins', 'local')
+    const ledgerEntries: CursorPluginInstallRecord[] = []
+    const pluginRoot = resolveCursorInstallRoot(cwd, scope)
     const pluginSourceRoot = path.join(result.outRoot, 'plugins')
 
     for (const pack of result.plugins) {
       const sourceDir = path.join(pluginSourceRoot, pack.pluginName)
       const destinationDir = path.join(pluginRoot, pack.pluginName)
-      const changed = dryRun ? true : await copyInstalledPlugin(sourceDir, destinationDir, force)
+      const copyResult = dryRun
+        ? { changed: true, files: [] }
+        : await copyInstalledPlugin(sourceDir, destinationDir, force)
+      const changed = copyResult.changed
       if (changed) {
         installed.push(pack.pluginName)
       } else {
         skipped.push(pack.pluginName)
       }
+
+      if (changed) {
+        ledgerEntries.push({
+          id: getPluginInstallRecordId('cursor', scope, pack.pluginName),
+          provider: 'cursor',
+          requestedScope,
+          scope,
+          packName: pack.meta.name,
+          packVersion: pack.meta.version,
+          pluginName: pack.pluginName,
+          sourceLocation: sourceDir,
+          targetPaths: [destinationDir],
+          installedAt: new Date().toISOString(),
+          files: copyResult.files,
+          metadata: {
+            pluginPath: destinationDir,
+          },
+        })
+      }
     }
 
     return {
       provider: 'cursor',
+      scope,
       installed,
       skipped,
       locations: [pluginRoot],
+      ledgerEntries,
+    }
+  },
+  async uninstall({ entries, dryRun }) {
+    const removed: string[] = []
+    const kept: string[] = []
+    const missing: string[] = []
+    const clearedRecordIds: string[] = []
+    const locations = [...new Set(entries.flatMap((entry) => entry.targetPaths))]
+
+    for (const entry of entries) {
+      if (entry.provider !== 'cursor') continue
+      const summary = await removeInstalledFiles(entry.metadata.pluginPath, entry.files, dryRun)
+      if (summary.kept.length > 0) {
+        kept.push(entry.pluginName)
+        continue
+      }
+      if (summary.removed.length > 0) {
+        removed.push(entry.pluginName)
+        clearedRecordIds.push(entry.id)
+        continue
+      }
+      missing.push(entry.pluginName)
+      clearedRecordIds.push(entry.id)
+    }
+
+    return {
+      provider: 'cursor',
+      removed,
+      kept,
+      missing,
+      locations,
+      clearedRecordIds,
     }
   },
 }

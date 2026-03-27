@@ -185,6 +185,85 @@ export type Manifest = {
   installed: Record<string, InstalledPack>
 }
 
+export type PluginProviderName = 'claude' | 'codex' | 'cursor'
+export type PluginInstallScopeName = 'personal' | 'workspace'
+export type PluginInstallScopeSelectorName = 'auto' | PluginInstallScopeName
+
+export type PluginInstalledFile = {
+  path: string
+  sha256: string
+}
+
+export type CodexMarketplacePluginSource = {
+  source: 'local'
+  path: string
+}
+
+export type CodexMarketplacePluginPolicy = {
+  installation: 'AVAILABLE' | 'INSTALLED_BY_DEFAULT' | 'NOT_AVAILABLE'
+  authentication: 'ON_INSTALL' | 'ON_FIRST_USE'
+}
+
+export type CodexMarketplacePluginRecord = {
+  name: string
+  source: CodexMarketplacePluginSource
+  policy: CodexMarketplacePluginPolicy
+  category: string
+}
+
+type PluginInstallRecordBase = {
+  id: string
+  provider: PluginProviderName
+  requestedScope: PluginInstallScopeSelectorName
+  scope: PluginInstallScopeName
+  packName: string
+  packVersion: string
+  pluginName: string
+  sourceLocation: string
+  targetPaths: string[]
+  installedAt: string
+}
+
+export type ClaudePluginInstallRecord = PluginInstallRecordBase & {
+  provider: 'claude'
+  files: []
+  metadata: {
+    marketplaceName: string
+    pluginRef: string
+    scopeArg: 'user' | 'project'
+    marketplaceSourcePath: string
+    marketplaceAdded: boolean
+  }
+}
+
+export type CodexPluginInstallRecord = PluginInstallRecordBase & {
+  provider: 'codex'
+  files: PluginInstalledFile[]
+  metadata: {
+    pluginPath: string
+    marketplacePath: string
+    marketplaceEntry: CodexMarketplacePluginRecord
+  }
+}
+
+export type CursorPluginInstallRecord = PluginInstallRecordBase & {
+  provider: 'cursor'
+  files: PluginInstalledFile[]
+  metadata: {
+    pluginPath: string
+  }
+}
+
+export type PluginInstallRecord =
+  | ClaudePluginInstallRecord
+  | CodexPluginInstallRecord
+  | CursorPluginInstallRecord
+
+export type PluginInstallLedger = {
+  schemaVersion: 1
+  installs: Record<string, PluginInstallRecord>
+}
+
 export type CliAuthIdentity = {
   userId: string
   email?: string

@@ -121,12 +121,15 @@ dist/plugins/
 Install into local providers:
 
 ```bash
-agentrig pack plugin install --agent all --scope personal
+agentrig pack plugin install --agent codex --pack my-pack --scope auto
+agentrig pack plugin install --agent cursor --pack my-pack --scope workspace
 ```
 
 For Claude, agentrig calls the native `claude plugin marketplace add` and `claude plugin install` commands.
 For Codex, it updates a local marketplace manifest and copies plugins into `~/.codex/plugins/` or `./plugins/`.
-For Cursor, it copies plugins into `~/.cursor/plugins/local/`.
+For Cursor, `--scope personal` copies plugins into `~/.cursor/plugins/local/`.
+For Cursor, explicit `--scope workspace` copies plugins into `<cwd>/.cursor/plugins/local/` using AgentRig's project-local convention.
+Cursor `--scope auto` still resolves to `personal`.
 
 You can customize marketplace names, owners, and prefixes in `agentrig.plugins.json`. The older `agentrig.marketplace.json` file is still supported for Claude-only settings.
 

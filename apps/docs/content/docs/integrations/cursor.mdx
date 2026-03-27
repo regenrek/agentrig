@@ -6,8 +6,7 @@ icon: Monitor
 
 # Cursor integration
 
-Agentrig allows pack files to target `.cursor/` directories by default.
-This makes it easy to distribute Cursor rules, prompts, and tooling across projects.
+Agentrig can export packs as local Cursor plugins so you can distribute rules, prompts, agents, MCP config, and related tooling in one installable bundle.
 
 ## Export Cursor plugins
 
@@ -15,15 +14,48 @@ This makes it easy to distribute Cursor rules, prompts, and tooling across proje
 agentrig pack plugin export --agent cursor --packsDir registry/packs --out dist/cursor-marketplace
 ```
 
-This generates a multi-plugin Cursor marketplace repo with `.cursor-plugin/marketplace.json` plus one plugin directory per pack.
+For a single pack:
+
+```bash
+agentrig pack plugin export --agent cursor --pack my-pack --packsDir registry/packs --out dist/cursor-marketplace
+```
+
+This generates a Cursor marketplace repo with `.cursor-plugin/marketplace.json` plus one plugin directory per pack.
 
 ## Install local Cursor plugins
 
 ```bash
-agentrig pack plugin install --agent cursor --scope personal
+agentrig pack plugin install --agent cursor --pack my-pack --scope personal
 ```
 
 This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor after installing.
+
+## Install project-local Cursor plugins
+
+```bash
+agentrig pack plugin install --agent cursor --pack my-pack --scope workspace
+```
+
+This copies each generated plugin into `<cwd>/.cursor/plugins/local/`.
+Workspace scope is an AgentRig project-local convention so the plugin stays inside the repo instead of your global Cursor profile.
+
+If you omit `--scope`, `auto` still resolves Cursor installs to `personal` for now.
+
+In interactive terminals, AgentRig can prompt for the provider, pack, and scope.
+In non-interactive runs, pass `--pack <folder>` or `--all`.
+
+## Uninstall Cursor plugins
+
+```bash
+agentrig pack plugin uninstall --agent cursor --pack my-pack
+```
+
+Uninstall is safe by default:
+
+- AgentRig removes only files tracked in its install ledger
+- modified plugin files are kept instead of being deleted
+- workspace installs are removed from `.cursor/plugins/local/` inside the repo
+- personal installs are removed from `~/.cursor/plugins/local/`
 
 ## Example
 
@@ -38,3 +70,4 @@ This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor
 
 - Keep Cursor-specific files isolated in a pack.
 - Combine with rigs to apply the same Cursor setup across multiple repos.
+- Use `--scope workspace` when you want the Cursor plugin to stay repo-local and easy to remove with the project.

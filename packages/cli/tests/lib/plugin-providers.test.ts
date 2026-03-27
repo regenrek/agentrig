@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   exportPluginProviders,
   installPluginProviders,
+  uninstallPluginProviders,
   type ExternalCommandRunner,
 } from '../../src/lib/plugin-providers'
+import { loadPluginInstallLedgers } from '../../src/lib/plugin-install-ledger'
 
 type TempWorkspace = {
   rootDir: string
@@ -134,6 +136,50 @@ describe('plugin providers', () => {
     expect(cursorMarketplace.plugins[0].source).toBe('plugins/agentrig-sample-pack')
   })
 
+  it('fails early when plugin pack metadata has malformed tags', async () => {
+    workspace = await createWorkspace()
+    const packMetaPath = path.join(workspace.packsRoot, 'sample-pack', 'meta.json')
+    await writeJson(packMetaPath, {
+      name: 'sample-pack',
+      title: 'Sample Pack',
+      description: 'Sample description',
+      version: '1.0.0',
+      tags: 'demo',
+    })
+
+    await expect(
+      exportPluginProviders({
+        cwd: workspace.rootDir,
+        agent: 'codex',
+        packsDir: workspace.packsRoot,
+        out: path.join(workspace.rootDir, 'dist'),
+        clean: true,
+      })
+    ).rejects.toThrow(`Invalid meta.json in ${path.join(workspace.packsRoot, 'sample-pack')}`)
+  })
+
+  it('fails early when plugin pack metadata has an invalid version', async () => {
+    workspace = await createWorkspace()
+    const packMetaPath = path.join(workspace.packsRoot, 'sample-pack', 'meta.json')
+    await writeJson(packMetaPath, {
+      name: 'sample-pack',
+      title: 'Sample Pack',
+      description: 'Sample description',
+      version: 'latest',
+      tags: ['demo'],
+    })
+
+    await expect(
+      exportPluginProviders({
+        cwd: workspace.rootDir,
+        agent: 'cursor',
+        packsDir: workspace.packsRoot,
+        out: path.join(workspace.rootDir, 'dist'),
+        clean: true,
+      })
+    ).rejects.toThrow('Pack version must be valid semver (x.y.z)')
+  })
+
   it('installs providers using provider-specific flows', async () => {
     workspace = await createWorkspace()
     const fakeHome = path.join(workspace.rootDir, 'home')
@@ -163,7 +209,7 @@ describe('plugin providers', () => {
       },
       {
         command: 'claude',
-        args: ['plugin', 'install', 'agentrig-sample-pack@agentrig-community'],
+        args: ['plugin', 'install', 'agentrig-sample-pack@agentrig-community', '--scope', 'user'],
       },
     ])
 
@@ -178,5 +224,608 @@ describe('plugin providers', () => {
     const cursorPluginPath = path.join(fakeHome, '.cursor', 'plugins', 'local', 'agentrig-sample-pack', '.cursor-plugin', 'plugin.json')
     const cursorPluginManifest = JSON.parse(await fs.readFile(cursorPluginPath, 'utf-8'))
     expect(cursorPluginManifest.name).toBe('agentrig-sample-pack')
+
+    const ledgers = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgers.personal.installs)).toHaveLength(3)
+    expect(Object.keys(ledgers.workspace.installs)).toHaveLength(0)
+  })
+
+  it('records workspace installs in the workspace ledger', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'codex',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'workspace',
+      force: true,
+      clean: true,
+    })
+
+    const ledgers = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgers.personal.installs)).toHaveLength(0)
+    expect(Object.keys(ledgers.workspace.installs)).toEqual(['codex:workspace:agentrig-sample-pack'])
+  })
+
+  it('installs Cursor workspace plugins into the repo-local convention and records the workspace ledger', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'cursor',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'workspace',
+      force: true,
+      clean: true,
+    })
+
+    const cursorPluginPath = path.join(
+      workspace.rootDir,
+      '.cursor',
+      'plugins',
+      'local',
+      'agentrig-sample-pack',
+      '.cursor-plugin',
+      'plugin.json'
+    )
+    const cursorPluginManifest = JSON.parse(await fs.readFile(cursorPluginPath, 'utf-8'))
+    expect(cursorPluginManifest.name).toBe('agentrig-sample-pack')
+
+    const ledgers = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgers.personal.installs)).toHaveLength(0)
+    expect(Object.keys(ledgers.workspace.installs)).toEqual(['cursor:workspace:agentrig-sample-pack'])
+
+    const cursorRecord = ledgers.workspace.installs['cursor:workspace:agentrig-sample-pack']
+    expect(cursorRecord?.provider).toBe('cursor')
+    if (!cursorRecord || cursorRecord.provider !== 'cursor') {
+      throw new Error('Expected a Cursor workspace ledger record')
+    }
+    expect(cursorRecord.metadata.pluginPath).toBe(
+      path.join(workspace.rootDir, '.cursor', 'plugins', 'local', 'agentrig-sample-pack')
+    )
+    expect(cursorRecord.targetPaths).toEqual([
+      path.join(workspace.rootDir, '.cursor', 'plugins', 'local', 'agentrig-sample-pack'),
+    ])
+  })
+
+  it('uninstalls Cursor workspace plugins safely and clears the workspace ledger entry', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'cursor',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'workspace',
+      force: true,
+      clean: true,
+    })
+
+    const ledgersBefore = await loadPluginInstallLedgers(workspace.rootDir)
+    const records = Object.values(ledgersBefore.workspace.installs)
+    const uninstallResults = await uninstallPluginProviders(records, {
+      cwd: workspace.rootDir,
+    })
+
+    expect(uninstallResults).toHaveLength(1)
+    const cursorResult = uninstallResults[0]
+    expect(cursorResult?.provider).toBe('cursor')
+    expect(cursorResult?.removed).toEqual(['agentrig-sample-pack'])
+    expect(cursorResult?.kept).toEqual([])
+
+    await expect(
+      fs.stat(path.join(workspace.rootDir, '.cursor', 'plugins', 'local', 'agentrig-sample-pack'))
+    ).rejects.toThrow()
+
+    const ledgersAfter = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgersAfter.workspace.installs)).toEqual([])
+  })
+
+  it('keeps modified Cursor workspace plugin files and preserves the workspace ledger entry', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'cursor',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'workspace',
+      force: true,
+      clean: true,
+    })
+
+    const cursorPluginManifestPath = path.join(
+      workspace.rootDir,
+      '.cursor',
+      'plugins',
+      'local',
+      'agentrig-sample-pack',
+      '.cursor-plugin',
+      'plugin.json'
+    )
+    await fs.writeFile(cursorPluginManifestPath, '{ "mutated": true }\n', 'utf-8')
+
+    const ledgersBefore = await loadPluginInstallLedgers(workspace.rootDir)
+    const records = Object.values(ledgersBefore.workspace.installs)
+    const uninstallResults = await uninstallPluginProviders(records, {
+      cwd: workspace.rootDir,
+    })
+
+    expect(uninstallResults).toHaveLength(1)
+    const cursorResult = uninstallResults[0]
+    expect(cursorResult?.provider).toBe('cursor')
+    expect(cursorResult?.removed).toEqual([])
+    expect(cursorResult?.kept).toEqual(['agentrig-sample-pack'])
+
+    expect(await fs.readFile(cursorPluginManifestPath, 'utf-8')).toContain('"mutated": true')
+
+    const ledgersAfter = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgersAfter.workspace.installs)).toEqual(['cursor:workspace:agentrig-sample-pack'])
+  })
+
+  it('uninstalls safely, keeps modified files, and preserves unrelated marketplace entries', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const preexistingMarketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    await writeJson(preexistingMarketplacePath, {
+      name: 'custom-market',
+      interface: { displayName: 'Custom Market' },
+      plugins: [
+        {
+          name: 'unrelated-plugin',
+          source: { source: 'local', path: './.codex/plugins/unrelated-plugin' },
+          policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+          category: 'Productivity',
+        },
+      ],
+    })
+
+    const installCalls: Array<{ command: string; args: string[] }> = []
+    const installRunner: ExternalCommandRunner = async (command, args) => {
+      installCalls.push({ command, args })
+    }
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'all',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+      commandRunner: installRunner,
+    })
+
+    const cursorPluginManifestPath = path.join(
+      fakeHome,
+      '.cursor',
+      'plugins',
+      'local',
+      'agentrig-sample-pack',
+      '.cursor-plugin',
+      'plugin.json'
+    )
+    await fs.writeFile(cursorPluginManifestPath, '{ "mutated": true }\n', 'utf-8')
+
+    const ledgersBefore = await loadPluginInstallLedgers(workspace.rootDir)
+    const records = Object.values(ledgersBefore.personal.installs)
+
+    const uninstallCalls: Array<{ command: string; args: string[] }> = []
+    const uninstallRunner: ExternalCommandRunner = async (command, args) => {
+      uninstallCalls.push({ command, args })
+    }
+
+    const uninstallResults = await uninstallPluginProviders(records, {
+      cwd: workspace.rootDir,
+      commandRunner: uninstallRunner,
+    })
+
+    const codexResult = uninstallResults.find((result) => result.provider === 'codex')
+    expect(codexResult?.removed).toEqual(['agentrig-sample-pack'])
+    expect(codexResult?.kept).toEqual([])
+
+    const cursorResult = uninstallResults.find((result) => result.provider === 'cursor')
+    expect(cursorResult?.removed).toEqual([])
+    expect(cursorResult?.kept).toEqual(['agentrig-sample-pack'])
+
+    const claudeResult = uninstallResults.find((result) => result.provider === 'claude')
+    expect(claudeResult?.removed).toEqual(['agentrig-sample-pack'])
+
+    expect(uninstallCalls).toEqual([
+      {
+        command: 'claude',
+        args: ['plugin', 'uninstall', 'agentrig-sample-pack@agentrig-community', '--scope', 'user'],
+      },
+      {
+        command: 'claude',
+        args: ['plugin', 'marketplace', 'remove', 'agentrig-community'],
+      },
+    ])
+
+    const codexPluginPath = path.join(fakeHome, '.codex', 'plugins', 'agentrig-sample-pack')
+    await expect(fs.stat(codexPluginPath)).rejects.toThrow()
+
+    const updatedMarketplace = JSON.parse(await fs.readFile(preexistingMarketplacePath, 'utf-8'))
+    expect(updatedMarketplace.plugins).toEqual([
+      {
+        name: 'unrelated-plugin',
+        source: { source: 'local', path: './.codex/plugins/unrelated-plugin' },
+        policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+        category: 'Productivity',
+      },
+    ])
+
+    expect(await fs.readFile(cursorPluginManifestPath, 'utf-8')).toContain('"mutated": true')
+
+    const ledgersAfter = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgersAfter.personal.installs)).toEqual(['cursor:personal:agentrig-sample-pack'])
+  })
+
+  it('does not remove a preexisting Claude marketplace during uninstall', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const installCalls: Array<{ command: string; args: string[] }> = []
+    const installRunner: ExternalCommandRunner = async (command, args) => {
+      installCalls.push({ command, args })
+      if (command === 'claude' && args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add') {
+        throw new Error('Marketplace already exists')
+      }
+    }
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'claude',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+      commandRunner: installRunner,
+    })
+
+    expect(installCalls).toEqual([
+      {
+        command: 'claude',
+        args: ['plugin', 'marketplace', 'add', path.join(workspace.rootDir, 'generated')],
+      },
+      {
+        command: 'claude',
+        args: ['plugin', 'install', 'agentrig-sample-pack@agentrig-community', '--scope', 'user'],
+      },
+    ])
+
+    const ledgersBefore = await loadPluginInstallLedgers(workspace.rootDir)
+    const records = Object.values(ledgersBefore.personal.installs)
+    expect(records).toHaveLength(1)
+    const claudeRecord = records[0]
+    expect(claudeRecord?.provider).toBe('claude')
+    if (!claudeRecord || claudeRecord.provider !== 'claude') {
+      throw new Error('Expected a Claude ledger record')
+    }
+    expect(claudeRecord.metadata.marketplaceAdded).toBe(false)
+
+    const uninstallCalls: Array<{ command: string; args: string[] }> = []
+    const uninstallRunner: ExternalCommandRunner = async (command, args) => {
+      uninstallCalls.push({ command, args })
+    }
+
+    const uninstallResults = await uninstallPluginProviders(records, {
+      cwd: workspace.rootDir,
+      commandRunner: uninstallRunner,
+    })
+
+    expect(uninstallResults).toHaveLength(1)
+    expect(uninstallResults[0]?.provider).toBe('claude')
+    expect(uninstallResults[0]?.removed).toEqual(['agentrig-sample-pack'])
+    expect(uninstallCalls).toEqual([
+      {
+        command: 'claude',
+        args: ['plugin', 'uninstall', 'agentrig-sample-pack@agentrig-community', '--scope', 'user'],
+      },
+    ])
+
+    const ledgersAfter = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgersAfter.personal.installs)).toEqual([])
+  })
+
+  it('keeps the Codex marketplace entry when plugin files were modified and preserves extra marketplace fields', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const codexMarketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    await writeJson(codexMarketplacePath, {
+      name: 'custom-market',
+      interface: { displayName: 'Custom Market' },
+      customMetadata: { owner: 'user-managed' },
+      plugins: [],
+    })
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'codex',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+    })
+
+    const marketplaceAfterInstall = JSON.parse(await fs.readFile(codexMarketplacePath, 'utf-8'))
+    expect(marketplaceAfterInstall.customMetadata).toEqual({ owner: 'user-managed' })
+    expect(marketplaceAfterInstall.plugins).toHaveLength(1)
+
+    const codexPluginManifestPath = path.join(
+      fakeHome,
+      '.codex',
+      'plugins',
+      'agentrig-sample-pack',
+      '.codex-plugin',
+      'plugin.json'
+    )
+    await fs.writeFile(codexPluginManifestPath, '{ "mutated": true }\n', 'utf-8')
+
+    const ledgersBefore = await loadPluginInstallLedgers(workspace.rootDir)
+    const records = Object.values(ledgersBefore.personal.installs)
+    const uninstallResults = await uninstallPluginProviders(records, {
+      cwd: workspace.rootDir,
+    })
+
+    const codexResult = uninstallResults.find((result) => result.provider === 'codex')
+    expect(codexResult?.removed).toEqual([])
+    expect(codexResult?.kept).toEqual(['agentrig-sample-pack'])
+
+    const marketplaceAfterUninstall = JSON.parse(await fs.readFile(codexMarketplacePath, 'utf-8'))
+    expect(marketplaceAfterUninstall.customMetadata).toEqual({ owner: 'user-managed' })
+    expect(marketplaceAfterUninstall.plugins).toEqual([
+      expect.objectContaining({
+        name: 'agentrig-sample-pack',
+        source: expect.objectContaining({
+          path: './.codex/plugins/agentrig-sample-pack',
+        }),
+      }),
+    ])
+
+    const ledgersAfter = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgersAfter.personal.installs)).toEqual(['codex:personal:agentrig-sample-pack'])
+  })
+
+  it('preserves unknown fields on an existing managed Codex marketplace row during install', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const codexMarketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    await writeJson(codexMarketplacePath, {
+      name: 'custom-market',
+      interface: {
+        displayName: 'Custom Market',
+        customBadge: 'beta',
+      },
+      customMetadata: { owner: 'user-managed' },
+      plugins: [
+        {
+          name: 'agentrig-sample-pack',
+          source: {
+            source: 'local',
+            path: './.codex/plugins/agentrig-sample-pack',
+            customSourceFlag: 'keep-me',
+          },
+          policy: {
+            installation: 'NOT_AVAILABLE',
+            authentication: 'ON_FIRST_USE',
+            reviewState: 'manual',
+          },
+          category: 'Legacy',
+          customFlag: true,
+        },
+      ],
+    })
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'codex',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+    })
+
+    const marketplaceAfterInstall = JSON.parse(await fs.readFile(codexMarketplacePath, 'utf-8'))
+    expect(marketplaceAfterInstall.customMetadata).toEqual({ owner: 'user-managed' })
+    expect(marketplaceAfterInstall.interface).toEqual({
+      displayName: 'Custom Market',
+      customBadge: 'beta',
+    })
+    expect(marketplaceAfterInstall.plugins).toEqual([
+      {
+        name: 'agentrig-sample-pack',
+        source: {
+          source: 'local',
+          path: './.codex/plugins/agentrig-sample-pack',
+          customSourceFlag: 'keep-me',
+        },
+        policy: {
+          installation: 'AVAILABLE',
+          authentication: 'ON_INSTALL',
+          reviewState: 'manual',
+        },
+        category: 'Productivity',
+        customFlag: true,
+      },
+    ])
+  })
+
+  it('preserves foreign or partial Codex marketplace entries during install', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const codexMarketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    await writeJson(codexMarketplacePath, {
+      name: 'custom-market',
+      interface: { displayName: 'Custom Market' },
+      plugins: [
+        {
+          name: 'foreign-plugin',
+          source: { source: 'remote', url: 'https://example.com/plugin.json' },
+        },
+        {
+          name: 'partial-plugin',
+        },
+      ],
+    })
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'codex',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+    })
+
+    const marketplaceAfterInstall = JSON.parse(await fs.readFile(codexMarketplacePath, 'utf-8'))
+    expect(marketplaceAfterInstall.plugins).toEqual([
+      {
+        name: 'foreign-plugin',
+        source: { source: 'remote', url: 'https://example.com/plugin.json' },
+      },
+      {
+        name: 'partial-plugin',
+      },
+      expect.objectContaining({
+        name: 'agentrig-sample-pack',
+        source: expect.objectContaining({
+          path: './.codex/plugins/agentrig-sample-pack',
+        }),
+      }),
+    ])
+  })
+
+  it('fails clearly when an existing Codex marketplace top-level shape cannot be safely merged', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const codexMarketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    await writeJson(codexMarketplacePath, {
+      name: 'custom-market',
+      interface: { displayName: 'Custom Market' },
+      plugins: {},
+    })
+
+    await expect(
+      installPluginProviders({
+        cwd: workspace.rootDir,
+        agent: 'codex',
+        packsDir: workspace.packsRoot,
+        out: path.join(workspace.rootDir, 'generated'),
+        scope: 'personal',
+        force: true,
+        clean: true,
+      })
+    ).rejects.toThrow(`Invalid Codex marketplace at ${codexMarketplacePath}`)
+  })
+
+  it('does not remove Codex plugin files before rejecting an invalid marketplace top-level during uninstall', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'codex',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+    })
+
+    const codexMarketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    const codexPluginPath = path.join(fakeHome, '.codex', 'plugins', 'agentrig-sample-pack')
+    await writeJson(codexMarketplacePath, {
+      name: 'custom-market',
+      interface: { displayName: 'Custom Market' },
+      plugins: {},
+    })
+
+    const ledgersBefore = await loadPluginInstallLedgers(workspace.rootDir)
+    const records = Object.values(ledgersBefore.personal.installs)
+
+    await expect(
+      uninstallPluginProviders(records, {
+        cwd: workspace.rootDir,
+      })
+    ).rejects.toThrow(`Invalid Codex marketplace at ${codexMarketplacePath}`)
+
+    await expect(fs.stat(codexPluginPath)).resolves.toBeDefined()
+
+    const ledgersAfter = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgersAfter.personal.installs)).toEqual(['codex:personal:agentrig-sample-pack'])
+  })
+
+  it('removes Codex marketplace entries using stable fields even when extra keys are present', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const codexMarketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
+    await installPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'codex',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+    })
+
+    const marketplace = JSON.parse(await fs.readFile(codexMarketplacePath, 'utf-8'))
+    marketplace.plugins = marketplace.plugins.map((plugin: Record<string, unknown>) =>
+      plugin.name === 'agentrig-sample-pack'
+        ? {
+            category: plugin.category,
+            source: plugin.source,
+            policy: plugin.policy,
+            name: plugin.name,
+            customFlag: true,
+          }
+        : plugin
+    )
+    await writeJson(codexMarketplacePath, marketplace)
+
+    const ledgersBefore = await loadPluginInstallLedgers(workspace.rootDir)
+    const records = Object.values(ledgersBefore.personal.installs)
+    const uninstallResults = await uninstallPluginProviders(records, {
+      cwd: workspace.rootDir,
+    })
+
+    const codexResult = uninstallResults.find((result) => result.provider === 'codex')
+    expect(codexResult?.removed).toEqual(['agentrig-sample-pack'])
+    expect(codexResult?.kept).toEqual([])
+
+    const marketplaceAfterUninstall = JSON.parse(await fs.readFile(codexMarketplacePath, 'utf-8'))
+    expect(marketplaceAfterUninstall.plugins).toEqual([])
+
+    const ledgersAfter = await loadPluginInstallLedgers(workspace.rootDir)
+    expect(Object.keys(ledgersAfter.personal.installs)).toEqual([])
   })
 })
