@@ -1,4 +1,9 @@
-import JSZip from 'jszip'
+import {
+  TextReader,
+  Uint8ArrayReader,
+  Uint8ArrayWriter,
+  ZipWriter,
+} from '@zip.js/zip.js'
 import { describe, expect, it } from 'vitest'
 import {
   PackPublishValidationError,
@@ -19,10 +24,32 @@ const policy: PackUploadPolicySnapshot = {
   publishedVersionRetention: 10,
 }
 
-async function buildZip(configure: (zip: JSZip) => void) {
-  const zip = new JSZip()
-  configure(zip)
-  return await zip.generateAsync({ type: 'uint8array' })
+type TestZipBuilder = {
+  file: (name: string, content: string | Uint8Array) => void
+}
+
+async function buildZip(configure: (zip: TestZipBuilder) => void) {
+  const files: Array<{ name: string; content: string | Uint8Array }> = []
+  configure({
+    file(name, content) {
+      files.push({ name, content })
+    },
+  })
+
+  const zipWriter = new ZipWriter(new Uint8ArrayWriter(), {
+    level: 9,
+    useWebWorkers: false,
+  })
+
+  for (const file of files) {
+    const reader =
+      typeof file.content === 'string'
+        ? new TextReader(file.content)
+        : new Uint8ArrayReader(file.content)
+    await zipWriter.add(file.name, reader)
+  }
+
+  return await zipWriter.close()
 }
 
 describe('pack publish validation', () => {

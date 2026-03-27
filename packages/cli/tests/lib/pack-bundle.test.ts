@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import JSZip from 'jszip'
+import { Uint8ArrayReader, ZipReader, type FileEntry } from '@zip.js/zip.js'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createPackBundle, removePackBundle } from '../../src/lib/pack-bundle'
 import type { PackUploadPolicySnapshot } from '../../src/lib/types'
@@ -58,10 +58,17 @@ describe('pack bundle', () => {
     const bundle = await createPackBundle({ dir: tempDir, policy })
 
     expect(bundle.fileName).toBe('demo-pack-1.2.3.zip')
-    const zip = await JSZip.loadAsync(bundle.zipBytes)
-    expect(zip.file('meta.json')).toBeTruthy()
-    expect(zip.file('README.md')).toBeTruthy()
-    expect(zip.file('skills/demo/SKILL.md')).toBeTruthy()
+    const zipReader = new ZipReader(new Uint8ArrayReader(bundle.zipBytes), {
+      useWebWorkers: false,
+    })
+    const entries = (await zipReader.getEntries()).filter(
+      (entry): entry is FileEntry => !entry.directory
+    )
+    const filenames = entries.map((entry) => entry.filename)
+    expect(filenames).toContain('meta.json')
+    expect(filenames).toContain('README.md')
+    expect(filenames).toContain('skills/demo/SKILL.md')
+    await zipReader.close()
 
     await removePackBundle(bundle)
     await expect(fs.access(bundle.bundlePath)).rejects.toThrow()

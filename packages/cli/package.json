@@ -23,9 +23,9 @@
     "coverage": "vitest --run --coverage"
   },
   "dependencies": {
+    "@zip.js/zip.js": "^2.8.23",
     "citty": "^0.1.6",
-    "giget": "^1.2.3",
-    "jszip": "^3.10.1"
+    "giget": "^1.2.3"
   },
   "devDependencies": {
     "@types/node": "^25.0.10",

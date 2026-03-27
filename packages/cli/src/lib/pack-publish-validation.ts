@@ -1,4 +1,10 @@
-import JSZip from 'jszip'
+import {
+  Uint8ArrayReader,
+  Uint8ArrayWriter,
+  ZipReader,
+  type Entry,
+  type FileEntry,
+} from '@zip.js/zip.js'
 import {
   isAllowedExtension,
   isAllowedFilename,
@@ -8,8 +14,6 @@ import {
   validatePackMeta,
 } from './pack-validation'
 import type { PackMeta, PackPublishValidationResult, PackUploadPolicySnapshot } from './types'
-
-type ZipEntry = JSZip.JSZipObject
 
 export class PackPublishValidationError extends Error {
   readonly errors: string[]
@@ -23,18 +27,15 @@ export class PackPublishValidationError extends Error {
   }
 }
 
-function getUncompressedSize(entry: ZipEntry) {
-  const data = (entry as { _data?: { uncompressedSize?: number; _uncompressedSize?: number } })._data
-  if (typeof data?.uncompressedSize === 'number') return data.uncompressedSize
-  if (typeof data?._uncompressedSize === 'number') return data._uncompressedSize
-  return null
+function getUncompressedSize(entry: Entry) {
+  return typeof entry.uncompressedSize === 'number' ? entry.uncompressedSize : null
 }
 
-function buildEntryIndex(entries: ZipEntry[]) {
-  return new Map(entries.map((entry) => [entry.name, entry]))
+function buildEntryIndex(entries: FileEntry[]) {
+  return new Map(entries.map((entry) => [entry.filename, entry]))
 }
 
-function validateArchiveEntries(entries: ZipEntry[], policy: PackUploadPolicySnapshot) {
+function validateArchiveEntries(entries: FileEntry[], policy: PackUploadPolicySnapshot) {
   const errors: string[] = []
   let totalBytes = 0
 
@@ -43,24 +44,24 @@ function validateArchiveEntries(entries: ZipEntry[], policy: PackUploadPolicySna
   }
 
   for (const entry of entries) {
-    if (!isSafeRelativePath(entry.name)) {
-      errors.push(`Unsafe path detected: ${entry.name}`)
+    if (!isSafeRelativePath(entry.filename)) {
+      errors.push(`Unsafe path detected: ${entry.filename}`)
       continue
     }
-    if (isBlockedExtension(entry.name, policy)) {
-      errors.push(`Blocked file type: ${entry.name}`)
+    if (isBlockedExtension(entry.filename, policy)) {
+      errors.push(`Blocked file type: ${entry.filename}`)
       continue
     }
 
     const uncompressed = getUncompressedSize(entry)
     if (uncompressed == null) {
-      errors.push(`Unable to verify size for ${entry.name}`)
+      errors.push(`Unable to verify size for ${entry.filename}`)
       continue
     }
 
     totalBytes += uncompressed
     if (uncompressed > policy.maxFileBytes) {
-      errors.push(`File too large: ${entry.name}`)
+      errors.push(`File too large: ${entry.filename}`)
     }
     if (totalBytes > policy.maxTotalBytes) {
       errors.push('Total unpacked size exceeds limit')
@@ -73,15 +74,15 @@ function validateArchiveEntries(entries: ZipEntry[], policy: PackUploadPolicySna
 
 async function validatePackMetaAgainstArchive(
   meta: PackMeta,
-  entryIndex: Map<string, ZipEntry>,
-  entries: ZipEntry[],
+  entryIndex: Map<string, FileEntry>,
+  entries: FileEntry[],
   policy: PackUploadPolicySnapshot
 ) {
   const errors: string[] = []
   const warnings: string[] = []
 
   const extraFiles = entries
-    .map((entry) => entry.name)
+    .map((entry) => entry.filename)
     .filter((name) => name !== 'meta.json' && name !== 'README.md')
     .filter((name) => !meta.files.some((file) => file.path === name))
 
@@ -110,7 +111,7 @@ async function validatePackMetaAgainstArchive(
       continue
     }
 
-    const bytes = await entry.async('uint8array')
+    const bytes = await entry.getData(new Uint8ArrayWriter(), { useWebWorkers: false })
     if (
       isProbablyBinary(bytes) &&
       !isAllowedExtension(fileRef.path, policy) &&
@@ -134,51 +135,60 @@ export async function validatePackBundle(
     errors.push('Upload exceeds size limit')
   }
 
-  const zip = await JSZip.loadAsync(zipBytes)
-  const entries = Object.values(zip.files).filter((entry) => !entry.dir)
-  const entryIndex = buildEntryIndex(entries)
+  const zipReader = new ZipReader(new Uint8ArrayReader(zipBytes), {
+    useWebWorkers: false,
+  })
 
-  const metaEntry = zip.file('meta.json')
-  if (!metaEntry) {
-    errors.push('meta.json is required at the archive root')
-  }
+  try {
+    const allEntries = await zipReader.getEntries()
+    const entries = allEntries.filter((entry): entry is FileEntry => !entry.directory)
+    const entryIndex = buildEntryIndex(entries)
 
-  const readmeEntry = zip.file('README.md')
-  if (!readmeEntry) {
-    warnings.push('README.md is missing')
-  }
-
-  const archiveValidation = validateArchiveEntries(entries, policy)
-  errors.push(...archiveValidation.errors)
-
-  let meta: PackMeta | null = null
-  if (metaEntry) {
-    try {
-      const raw = await metaEntry.async('string')
-      meta = validatePackMeta(JSON.parse(raw), policy)
-    } catch (error) {
-      errors.push(
-        error instanceof Error ? error.message : 'Failed to parse meta.json'
-      )
+    const metaEntry = entryIndex.get('meta.json')
+    if (!metaEntry) {
+      errors.push('meta.json is required at the archive root')
     }
-  }
 
-  if (meta) {
-    const metaValidation = await validatePackMetaAgainstArchive(meta, entryIndex, entries, policy)
-    errors.push(...metaValidation.errors)
-    warnings.push(...metaValidation.warnings)
-  }
+    const readmeEntry = entryIndex.get('README.md')
+    if (!readmeEntry) {
+      warnings.push('README.md is missing')
+    }
 
-  if (errors.length || !meta) {
-    throw new PackPublishValidationError(errors, warnings)
-  }
+    const archiveValidation = validateArchiveEntries(entries, policy)
+    errors.push(...archiveValidation.errors)
 
-  return {
-    meta,
-    fileCount: entries.length,
-    totalBytes: archiveValidation.totalBytes,
-    zipBytes: zipBytes.length,
-    warnings,
+    let meta: PackMeta | null = null
+    if (metaEntry) {
+      try {
+        const rawBytes = await metaEntry.getData(new Uint8ArrayWriter(), { useWebWorkers: false })
+        const raw = new TextDecoder().decode(rawBytes)
+        meta = validatePackMeta(JSON.parse(raw), policy)
+      } catch (error) {
+        errors.push(
+          error instanceof Error ? error.message : 'Failed to parse meta.json'
+        )
+      }
+    }
+
+    if (meta) {
+      const metaValidation = await validatePackMetaAgainstArchive(meta, entryIndex, entries, policy)
+      errors.push(...metaValidation.errors)
+      warnings.push(...metaValidation.warnings)
+    }
+
+    if (errors.length || !meta) {
+      throw new PackPublishValidationError(errors, warnings)
+    }
+
+    return {
+      meta,
+      fileCount: entries.length,
+      totalBytes: archiveValidation.totalBytes,
+      zipBytes: zipBytes.length,
+      warnings,
+    }
+  } finally {
+    await zipReader.close()
   }
 }
 
