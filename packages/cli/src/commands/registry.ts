@@ -1,4 +1,5 @@
 import { defineCommand, showUsage } from 'citty'
+import { shouldShowParentUsage } from '../lib/command'
 
 const command = defineCommand({
   meta: {
@@ -12,9 +13,9 @@ const command = defineCommand({
     list: () => import('./registry/list').then((m) => m.default),
     add: () => import('./registry/add').then((m) => m.default),
   },
-  run({ args }) {
+  run({ args, rawArgs }) {
     if (args.help) return showUsage(command)
-    return showUsage(command)
+    if (shouldShowParentUsage(rawArgs)) return showUsage(command)
   },
 })
 

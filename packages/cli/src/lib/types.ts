@@ -184,3 +184,103 @@ export type Manifest = {
   schemaVersion: 1
   installed: Record<string, InstalledPack>
 }
+
+export type CliAuthIdentity = {
+  userId: string
+  email?: string
+  name?: string
+}
+
+export type CliAuthSession = CliAuthIdentity & {
+  baseUrl: string
+  accessToken: string
+  expiresAt: number
+}
+
+export type CliLoginStart = {
+  requestId: string
+  publicCode: string
+  exchangeSecret: string
+  expiresAt: number
+  verificationUrl: string
+}
+
+export type CliLoginExchange =
+  | {
+      status: 'pending'
+      expiresAt: number
+    }
+  | {
+      status: 'expired'
+      expiresAt: number
+    }
+  | {
+      status: 'approved'
+      accessToken: string
+      expiresAt: number
+      user: CliAuthIdentity
+    }
+
+export type CliWhoAmI = {
+  userId: string
+  email?: string | null
+  name?: string | null
+}
+
+export type PackUploadPolicySnapshot = {
+  maxZipBytes: number
+  maxFileBytes: number
+  maxTotalBytes: number
+  maxFiles: number
+  allowedContentTypes: string[]
+  blockedExtensions: string[]
+  allowedFileExtensions: string[]
+  allowedFilenames: string[]
+  allowedTargetPrefixes: string[]
+  publishedVersionRetention: number
+}
+
+export type PackBundle = {
+  directory: string
+  bundlePath: string
+  fileName: string
+  meta: PackMeta
+  zipBytes: Uint8Array
+  temporary: boolean
+}
+
+export type PackPublishValidationResult = {
+  meta: PackMeta
+  fileCount: number
+  totalBytes: number
+  zipBytes: number
+  warnings: string[]
+}
+
+export type PackUploadUrlResponse = {
+  uploadUrl: string
+}
+
+export type PackSubmissionCreateResponse = {
+  submissionId: string
+}
+
+export type PackSubmissionStatus = {
+  _id: string
+  fileName: string
+  status: string
+  scanStatus: string
+  scanErrors?: string[]
+  scanWarnings?: string[]
+  reviewStatus?: string
+  reviewNote?: string
+  packMeta?: unknown
+  packName?: string
+  packVersion?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export type PackSubmissionListResponse = {
+  submissions: PackSubmissionStatus[]
+}

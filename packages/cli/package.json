@@ -24,7 +24,8 @@
   },
   "dependencies": {
     "citty": "^0.1.6",
-    "giget": "^1.2.3"
+    "giget": "^1.2.3",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
