@@ -1,6 +1,6 @@
 {
   "title": "Getting Started",
-  "description": "See why teams use agentrig and how to try it quickly",
+  "description": "Learn how agentrig helps and how to try it quickly",
   "icon": "Rocket",
   "pages": ["index", "installation", "first-pack", "concepts"]
 }
