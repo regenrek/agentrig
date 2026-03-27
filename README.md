@@ -8,6 +8,8 @@ Agentrig helps you package the prompts, skills, rules, commands, hooks, MCP conf
 
 This repo includes the `agentrig` CLI, the docs and registry site, and a publishable pack registry.
 
+> Warning: Agentrig is under active development. Expect breaking changes, evolving behavior, and rough edges. Use it at your own risk.
+
 ## Features
 
 - `Pack-based workflows`: Define reusable packs with `meta.json` plus the files you want to distribute.
@@ -167,16 +169,6 @@ registry/packs/<your-pack>/
 ```
 
 They'll be copied into exported provider plugins when that provider supports them.
-
-## Registry model
-
-This project follows the same shape as the shadcn registry concept:
-
-- A `registry.json` index at the registry root
-- Per-item JSON documents under `r/<name>.json`
-- Item JSON references file paths instead of inlining file content
-
-
 
 ## Shared setup across projects
 
