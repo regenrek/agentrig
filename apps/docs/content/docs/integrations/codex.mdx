@@ -6,12 +6,18 @@ icon: Bot
 
 # Codex integration
 
-Agentrig can export packs as Codex plugins and wire them into a local Codex marketplace.
+Agentrig can export packs as Codex plugins, install them into either your user profile or the current repo, and keep them reversible through the AgentRig install ledger.
 
 ## Export a Codex marketplace
 
 ```bash
 agentrig pack plugin export --agent codex --packsDir registry/packs --out dist/codex-marketplace
+```
+
+For a single pack:
+
+```bash
+agentrig pack plugin export --agent codex --pack my-pack --packsDir registry/packs --out dist/codex-marketplace
 ```
 
 This generates:
@@ -27,10 +33,22 @@ dist/codex-marketplace/
       .app.json
 ```
 
+## Install behavior
+
+```bash
+agentrig pack plugin install --agent codex --pack my-pack
+```
+
+In interactive terminals, AgentRig can prompt for the provider, pack, and scope.
+In non-interactive runs, pass `--pack <folder>` or `--all`.
+
+`--scope auto` is the default selector.
+For Codex, `auto` resolves to `workspace`.
+
 ## Install for your user
 
 ```bash
-agentrig pack plugin install --agent codex --scope personal
+agentrig pack plugin install --agent codex --pack my-pack --scope personal
 ```
 
 This copies plugins into `~/.codex/plugins/` and updates `~/.agents/plugins/marketplace.json`.
@@ -38,7 +56,28 @@ This copies plugins into `~/.codex/plugins/` and updates `~/.agents/plugins/mark
 ## Install for the current repo
 
 ```bash
-agentrig pack plugin install --agent codex --scope workspace
+agentrig pack plugin install --agent codex --pack my-pack --scope workspace
 ```
 
 This writes a repo-local marketplace at `.agents/plugins/marketplace.json` and copies plugins into `./plugins/`.
+
+## Uninstall Codex plugins
+
+```bash
+agentrig pack plugin uninstall --agent codex --pack my-pack
+```
+
+Uninstall is ledger-backed and hash-guarded:
+
+- AgentRig removes only files it previously installed
+- modified plugin files are kept instead of being deleted
+- unrelated marketplace entries are preserved
+- existing extra metadata in `marketplace.json` is preserved when AgentRig updates its managed entry
+
+## What Codex plugins include
+
+Codex exports can include:
+
+- `skills/`
+- `.mcp.json`
+- `.app.json`

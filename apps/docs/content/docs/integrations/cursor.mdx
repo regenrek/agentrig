@@ -14,7 +14,13 @@ Agentrig can export packs as local Cursor plugins so you can distribute rules, p
 agentrig pack plugin export --agent cursor --packsDir registry/packs --out dist/cursor-marketplace
 ```
 
-This generates a multi-plugin Cursor marketplace repo with `.cursor-plugin/marketplace.json` plus one plugin directory per pack.
+For a single pack:
+
+```bash
+agentrig pack plugin export --agent cursor --pack my-pack --packsDir registry/packs --out dist/cursor-marketplace
+```
+
+This generates a Cursor marketplace repo with `.cursor-plugin/marketplace.json` plus one plugin directory per pack.
 
 ## Install local Cursor plugins
 
@@ -35,6 +41,22 @@ Workspace scope is an AgentRig project-local convention so the plugin stays insi
 
 If you omit `--scope`, `auto` still resolves Cursor installs to `personal` for now.
 
+In interactive terminals, AgentRig can prompt for the provider, pack, and scope.
+In non-interactive runs, pass `--pack <folder>` or `--all`.
+
+## Uninstall Cursor plugins
+
+```bash
+agentrig pack plugin uninstall --agent cursor --pack my-pack
+```
+
+Uninstall is safe by default:
+
+- AgentRig removes only files tracked in its install ledger
+- modified plugin files are kept instead of being deleted
+- workspace installs are removed from `.cursor/plugins/local/` inside the repo
+- personal installs are removed from `~/.cursor/plugins/local/`
+
 ## Example
 
 ```json
@@ -48,3 +70,4 @@ If you omit `--scope`, `auto` still resolves Cursor installs to `personal` for n
 
 - Keep Cursor-specific files isolated in a pack.
 - Combine with rigs to apply the same Cursor setup across multiple repos.
+- Use `--scope workspace` when you want the Cursor plugin to stay repo-local and easy to remove with the project.

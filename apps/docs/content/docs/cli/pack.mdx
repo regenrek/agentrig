@@ -45,8 +45,35 @@ In interactive terminals, the CLI prompts for provider and pack selection.
 In non-interactive runs, pass an explicit `--pack` or use `--all`.
 
 `--scope auto` remains the default selector. For Cursor, `auto` still resolves to `personal`; use `--scope workspace` to install into the repo-local AgentRig convention at `.cursor/plugins/local/`.
+For Codex and Claude, `auto` resolves to `workspace`.
+
+Before writing anything, the command prints an install plan showing:
+
+- selected packs
+- requested scope
+- provider-specific target locations
+- provider-specific actions
 
 Options: `--agent`, `--packsDir`, `--out`, `--config`, `--marketplaceName`, `--ownerName`, `--ownerEmail`, `--pluginPrefix`, `--pack`, `--scope`, `--force`, `--dryRun`, `--clean`.
+
+## plugin uninstall
+
+```bash
+agentrig pack plugin uninstall --agent codex --pack my-pack
+```
+
+Removes AgentRig-managed plugin installs using the install ledger.
+In interactive terminals, the CLI can prompt for provider, pack, and scope selection.
+In non-interactive runs, pass an explicit `--agent` and `--pack`, or use `--all`.
+
+Uninstall is safe by default:
+
+- only AgentRig-managed installs are considered
+- tracked files are removed only when they still match the recorded hashes
+- modified files are kept
+- provider-specific cleanup is limited to AgentRig-managed entries
+
+Options: `--agent`, `--all`, `--pack`, `--scope`, `--dryRun`.
 
 ## claude-marketplace
 

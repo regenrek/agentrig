@@ -12,6 +12,12 @@ Use `agentrig pack plugin export` to export packs as individual plugins for Clau
 agentrig pack plugin export --agent all --packsDir registry/packs --out dist/plugins
 ```
 
+Export a single pack:
+
+```bash
+agentrig pack plugin export --agent all --pack my-pack --packsDir registry/packs --out dist/plugins
+```
+
 This generates:
 
 ```text
@@ -20,6 +26,12 @@ dist/plugins/
   codex/
   cursor/
 ```
+
+Each provider gets its own native layout:
+
+- `claude`: `.claude-plugin/marketplace.json` plus `plugins/<plugin>/.claude-plugin/plugin.json`
+- `codex`: `.agents/plugins/marketplace.json` plus `plugins/<plugin>/.codex-plugin/plugin.json`
+- `cursor`: `.cursor-plugin/marketplace.json` plus `plugins/<plugin>/.cursor-plugin/plugin.json`
 
 ## Optional config file
 
@@ -45,3 +57,16 @@ Create `agentrig.plugins.json` to customize output:
 ```
 
 The exporter reads this file automatically when present. For backward compatibility, `agentrig.marketplace.json` is still supported for Claude-only settings.
+
+## Install and uninstall after export
+
+Most users will use the generic install and uninstall commands instead of manually copying the exported files:
+
+```bash
+agentrig pack plugin install --agent codex --pack my-pack
+agentrig pack plugin uninstall --agent codex --pack my-pack
+```
+
+The install command always prints a preflight summary before writing anything.
+In interactive terminals, it can prompt for provider, pack, and scope.
+In non-interactive runs, pass `--pack <folder>` or `--all`.
