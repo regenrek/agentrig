@@ -2,7 +2,7 @@
 
 ![Agentrig banner](public/banner_opt.png)
 
-**Package AI workflows as reusable packs, compose them into rigs, and ship them natively to Cursor, Codex, and Claude.**
+**Composable AI workflow packs for portable, provider-native integrations.**
 
 Agentrig helps you package the prompts, skills, rules, commands, hooks, MCP config, and agent setup that already work for your team, then reuse them across projects without rebuilding the same workflow for every repo or tool.
 
@@ -22,7 +22,7 @@ This repo includes the `agentrig` CLI, the docs and registry site, and a publish
 
 ## Install the CLI
 
-Install the published CLI from npm:
+Install the official CLI from npm:
 
 ```bash
 npm install -g agentrig
@@ -71,7 +71,6 @@ If you want your packs to be installable as local plugins, agentrig can export e
 - `agentrig pack plugin export` converts that pack into each provider's native plugin marketplace layout for Claude Code, Codex, or Cursor.
 - `agentrig pack plugin install` installs the native output into the provider-specific target location instead of inventing a separate runtime format.
 - AgentRig records install state in its ledger so uninstall can remove only tracked files, preserve user-modified files, and keep plugin cleanup auditable.
-
 Export all supported providers:
 
 ```bash
@@ -116,7 +115,7 @@ For Cursor, `--scope personal` copies plugins into `~/.cursor/plugins/local/`.
 For Cursor, explicit `--scope workspace` copies plugins into `<cwd>/.cursor/plugins/local/` using AgentRig's project-local convention.
 Cursor `--scope auto` still resolves to `personal`.
 
-You can customize marketplace names, owners, and prefixes in `agentrig.plugins.json`. The older `agentrig.marketplace.json` file is still supported for Claude-only settings.
+You can customize marketplace names, owners, and prefixes in `agentrig.plugins.json`.
 
 AgentRig also tracks the plugin installs it manages, so uninstall can remove only what AgentRig added, keep modified files in place, and reduce hidden plugin/config bloat over time.
 
@@ -149,14 +148,6 @@ registry/packs/<your-pack>/
 
 They'll be copied into exported provider plugins when that provider supports them.
 
-## Registry model
-
-This project follows the same shape as the shadcn registry concept:
-
-- A `registry.json` index at the registry root
-- Per-item JSON documents under `r/<name>.json`
-- Item JSON references file paths instead of inlining file content
-
 ## Documentation
 
 - [Getting Started](https://docs.agentrig.ai/getting-started)
@@ -165,3 +156,10 @@ This project follows the same shape as the shadcn registry concept:
 - [Packs](https://docs.agentrig.ai/packs)
 - [Registry](https://docs.agentrig.ai/registry)
 
+## Registry model
+
+This project follows the same shape as the shadcn registry concept:
+
+- A `registry.json` index at the registry root
+- Per-item JSON documents under `r/<name>.json`
+- Item JSON references file paths instead of inlining file content

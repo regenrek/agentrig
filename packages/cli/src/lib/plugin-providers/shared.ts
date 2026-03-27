@@ -63,8 +63,6 @@ type PluginConfigFile = {
     codex?: CodexMarketplaceConfig
     cursor?: CursorMarketplaceConfig
   }
-  name?: string
-  metadata?: ClaudeMarketplaceConfig['metadata']
 }
 
 export type ResolvedPluginConfig = {
@@ -243,44 +241,43 @@ const pluginProviderIdSchema = z.enum(PLUGIN_PROVIDER_IDS)
 const pluginInstallScopeSchema = z.enum(PLUGIN_INSTALL_SCOPES)
 const pluginInstallScopeSelectorSchema = z.enum(PLUGIN_INSTALL_SCOPE_SELECTORS)
 const pluginProviderSelectorSchema = z.union([pluginProviderIdSchema, z.literal('all')])
-const pluginMetadataSchema = z.looseObject({
+const pluginMetadataSchema = z.object({
   description: optionalStringSchema,
   version: optionalStringSchema,
   pluginRoot: optionalStringSchema,
-})
-const pluginOwnerSchema = z.looseObject({
+}).strict()
+const pluginOwnerSchema = z.object({
   name: optionalStringSchema,
   email: optionalStringSchema,
-})
-const claudeMarketplaceConfigSchema = z.looseObject({
+}).strict()
+const claudeMarketplaceConfigSchema = z.object({
   marketplaceName: optionalStringSchema,
   metadata: pluginMetadataSchema.optional(),
-})
-const codexMarketplaceConfigSchema = z.looseObject({
+}).strict()
+const codexMarketplaceConfigSchema = z.object({
   marketplaceName: optionalStringSchema,
   displayName: optionalStringSchema,
   category: optionalStringSchema,
   installationPolicy: z.enum(['AVAILABLE', 'INSTALLED_BY_DEFAULT', 'NOT_AVAILABLE']).optional(),
   authenticationPolicy: z.enum(['ON_INSTALL', 'ON_FIRST_USE']).optional(),
   pluginRoot: optionalStringSchema,
-})
-const cursorMarketplaceConfigSchema = z.looseObject({
+}).strict()
+const cursorMarketplaceConfigSchema = z.object({
   marketplaceName: optionalStringSchema,
   metadata: pluginMetadataSchema.optional(),
-})
-const pluginConfigFileSchema = z.looseObject({
+}).strict()
+const pluginConfigFileSchema = z.object({
   pluginPrefix: optionalStringSchema,
   owner: pluginOwnerSchema.optional(),
   providers: z
-    .looseObject({
+    .object({
       claude: claudeMarketplaceConfigSchema.optional(),
       codex: codexMarketplaceConfigSchema.optional(),
       cursor: cursorMarketplaceConfigSchema.optional(),
     })
+    .strict()
     .optional(),
-  name: optionalStringSchema,
-  metadata: pluginMetadataSchema.optional(),
-})
+}).strict()
 const pluginPackMetaSchema = z.looseObject({
   name: nonEmptyStringSchema.refine(isValidPackName, 'Pack name must be lowercase letters, numbers, or hyphens'),
   title: nonEmptyStringSchema,
@@ -299,7 +296,7 @@ const DEFAULT_CONFIG: ResolvedPluginConfig = {
     claude: {
       marketplaceName: 'agentrig-community',
       metadata: {
-        description: 'Agentrig packs exported as Claude Code plugins.',
+        description: 'Agentrig workflow packs exported as provider-native plugins.',
         version: '1.0.0',
         pluginRoot: './plugins',
       },
@@ -454,14 +451,11 @@ export async function loadPluginConfig(
   overrides?: Partial<PluginExportOptions>
 ) {
   const defaultNewConfigPath = path.join(cwd, 'agentrig.plugins.json')
-  const defaultLegacyConfigPath = path.join(cwd, 'agentrig.marketplace.json')
   const configPath = explicitConfigPath
     ? path.resolve(cwd, explicitConfigPath)
     : (await pathExists(defaultNewConfigPath))
       ? defaultNewConfigPath
-      : (await pathExists(defaultLegacyConfigPath))
-        ? defaultLegacyConfigPath
-        : null
+      : null
 
   const raw = configPath ? await readJsonFile<PluginConfigFile>(configPath) : null
   const parsedResult = pluginConfigFileSchema.safeParse(raw ?? {})
@@ -470,14 +464,6 @@ export async function loadPluginConfig(
     throw new Error(`Invalid plugin config: ${issue?.message ?? 'invalid data'}`)
   }
   const parsed = parsedResult.data
-
-  const claudeFromLegacy =
-    !parsed.providers && (parsed.name || parsed.metadata)
-      ? {
-          marketplaceName: parsed.name,
-          metadata: parsed.metadata,
-        }
-      : undefined
 
   const ownerName = overrides?.ownerName?.trim() || parsed.owner?.name?.trim() || DEFAULT_CONFIG.owner.name
   const ownerEmail = overrides?.ownerEmail?.trim() || parsed.owner?.email?.trim() || DEFAULT_CONFIG.owner.email
@@ -494,20 +480,16 @@ export async function loadPluginConfig(
         marketplaceName:
           overrides?.marketplaceName?.trim() ||
           parsed.providers?.claude?.marketplaceName?.trim() ||
-          claudeFromLegacy?.marketplaceName?.trim() ||
           DEFAULT_CONFIG.providers.claude.marketplaceName,
         metadata: {
           description:
             parsed.providers?.claude?.metadata?.description?.trim() ||
-            claudeFromLegacy?.metadata?.description?.trim() ||
             DEFAULT_CONFIG.providers.claude.metadata.description,
           version:
             parsed.providers?.claude?.metadata?.version?.trim() ||
-            claudeFromLegacy?.metadata?.version?.trim() ||
             DEFAULT_CONFIG.providers.claude.metadata.version,
           pluginRoot:
             parsed.providers?.claude?.metadata?.pluginRoot?.trim() ||
-            claudeFromLegacy?.metadata?.pluginRoot?.trim() ||
             DEFAULT_CONFIG.providers.claude.metadata.pluginRoot,
         },
       },

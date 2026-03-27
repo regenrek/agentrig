@@ -29,7 +29,7 @@ const command = defineCommand({
     },
     config: {
       type: 'string',
-      description: 'Optional config file (defaults to agentrig.plugins.json or agentrig.marketplace.json).',
+      description: 'Optional config file (defaults to agentrig.plugins.json).',
     },
     marketplaceName: {
       type: 'string',
