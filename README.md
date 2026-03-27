@@ -2,7 +2,7 @@
 
 ![Agentrig banner](public/banner_opt.png)
 
-**Composable AI workflow packs for portable, provider-native integrations.**
+**Reusable AI workflow packs, portable across projects and shipped as native plugins for Claude Code, Codex, and Cursor.**
 
 Agentrig helps you package the prompts, skills, rules, commands, hooks, MCP config, and agent setup that already work for your team, then reuse them across projects without rebuilding the same workflow for every repo or tool.
 
