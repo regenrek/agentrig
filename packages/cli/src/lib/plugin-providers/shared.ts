@@ -5,8 +5,8 @@ import { promisify } from 'node:util'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
+import { isValidPackName, isValidPackVersion } from '../pack-validation'
 import type {
-  PackMeta,
   PluginInstallRecord,
   PluginInstalledFile,
   PluginInstallScopeSelectorName,
@@ -77,8 +77,10 @@ export type ResolvedPluginConfig = {
   }
 }
 
+export type PluginPackMeta = z.infer<typeof pluginPackMetaSchema>
+
 export type PackEntry = {
-  meta: PackMeta
+  meta: PluginPackMeta
   packDir: string
   pluginName: string
 }
@@ -279,11 +281,13 @@ const pluginConfigFileSchema = z.looseObject({
   name: optionalStringSchema,
   metadata: pluginMetadataSchema.optional(),
 })
-const minimalPackMetaSchema = z.looseObject({
-  name: nonEmptyStringSchema,
+const pluginPackMetaSchema = z.looseObject({
+  name: nonEmptyStringSchema.refine(isValidPackName, 'Pack name must be lowercase letters, numbers, or hyphens'),
   title: nonEmptyStringSchema,
   description: nonEmptyStringSchema,
-  version: nonEmptyStringSchema,
+  version: nonEmptyStringSchema.refine(isValidPackVersion, 'Pack version must be valid semver (x.y.z)'),
+  author: optionalStringSchema,
+  tags: z.array(nonEmptyStringSchema).optional(),
 })
 
 const DEFAULT_CONFIG: ResolvedPluginConfig = {
@@ -340,7 +344,7 @@ export function toPosixPath(value: string) {
   return value.split(path.sep).join('/')
 }
 
-export function normalizeManifestDescription(meta: PackMeta) {
+export function normalizeManifestDescription(meta: PluginPackMeta) {
   return meta.description || meta.title
 }
 
@@ -350,7 +354,7 @@ export function normalizeAuthorObject(name?: string, email?: string) {
   return email?.trim() ? { name: authorName, email: email.trim() } : { name: authorName }
 }
 
-export function pluginAuthor(meta: PackMeta, owner: PluginOwner) {
+export function pluginAuthor(meta: PluginPackMeta, owner: PluginOwner) {
   return normalizeAuthorObject(meta.author ?? owner.name, owner.email)
 }
 
@@ -360,12 +364,12 @@ export async function readPackMeta(packDir: string) {
   if (!raw) {
     throw new Error(`Missing meta.json in ${packDir}`)
   }
-  const meta = minimalPackMetaSchema.safeParse(raw)
+  const meta = pluginPackMetaSchema.safeParse(raw)
   if (!meta.success) {
     const issue = meta.error.issues[0]
     throw new Error(`Invalid meta.json in ${packDir}: ${issue?.message ?? 'invalid data'}`)
   }
-  return raw as PackMeta
+  return meta.data
 }
 
 export async function listPackDirs(packsRoot: string, onlyPack?: string) {

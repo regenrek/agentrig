@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
+import { hasFlag, isInteractiveTty } from '../../lib/command-ui'
 import {
   parsePluginInstallScopeSelector,
   parsePluginProviderSelector,
@@ -10,14 +11,6 @@ import {
 import { loadPluginInstallLedgers, listPluginInstallRecords } from '../../lib/plugin-install-ledger'
 import { selectOption } from '../../lib/interactive'
 import type { PluginInstallRecord } from '../../lib/types'
-
-function hasFlag(rawArgs: string[] | undefined, name: string) {
-  return Boolean(rawArgs?.some((arg) => arg === `--${name}` || arg.startsWith(`--${name}=`)))
-}
-
-function isInteractiveTty() {
-  return Boolean(process.stdin.isTTY && process.stdout.isTTY)
-}
 
 async function resolveProviderSelection(
   rawArgs: string[] | undefined,

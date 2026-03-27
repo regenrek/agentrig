@@ -1,6 +1,7 @@
 import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
+import { hasFlag, isInteractiveTty } from '../../lib/command-ui'
 import {
   installPreparedPluginProviders,
   parsePluginInstallScopeSelector,
@@ -11,14 +12,6 @@ import {
 } from '../../lib/plugin-providers'
 import { buildPackEntries, loadPluginConfig } from '../../lib/plugin-providers/shared'
 import { selectOption } from '../../lib/interactive'
-
-function hasFlag(rawArgs: string[] | undefined, name: string) {
-  return Boolean(rawArgs?.some((arg) => arg === `--${name}` || arg.startsWith(`--${name}=`)))
-}
-
-function isInteractiveTty() {
-  return Boolean(process.stdin.isTTY && process.stdout.isTTY)
-}
 
 async function resolveProviderSelection(
   rawArgs: string[] | undefined,

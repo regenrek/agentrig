@@ -2,6 +2,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
 import { ensureDir, readJsonFile, writeJsonFile } from './fs'
+import { codexMarketplacePluginSchema } from './plugin-providers/schemas'
 import type {
   PluginInstallLedger,
   PluginInstallRecord,
@@ -15,18 +16,6 @@ const pluginInstallScopeSelectorSchema = z.enum(['auto', 'personal', 'workspace'
 const pluginInstalledFileSchema = z.strictObject({
   path: z.string().min(1),
   sha256: z.string().min(1),
-})
-const codexMarketplacePluginRecordSchema = z.strictObject({
-  name: z.string().min(1),
-  source: z.strictObject({
-    source: z.literal('local'),
-    path: z.string().min(1),
-  }),
-  policy: z.strictObject({
-    installation: z.enum(['AVAILABLE', 'INSTALLED_BY_DEFAULT', 'NOT_AVAILABLE']),
-    authentication: z.enum(['ON_INSTALL', 'ON_FIRST_USE']),
-  }),
-  category: z.string().min(1),
 })
 const pluginInstallRecordBaseSchema = z.strictObject({
   id: z.string().min(1),
@@ -57,7 +46,7 @@ const codexPluginInstallRecordSchema = pluginInstallRecordBaseSchema.extend({
   metadata: z.strictObject({
     pluginPath: z.string().min(1),
     marketplacePath: z.string().min(1),
-    marketplaceEntry: codexMarketplacePluginRecordSchema,
+    marketplaceEntry: codexMarketplacePluginSchema,
   }),
 })
 const cursorPluginInstallRecordSchema = pluginInstallRecordBaseSchema.extend({
