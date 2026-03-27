@@ -6,7 +6,7 @@ import { exportPluginProviders, formatProviderSummary } from '../../lib/plugin-p
 const command = defineCommand({
   meta: {
     name: 'claude-marketplace',
-    description: 'Export packs as a Claude Code plugin marketplace (Option A: many small plugins).',
+    description: 'Legacy alias for `pack plugin export --agent claude`.',
   },
   args: {
     packsDir: {

@@ -25,7 +25,8 @@
   "dependencies": {
     "@zip.js/zip.js": "^2.8.23",
     "citty": "^0.1.6",
-    "giget": "^1.2.3"
+    "giget": "^1.2.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
