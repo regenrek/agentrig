@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
-import JSZip from 'jszip'
+import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js'
 import { ensureDir, pathExists, removeIfExists } from './fs'
 import { isSafeRelativePath, validatePackMeta } from './pack-validation'
 import type { PackBundle, PackMeta, PackUploadPolicySnapshot } from './types'
@@ -87,15 +87,19 @@ export async function createPackBundle(options: {
 }) {
   const directory = await fs.realpath(path.resolve(options.dir))
   const { meta, metaRaw } = await readMetaFile(directory, options.policy)
-  const zip = new JSZip()
+  const zipWriter = new ZipWriter(new Uint8ArrayWriter(), {
+    level: 9,
+    useWebWorkers: false,
+  })
 
-  zip.file('meta.json', metaRaw.endsWith('\n') ? metaRaw : `${metaRaw}\n`)
+  const normalizedMeta = metaRaw.endsWith('\n') ? metaRaw : `${metaRaw}\n`
+  await zipWriter.add('meta.json', new Uint8ArrayReader(new TextEncoder().encode(normalizedMeta)))
 
   for (const entry of meta.files) {
     const sourceFile = await resolveBundleInputFile(directory, entry.path, 'pack file path')
     const bytes = await fs.readFile(sourceFile.absolutePath)
-    zip.file(sourceFile.normalizedPath, bytes, {
-      unixPermissions: entry.mode ? Number.parseInt(entry.mode, 8) : undefined,
+    await zipWriter.add(sourceFile.normalizedPath, new Uint8ArrayReader(bytes), {
+      unixMode: entry.mode ? Number.parseInt(entry.mode, 8) : undefined,
     })
   }
 
@@ -103,14 +107,10 @@ export async function createPackBundle(options: {
   if (await pathExists(readmePath)) {
     const { absolutePath: safeReadmePath } = await resolveBundleInputFile(directory, 'README.md', 'README.md')
     const readmeBytes = await fs.readFile(safeReadmePath)
-    zip.file('README.md', readmeBytes)
+    await zipWriter.add('README.md', new Uint8ArrayReader(readmeBytes))
   }
 
-  const zipBytes = await zip.generateAsync({
-    type: 'uint8array',
-    compression: 'DEFLATE',
-    compressionOptions: { level: 9 },
-  })
+  const zipBytes = await zipWriter.close()
 
   const fileName = bundleFileName(meta)
   const temporary = options.temporary ?? !options.outFile
