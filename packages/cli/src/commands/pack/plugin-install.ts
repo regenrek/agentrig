@@ -1,7 +1,11 @@
 import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
-import { installPluginProviders, parsePluginProviderSelector } from '../../lib/plugin-providers'
+import {
+  installPluginProviders,
+  parsePluginInstallScope,
+  parsePluginProviderSelector,
+} from '../../lib/plugin-providers'
 
 const command = defineCommand({
   meta: {
@@ -76,12 +80,10 @@ const command = defineCommand({
   },
   async run({ args }) {
     if (args.help) return showUsage(command)
-    if (args.scope !== 'personal' && args.scope !== 'workspace') {
-      throw new Error(`Unsupported scope: ${args.scope}`)
-    }
 
     const cwd = process.cwd()
     const provider = parsePluginProviderSelector(args.agent)
+    const scope = parsePluginInstallScope(args.scope)
     const results = await installPluginProviders({
       cwd,
       agent: provider,
@@ -93,7 +95,7 @@ const command = defineCommand({
       ownerEmail: args.ownerEmail,
       pluginPrefix: args.pluginPrefix,
       pack: args.pack,
-      scope: args.scope,
+      scope,
       force: args.force,
       dryRun: args.dryRun,
       clean: args.clean,
