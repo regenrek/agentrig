@@ -136,6 +136,43 @@ describe('plugin providers', () => {
     expect(cursorMarketplace.plugins[0].source).toBe('plugins/agentrig-sample-pack')
   })
 
+  it('auto-discovers agentrig.plugins.json as the canonical plugin config', async () => {
+    workspace = await createWorkspace()
+    const outRoot = path.join(workspace.rootDir, 'dist')
+
+    await writeJson(path.join(workspace.rootDir, 'agentrig.plugins.json'), {
+      pluginPrefix: 'custom-',
+      owner: { name: 'Configured Owner' },
+      providers: {
+        claude: {
+          marketplaceName: 'configured-market',
+          metadata: {
+            description: 'Configured description',
+            version: '2.0.0',
+            pluginRoot: './plugins',
+          },
+        },
+      },
+    })
+
+    const [result] = await exportPluginProviders({
+      cwd: workspace.rootDir,
+      agent: 'claude',
+      packsDir: workspace.packsRoot,
+      out: outRoot,
+      clean: true,
+    })
+
+    expect(result?.marketplaceName).toBe('configured-market')
+
+    const marketplaceManifest = JSON.parse(
+      await fs.readFile(path.join(outRoot, '.claude-plugin', 'marketplace.json'), 'utf-8')
+    )
+    expect(marketplaceManifest.name).toBe('configured-market')
+    expect(marketplaceManifest.owner.name).toBe('Configured Owner')
+    expect(marketplaceManifest.plugins[0].name).toBe('custom-sample-pack')
+  })
+
   it('fails early when plugin pack metadata has malformed tags', async () => {
     workspace = await createWorkspace()
     const packMetaPath = path.join(workspace.packsRoot, 'sample-pack', 'meta.json')

@@ -31,7 +31,8 @@ pack-name/
 
 - **skills/** maps to `{{skillsDir}}` by default during install.
 - **scripts/** and other folders install exactly where `meta.json` targets specify.
-- **hooks/**, **agents/**, **commands/** are used when exporting to Claude marketplace.
-- **.mcp.json** and **.lsp.json** enable MCP/LSP bundles in Claude exports.
+- **hooks/**, **agents/**, **commands/** are bundled into plugin exports when the target integration supports them.
+- **.mcp.json** is bundled into plugin exports that support MCP servers.
+- **.lsp.json** is bundled into plugin exports that support LSP configuration.
 
 Use `agentrig pack create` to scan a directory and generate a matching `meta.json`.

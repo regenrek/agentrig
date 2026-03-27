@@ -9,7 +9,7 @@
   "scripts": {
     "registry:build": "tsx scripts/build-registry.ts",
     "plugins:build": "pnpm -C packages/cli dev -- pack plugin export --agent all",
-    "claude:marketplace:build": "pnpm -C packages/cli dev -- pack claude-marketplace",
+    "plugins:build:claude": "pnpm -C packages/cli dev -- pack plugin export --agent claude",
     "dev:cli": "pnpm -C packages/cli dev",
     "test": "pnpm -C packages/cli test",
     "test:run": "pnpm -C packages/cli test:run",
