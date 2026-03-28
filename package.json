@@ -7,30 +7,38 @@
     "apps/*"
   ],
   "scripts": {
-    "registry:build": "tsx scripts/build-registry.ts",
-    "plugins:build": "pnpm -C packages/cli dev -- pack plugin export --agent all",
-    "plugins:build:claude": "pnpm -C packages/cli dev -- pack plugin export --agent claude",
-    "dev:cli": "pnpm -C packages/cli dev",
-    "test": "pnpm -C packages/cli test",
-    "test:run": "pnpm -C packages/cli test:run",
-    "test:e2e:run": "pnpm -C packages/cli test:e2e:run",
-    "test:release:local": "node scripts/test-release-local.mjs",
-    "test:release:smoke": "node scripts/test-release-local.mjs --smoke-only",
-    "coverage": "pnpm -C packages/cli coverage",
-    "build:cli": "pnpm -C packages/cli build",
-    "docs:dev": "pnpm -C apps/docs dev",
-    "docs:build": "pnpm -C apps/docs build",
-    "playground:vite:check": "node scripts/vite-playground.mjs --check",
-    "playground:vite:refresh": "node scripts/vite-playground.mjs --write",
-    "dev": "pnpm -r dev",
-    "build": "pnpm -r build",
+    "registry:build": "vp run repo:registry:build",
+    "plugins:build": "vp run repo:plugins:build",
+    "plugins:build:claude": "vp run repo:plugins:build:claude",
+    "check": "vp run repo:check",
+    "dev:cli": "vp run repo:dev:cli",
+    "test": "vp run repo:test",
+    "test:run": "vp run repo:test",
+    "test:e2e:run": "vp run repo:test:e2e",
+    "test:release:local": "vp run repo:test:release:local",
+    "test:release:smoke": "vp run repo:test:release:smoke",
+    "coverage": "vp run repo:coverage",
+    "build:cli": "vp run repo:build:cli",
+    "docs:dev": "vp run repo:docs:dev",
+    "docs:build": "vp run repo:docs:build",
+    "playground:vite-plus:check": "vp run repo:playground:vite-plus:check",
+    "playground:vite-plus:refresh": "vp run repo:playground:vite-plus:refresh",
+    "dev": "vp run -r dev",
+    "build": "vp run -r build",
     "prepare": "lefthook install",
     "security:check": "./scripts/secleak-check.sh",
     "security:hooks": "node scripts/hooks/block-forbidden-staged-files.mjs"
   },
+  "pnpm": {
+    "overrides": {
+      "vite": "npm:@voidzero-dev/vite-plus-core@latest"
+    }
+  },
   "devDependencies": {
     "lefthook": "^2.1.4",
     "tsx": "^4.7.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vite-plus": "^0.1.14"
   }
 }

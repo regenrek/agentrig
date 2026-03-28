@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vite-plus/test'
 import {
   appendTextFile,
   cleanupE2EWorkspace,
@@ -10,12 +10,18 @@ import {
   runBuiltCli,
   type E2EProject,
   type E2EWorkspace,
+  validateVpProject,
 } from '../helpers/e2e'
+import {
+  createNodeBackedCommand,
+  readJsonLinesFile,
+  withPrependedBinPath,
+} from '../helpers/harness'
 
 const registryUrl = 'https://agentrig.ai/registry'
 const packName = 'full-e2e-pack'
 const packTitle = 'Full E2E Pack'
-const packDescription = 'Fixture pack for Vite E2E tests.'
+const packDescription = 'Fixture pack for Vite+ E2E tests.'
 const pluginName = `agentrig-${packName}`
 
 async function pathExists(filePath: string) {
@@ -25,6 +31,11 @@ async function pathExists(filePath: string) {
   } catch {
     return false
   }
+}
+
+async function assertVpBuildWorks(project: E2EProject, workspace: E2EWorkspace) {
+  await validateVpProject(project, workspace)
+  expect(await pathExists(path.join(project.dir, 'dist', 'index.html'))).toBe(true)
 }
 
 async function initializeProject(project: E2EProject, workspace: E2EWorkspace) {
@@ -87,7 +98,95 @@ async function scaffoldPack(project: E2EProject, workspace: E2EWorkspace) {
   return { packDir }
 }
 
-describe.sequential('e2e:vite-playground', () => {
+async function createFakeClaudeEnv(workspace: E2EWorkspace) {
+  const binDir = path.join(workspace.rootDir, 'bin')
+  const logPath = path.join(workspace.rootDir, 'claude-calls.jsonl')
+  const statePath = path.join(workspace.rootDir, 'claude-state.json')
+
+  await createNodeBackedCommand(
+    binDir,
+    'claude',
+    `
+import { promises as fs } from 'node:fs'
+import path from 'node:path'
+
+const logPath = process.env.AGENTRIG_FAKE_CLAUDE_LOG
+const statePath = process.env.AGENTRIG_FAKE_CLAUDE_STATE
+const args = process.argv.slice(2)
+
+async function ensureParent(filePath) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true })
+}
+
+async function readState() {
+  try {
+    return JSON.parse(await fs.readFile(statePath, 'utf-8'))
+  } catch {
+    return { installs: [] }
+  }
+}
+
+async function writeState(state) {
+  await ensureParent(statePath)
+  await fs.writeFile(statePath, JSON.stringify(state, null, 2) + '\\n', 'utf-8')
+}
+
+async function appendLog(entry) {
+  await ensureParent(logPath)
+  await fs.appendFile(logPath, JSON.stringify(entry) + '\\n', 'utf-8')
+}
+
+const state = await readState()
+await appendLog({ args })
+
+if (args[0] !== 'plugin') {
+  console.error('Unsupported command')
+  process.exit(1)
+}
+
+if (args[1] === 'marketplace' && args[2] === 'add') {
+  process.exit(0)
+}
+
+if (args[1] === 'marketplace' && args[2] === 'remove') {
+  process.exit(0)
+}
+
+if (args[1] === 'install') {
+  const pluginRef = args[2]
+  if (!state.installs.includes(pluginRef)) {
+    state.installs.push(pluginRef)
+    await writeState(state)
+  }
+  process.exit(0)
+}
+
+if (args[1] === 'uninstall') {
+  const pluginRef = args[2]
+  if (!state.installs.includes(pluginRef)) {
+    console.error('Plugin not installed')
+    process.exit(1)
+  }
+  state.installs = state.installs.filter((entry) => entry !== pluginRef)
+  await writeState(state)
+  process.exit(0)
+}
+
+console.error('Unsupported plugin subcommand')
+process.exit(1)
+`
+  )
+
+  return {
+    env: withPrependedBinPath(binDir, {
+      AGENTRIG_FAKE_CLAUDE_LOG: logPath,
+      AGENTRIG_FAKE_CLAUDE_STATE: statePath,
+    }),
+    logPath,
+  }
+}
+
+describe.sequential('e2e:vite-plus-playground', () => {
   let workspace: E2EWorkspace | null = null
 
   afterEach(async () => {
@@ -95,11 +194,12 @@ describe.sequential('e2e:vite-playground', () => {
     workspace = null
   })
 
-  it('initializes a Vite project, scaffolds a pack, and exports all provider layouts', async () => {
+  it('validates the Vite+ app, scaffolds a pack, and exports all provider layouts', async () => {
     workspace = await createE2EWorkspace()
     const project = workspace.projects[0]
     if (!project) throw new Error('Missing project-a fixture')
 
+    await assertVpBuildWorks(project, workspace)
     const { packDir } = await scaffoldPack(project, workspace)
     const generatedMetaPath = path.join(packDir, 'meta.generated.json')
 
@@ -193,6 +293,7 @@ describe.sequential('e2e:vite-playground', () => {
     const project = workspace.projects[0]
     if (!project) throw new Error('Missing project-a fixture')
 
+    await assertVpBuildWorks(project, workspace)
     await scaffoldPack(project, workspace)
 
     await runBuiltCli(
@@ -310,6 +411,7 @@ describe.sequential('e2e:vite-playground', () => {
     const project = workspace.projects[0]
     if (!project) throw new Error('Missing project-a fixture')
 
+    await assertVpBuildWorks(project, workspace)
     await scaffoldPack(project, workspace)
 
     await runBuiltCli(
@@ -354,7 +456,14 @@ describe.sequential('e2e:vite-playground', () => {
       }
     )
 
-    const codexPluginPath = path.join(workspace.homeDir, '.codex', 'plugins', pluginName, '.codex-plugin', 'plugin.json')
+    const codexPluginPath = path.join(
+      workspace.homeDir,
+      '.codex',
+      'plugins',
+      pluginName,
+      '.codex-plugin',
+      'plugin.json'
+    )
     const cursorPluginPath = path.join(
       workspace.homeDir,
       '.cursor',
@@ -422,12 +531,288 @@ describe.sequential('e2e:vite-playground', () => {
     expect(Object.keys(personalLedgerAfterUninstall.installs)).toHaveLength(0)
   })
 
-  it('keeps workspace installs isolated between copied Vite projects', async () => {
+  it('installs and uninstalls Claude plugins for workspace and personal scopes', async () => {
+    workspace = await createE2EWorkspace()
+    const project = workspace.projects[0]
+    if (!project) throw new Error('Missing project-a fixture')
+
+    await assertVpBuildWorks(project, workspace)
+    await scaffoldPack(project, workspace)
+
+    const fakeClaude = await createFakeClaudeEnv(workspace)
+
+    await runBuiltCli(
+      [
+        'pack',
+        'plugin',
+        'install',
+        '--agent',
+        'claude',
+        '--pack',
+        packName,
+        '--packsDir',
+        workspace.packsRoot,
+        '--scope',
+        'workspace',
+        '--clean',
+      ],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+        env: fakeClaude.env,
+      }
+    )
+
+    await runBuiltCli(
+      [
+        'pack',
+        'plugin',
+        'install',
+        '--agent',
+        'claude',
+        '--pack',
+        packName,
+        '--packsDir',
+        workspace.packsRoot,
+        '--scope',
+        'personal',
+        '--clean',
+      ],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+        env: fakeClaude.env,
+      }
+    )
+
+    const workspaceLedger = await readJsonFile<{ installs: Record<string, unknown> }>(
+      path.join(project.dir, '.agentrig', 'plugin-installs.json')
+    )
+    const personalLedger = await readJsonFile<{ installs: Record<string, unknown> }>(
+      path.join(workspace.homeDir, '.agentrig', 'plugin-installs.json')
+    )
+    expect(Object.keys(workspaceLedger.installs)).toContain(`claude:workspace:${pluginName}`)
+    expect(Object.keys(personalLedger.installs)).toContain(`claude:personal:${pluginName}`)
+
+    await runBuiltCli(
+      [
+        'pack',
+        'plugin',
+        'uninstall',
+        '--agent',
+        'claude',
+        '--pack',
+        packName,
+        '--scope',
+        'workspace',
+      ],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+        env: fakeClaude.env,
+      }
+    )
+
+    await runBuiltCli(
+      [
+        'pack',
+        'plugin',
+        'uninstall',
+        '--agent',
+        'claude',
+        '--pack',
+        packName,
+        '--scope',
+        'personal',
+      ],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+        env: fakeClaude.env,
+      }
+    )
+
+    const calls = await readJsonLinesFile<{ args: string[] }>(fakeClaude.logPath)
+    expect(calls).toHaveLength(7)
+    expect(calls[0]?.args.slice(0, 3)).toEqual(['plugin', 'marketplace', 'add'])
+    expect(calls[0]?.args[3]).toBeTruthy()
+    expect(calls[1]?.args).toEqual([
+      'plugin',
+      'install',
+      `${pluginName}@agentrig-community`,
+      '--scope',
+      'project',
+    ])
+    expect(calls[2]?.args.slice(0, 3)).toEqual(['plugin', 'marketplace', 'add'])
+    expect(calls[2]?.args[3]).toBeTruthy()
+    expect(calls[3]?.args).toEqual([
+      'plugin',
+      'install',
+      `${pluginName}@agentrig-community`,
+      '--scope',
+      'user',
+    ])
+    expect(calls[4]?.args).toEqual([
+      'plugin',
+      'uninstall',
+      `${pluginName}@agentrig-community`,
+      '--scope',
+      'project',
+    ])
+    expect(calls[5]?.args).toEqual([
+      'plugin',
+      'uninstall',
+      `${pluginName}@agentrig-community`,
+      '--scope',
+      'user',
+    ])
+    expect(calls[6]?.args).toEqual(['plugin', 'marketplace', 'remove', 'agentrig-community'])
+
+    const workspaceLedgerAfter = await readJsonFile<{ installs: Record<string, unknown> }>(
+      path.join(project.dir, '.agentrig', 'plugin-installs.json')
+    )
+    const personalLedgerAfter = await readJsonFile<{ installs: Record<string, unknown> }>(
+      path.join(workspace.homeDir, '.agentrig', 'plugin-installs.json')
+    )
+    expect(Object.keys(workspaceLedgerAfter.installs)).toHaveLength(0)
+    expect(Object.keys(personalLedgerAfter.installs)).toHaveLength(0)
+  })
+
+  it('supports dry-run, force, and corrupted-ledger plugin cases', async () => {
+    workspace = await createE2EWorkspace()
+    const project = workspace.projects[0]
+    if (!project) throw new Error('Missing project-a fixture')
+
+    await assertVpBuildWorks(project, workspace)
+    await scaffoldPack(project, workspace)
+
+    const fakeClaude = await createFakeClaudeEnv(workspace)
+
+    const dryRun = await runBuiltCli(
+      [
+        'pack',
+        'plugin',
+        'install',
+        '--agent',
+        'claude',
+        '--pack',
+        packName,
+        '--packsDir',
+        workspace.packsRoot,
+        '--scope',
+        'workspace',
+        '--dryRun',
+      ],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+        env: fakeClaude.env,
+      }
+    )
+    expect(dryRun.stdout).toContain('claude [workspace]: installed 1, skipped 0')
+    const dryRunLedgerPath = path.join(project.dir, '.agentrig', 'plugin-installs.json')
+    if (await pathExists(dryRunLedgerPath)) {
+      const dryRunLedger = await readJsonFile<{ installs: Record<string, unknown> }>(dryRunLedgerPath)
+      expect(Object.keys(dryRunLedger.installs)).toHaveLength(0)
+    }
+    expect(await pathExists(fakeClaude.logPath)).toBe(false)
+
+    await runBuiltCli(
+      [
+        'pack',
+        'plugin',
+        'install',
+        '--agent',
+        'cursor',
+        '--pack',
+        packName,
+        '--packsDir',
+        workspace.packsRoot,
+        '--scope',
+        'workspace',
+        '--clean',
+      ],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+      }
+    )
+
+    const skipped = await runBuiltCli(
+      [
+        'pack',
+        'plugin',
+        'install',
+        '--agent',
+        'cursor',
+        '--pack',
+        packName,
+        '--packsDir',
+        workspace.packsRoot,
+        '--scope',
+        'workspace',
+      ],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+      }
+    )
+    expect(skipped.stdout).toContain('cursor [workspace]: installed 0, skipped 1')
+
+    const forced = await runBuiltCli(
+      [
+        'pack',
+        'plugin',
+        'install',
+        '--agent',
+        'cursor',
+        '--pack',
+        packName,
+        '--packsDir',
+        workspace.packsRoot,
+        '--scope',
+        'workspace',
+        '--force',
+      ],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+      }
+    )
+    expect(forced.stdout).toContain('cursor [workspace]: installed 1, skipped 0')
+
+    const workspaceLedgerPath = path.join(project.dir, '.agentrig', 'plugin-installs.json')
+    await fs.writeFile(workspaceLedgerPath, '{ "schemaVersion": 1, "installs": { "oops": true } }\n', 'utf-8')
+
+    await expect(
+      runBuiltCli(
+        [
+          'pack',
+          'plugin',
+          'uninstall',
+          '--agent',
+          'cursor',
+          '--pack',
+          packName,
+          '--scope',
+          'workspace',
+        ],
+        {
+          cwd: project.dir,
+          homeDir: workspace.homeDir,
+        }
+      )
+    ).rejects.toThrow('Invalid plugin install ledger')
+  })
+
+  it('keeps workspace installs isolated between copied Vite+ projects', async () => {
     workspace = await createE2EWorkspace()
     const projectA = workspace.projects[0]
     const projectB = workspace.projects[1]
     if (!projectA || !projectB) throw new Error('Expected both project-a and project-b fixtures')
 
+    await assertVpBuildWorks(projectA, workspace)
+    await assertVpBuildWorks(projectB, workspace)
     await scaffoldPack(projectA, workspace)
     await initializeProject(projectB, workspace)
 

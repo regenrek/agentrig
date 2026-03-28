@@ -65,11 +65,18 @@ export function isAllowedFilename(value: string, policy: PackUploadPolicySnapsho
   return policy.allowedFilenames.includes(name)
 }
 
+function normalizeTargetForValidation(value: string) {
+  return value
+    .replace(/\{\{skillsDir\}\}/g, '.codex/skills')
+    .replace(/\{\{[^}]+\}\}/g, '')
+}
+
 export function isAllowedTarget(value: string, policy: PackUploadPolicySnapshot) {
   if (!value) return false
-  if (!isSafeRelativePath(value)) return false
-  const normalized = value.replace(/\\/g, '/')
-  return policy.allowedTargetPrefixes.some((prefix) => normalized.startsWith(prefix))
+  const normalized = normalizeTargetForValidation(value)
+  if (!normalized || !isSafeRelativePath(normalized)) return false
+  const posix = normalized.replace(/\\/g, '/')
+  return policy.allowedTargetPrefixes.some((prefix) => posix.startsWith(prefix))
 }
 
 export function isProbablyBinary(bytes: Uint8Array) {

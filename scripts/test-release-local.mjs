@@ -10,6 +10,12 @@ const execFile = promisify(execFileCallback)
 const exec = promisify(execCallback)
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const localVpBin = path.join(
+  repoRoot,
+  'node_modules',
+  '.bin',
+  process.platform === 'win32' ? 'vp.cmd' : 'vp'
+)
 const smokeOnly = process.argv.includes('--smoke-only')
 
 function commandName(base) {
@@ -20,6 +26,14 @@ function quoteWindowsArg(value) {
   if (value.length === 0) return '""'
   if (!/[\s"&()^<>|]/.test(value)) return value
   return `"${value.replace(/["^]/g, '^$&')}"`
+}
+
+async function assertNodeShebang(filePath) {
+  const contents = await fs.readFile(filePath, 'utf-8')
+  const firstLine = contents.split(/\r?\n/, 1)[0]
+  if (firstLine !== '#!/usr/bin/env node') {
+    throw new Error(`Expected node shebang in ${filePath}, got: ${firstLine || '<empty>'}`)
+  }
 }
 
 async function run(command, args, cwd = repoRoot) {
@@ -56,13 +70,19 @@ async function main() {
   const installDir = path.join(tempRoot, 'install')
 
   try {
+    await fs.access(localVpBin)
+    await run(localVpBin, ['--version'])
+
     if (!smokeOnly) {
-      await run(commandName('pnpm'), ['coverage'])
-      await run(commandName('pnpm'), ['test:e2e:run'])
-      await run(commandName('pnpm'), ['playground:vite:check'])
+      await run(localVpBin, ['run', 'repo:coverage'])
+      await run(localVpBin, ['run', 'repo:test:e2e'])
+      await run(localVpBin, ['run', 'repo:playground:vite-plus:check'])
     }
 
-    await run(commandName('pnpm'), ['build:cli'])
+    await run(localVpBin, ['run', 'repo:build:cli'])
+    const builtCliPath = path.join(repoRoot, 'packages', 'cli', 'dist', 'cli.mjs')
+    await assertNodeShebang(builtCliPath)
+
     await fs.mkdir(packDir, { recursive: true })
     await run(commandName('npm'), ['pack', '--pack-destination', packDir], path.join(repoRoot, 'packages', 'cli'))
 
@@ -74,11 +94,14 @@ async function main() {
 
     await run(commandName('npm'), ['install', '--prefix', installDir, path.join(packDir, tarball)])
 
-    const installedCliPath = path.join(installDir, 'node_modules', 'agentrig', 'dist', 'cli.js')
-    await fs.access(installedCliPath)
+    const installedCliPath = path.join(installDir, 'node_modules', 'agentrig', 'dist', 'cli.mjs')
+    await assertNodeShebang(installedCliPath)
 
-    await run(process.execPath, [installedCliPath, '--version'])
-    await run(process.execPath, [installedCliPath, '--help'])
+    const installedBinPath = path.join(installDir, 'node_modules', '.bin', commandName('agentrig'))
+    await fs.access(installedBinPath)
+
+    await run(installedBinPath, ['--version'])
+    await run(installedBinPath, ['--help'])
 
     console.log('\nLocal release smoke passed.')
   } finally {

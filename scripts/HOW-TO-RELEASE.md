@@ -15,21 +15,24 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - Include detailed descriptions of changes (Added/Changed/Fixed sections) so users can easily see what's included in the release
   - The release script extracts this section automatically for the GitHub Release description
 - Ensure any user-facing docs (README, templates) are committed.
+- Confirm the repo-local Vite+ toolchain is available:
+  - `pnpm exec vp --version`
 - Run the mandatory local pre-publish validation:
   - `pnpm test:release:local`
-  - This runs the CLI coverage suite, the Vite playground subprocess E2E suite, the latest-Vite fixture check, then builds/packs the CLI and smoke-tests the installed tarball with `--version` and `--help`.
+  - This runs the CLI coverage suite, the Vite+ consumer-app subprocess E2E suite, the latest Vite+ fixture check, then builds/packs the CLI and smoke-tests the installed `agentrig` bin with `--version` and `--help`.
   - Do not publish if this command fails.
 - **Release bar**: keep overall coverage **> 80%** (raise it if you touch core installer/config paths)
 - CI coverage after this change is split intentionally:
-  - Ubuntu on Node 24 runs the full coverage and Vite playground E2E jobs.
+  - Ubuntu on Node 24 runs the full coverage and Vite+ playground E2E jobs.
   - Ubuntu, macOS, and Windows run the packaged CLI smoke check on Node 24.
+  - Ubuntu on Node 25 runs a non-blocking smoke canary.
 
 ## Quick Release
 - Patch/minor/major bump and release:
   - `pnpm dlx tsx scripts/release.ts patch` (or `minor`/`major`)
 - The script will:
   - Bump `packages/cli/package.json#version`
-  - Build (`tsup`)
+  - Build the CLI through `vp pack`
   - Commit `chore: release vX.Y.Z`, tag `vX.Y.Z`, push (refuses non-`main` unless `ALLOW_NON_MAIN=1`)
   - Create/Update a GitHub Release with notes from `CHANGELOG.md`
   - Trigger the GitHub Actions publish workflow (OIDC) on release publish

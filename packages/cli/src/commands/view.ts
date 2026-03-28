@@ -38,6 +38,34 @@ const args = {
   },
 } as const
 
+function assertPackMeta(meta: any): asserts meta is {
+  name: string
+  title: string
+  description: string
+  version: string
+  files: Array<{ path: string; target: string; mode?: string; sha256?: string }>
+  author?: string
+  license?: string
+  tags?: string[]
+  rigDependencies?: string[]
+} {
+  if (!meta || typeof meta !== 'object') throw new Error('Invalid pack meta: not an object')
+  for (const key of ['name', 'title', 'description', 'version']) {
+    if (typeof meta[key] !== 'string' || !meta[key]) throw new Error(`Invalid pack meta: missing ${key}`)
+  }
+  if (!Array.isArray(meta.files)) throw new Error('Invalid pack meta: files must be an array')
+}
+
+function resolveTrustSource(
+  spec: string,
+  resolved: { source: { type: 'url'; baseUrl: string } | { type: 'fs'; baseDir: string } }
+) {
+  if (resolved.source.type === 'url') {
+    return resolved.source.baseUrl
+  }
+  return spec
+}
+
 const command = defineCommand({
   meta: {
     name: 'view',
@@ -63,8 +91,9 @@ const command = defineCommand({
     }
 
     const meta = resolved.meta
+    assertPackMeta(meta)
     const trustTier = resolved.trustTier ?? await determineTrustTier(
-      spec,
+      resolveTrustSource(spec, resolved),
       cfg.namespacedRegistries
     )
 

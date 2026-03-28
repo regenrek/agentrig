@@ -38,6 +38,7 @@ const args = {
   name: {
     type: 'positional',
     description: 'Rig name to apply (defaults to config.defaultRig)',
+    required: false,
   },
   cwd: {
     type: 'string',

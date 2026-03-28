@@ -39,31 +39,22 @@ mkdir -p "$AGENTRIG_E2E_PACKS_ROOT"
 cd "$AGENTRIG_E2E_ROOT"
 ```
 
-## Step 0: Create Disposable Test Projects
+## Step 0: Seed Disposable Vite+ Projects
 
-Create one primary workspace-install target and one secondary clean project.
-Both live under `/tmp`, so this layout works locally and in CI runners.
+Create one primary workspace-install target and one secondary clean project by copying the committed Vite+ playground fixture.
+This is the canonical consumer-app baseline used by the automated subprocess tests, so the manual and automated flows stay aligned.
 
 ```bash
 mkdir -p "$AGENTRIG_E2E_PROJECT_A" "$AGENTRIG_E2E_PROJECT_B"
 
+cp -R "/absolute/path/to/agentrig-public/test/playgrounds/vite-plus-application/." "$AGENTRIG_E2E_PROJECT_A/"
+cp -R "/absolute/path/to/agentrig-public/test/playgrounds/vite-plus-application/." "$AGENTRIG_E2E_PROJECT_B/"
+
 for project in "$AGENTRIG_E2E_PROJECT_A" "$AGENTRIG_E2E_PROJECT_B"; do
-  mkdir -p "$project"
-  cat > "$project/README.md" <<'EOF'
-# AgentRig manual test project
-EOF
-
-  cat > "$project/package.json" <<'EOF'
-{
-  "name": "agentrig-manual-test-project",
-  "private": true,
-  "version": "0.0.0"
-}
-EOF
-
   (
     cd "$project"
-    git init
+    pnpm install
+    pnpm run build
     agentrig init --registry https://agentrig.ai/registry
   )
 done
@@ -71,18 +62,10 @@ done
 
 Expected result:
 
-- `project-a/` exists and is a disposable repo-like test project.
-- `project-b/` exists and is a second clean test project.
+- `project-a/` exists as a disposable Vite+ application project.
+- `project-b/` exists as a second clean Vite+ application project.
+- Both projects build successfully before AgentRig writes its config.
 - Both projects contain `agentrig.config.json`.
-
-If you want the manual flow to mirror the automated Vite E2E tests exactly, seed the disposable projects from the committed playground fixture before running `agentrig init`:
-
-```bash
-cp -R "/absolute/path/to/agentrig-public/test/playgrounds/vite-basic/." "$AGENTRIG_E2E_PROJECT_A/"
-cp -R "/absolute/path/to/agentrig-public/test/playgrounds/vite-basic/." "$AGENTRIG_E2E_PROJECT_B/"
-```
-
-That playground is the canonical consumer-project fixture used by the automated subprocess tests.
 
 Recommended usage:
 
@@ -490,6 +473,65 @@ Expected result:
 - `~/.codex/plugins/agentrig-full-e2e-pack` is removed if unchanged.
 - `~/.agentrig/plugin-installs.json` no longer contains personal records for `agentrig-full-e2e-pack`.
 
+## Step 15: Hosted Auth And Store Submission Gate
+
+The automated integration suite now covers login, bundle, publish, and status flows against a local fake community API.
+This final gate is still manual because it depends on the real hosted browser flow, upload policy, storage, and moderation pipeline.
+
+Run these against the real environment you plan to ship against:
+
+```bash
+cd "$AGENTRIG_E2E_PACKS_ROOT/full-e2e-pack"
+
+agentrig login
+agentrig whoami
+agentrig pack bundle . --out "$AGENTRIG_E2E_ROOT/full-e2e-pack.zip"
+agentrig pack publish .
+agentrig pack status <submission-id>
+agentrig logout
+```
+
+Hosted pass criteria:
+
+- `agentrig login` opens the real browser flow and completes without manual token editing.
+- `agentrig whoami` shows the expected account.
+- `agentrig pack bundle` succeeds against the real hosted upload policy.
+- `agentrig pack publish` returns a real submission id.
+- `agentrig pack status <submission-id>` returns the hosted review/scan state.
+- `agentrig logout` revokes the session and removes the local auth file.
+
+## Step 16: Provider-Specific External Validation Gate
+
+The subprocess suite now validates AgentRig-managed provider install/uninstall behavior, including Claude.
+This manual gate is for checking the real external tools or apps after AgentRig finishes its work.
+
+Claude checks:
+
+- Run `claude plugin marketplace list` and confirm the exported marketplace was added.
+- Run `claude plugin list` and confirm `agentrig-full-e2e-pack` appears in the expected scope.
+- Uninstall through AgentRig, then confirm Claude no longer reports the plugin.
+
+Codex checks:
+
+- Confirm the installed plugin appears in the Codex marketplace or plugin surface you actually use.
+- Open the installed plugin directory and verify the expected `skills/`, `.mcp.json`, and `.app.json` files are present.
+- After uninstall, confirm the plugin disappears while unrelated marketplace entries remain untouched.
+
+Cursor checks:
+
+- Restart or reload the workspace after install so Cursor re-reads the local plugin directory.
+- Confirm rules, skills, commands, hooks, and MCP configuration are visible or active where expected.
+- After uninstall, confirm Cursor no longer loads the plugin and any manually edited files were preserved instead of deleted.
+
+## Step 17: Release Sign-Off Notes
+
+Record the following before shipping:
+
+- Which environment you used for hosted login and publish.
+- The submission id you validated.
+- Which providers were validated end to end with their real external tools.
+- Any manual cleanup or known caveats discovered during staging.
+
 ## Pass Criteria
 
 Consider this run successful when all of the following are true:
@@ -506,6 +548,8 @@ Consider this run successful when all of the following are true:
 - Install ledgers are written for successful installs.
 - Uninstall removes only AgentRig-managed state.
 - Modified installed files are kept rather than deleted.
+- The real hosted login, publish, and status flow succeeded at least once in staging or production.
+- The real Claude, Codex, and Cursor environments you support were spot-checked after AgentRig install/uninstall.
 
 ## Cleanup
 

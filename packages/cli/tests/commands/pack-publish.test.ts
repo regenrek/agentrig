@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/pack/publish'
 import { loadAuthSession } from '../../src/lib/auth'
 import {

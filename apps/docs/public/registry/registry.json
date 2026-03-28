@@ -2,7 +2,7 @@
   "$schema": "https://agentrig.dev/schema/registry.json",
   "name": "agentrig",
   "homepage": "https://agentrig.dev",
-  "generatedAt": "2026-01-29T03:01:32.352Z",
+  "generatedAt": "2026-03-28T13:34:19.764Z",
   "items": [
     {
       "name": "core-committer",

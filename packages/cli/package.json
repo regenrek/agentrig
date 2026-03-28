@@ -9,19 +9,19 @@
   },
   "type": "module",
   "bin": {
-    "agentrig": "./dist/cli.js"
+    "agentrig": "./dist/cli.mjs"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
-    "build": "tsup",
+    "build": "vp pack",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest",
-    "test:run": "vitest --run",
-    "coverage": "vitest --run --coverage",
-    "test:e2e:run": "pnpm build && vitest --run --config vitest.e2e.config.ts"
+    "test": "vp test",
+    "test:run": "vp test --run",
+    "coverage": "vp test --run --coverage",
+    "test:e2e:run": "vp pack && vp test --run --config vitest.e2e.config.ts"
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.8.23",
@@ -31,11 +31,11 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "@vitest/coverage-v8": "^4.1.2",
-    "tsup": "^8.0.0",
+    "@vitest/coverage-v8": "4.1.1",
     "tsx": "^4.7.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.2"
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vite-plus": "^0.1.14"
   },
   "engines": {
     "node": ">=18"

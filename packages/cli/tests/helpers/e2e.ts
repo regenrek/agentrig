@@ -1,4 +1,4 @@
-import { execFile as execFileCallback } from 'node:child_process'
+import { exec as execCallback, execFile as execFileCallback } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -6,13 +6,20 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
+const exec = promisify(execCallback)
 const execFile = promisify(execFileCallback)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const packagesCliDir = path.resolve(__dirname, '../..')
 const repoRoot = path.resolve(packagesCliDir, '../..')
-const builtCliPath = path.join(packagesCliDir, 'dist', 'cli.js')
-const vitePlaygroundDir = path.join(repoRoot, 'test', 'playgrounds', 'vite-basic')
+const builtCliPath = path.join(packagesCliDir, 'dist', 'cli.mjs')
+const vitePlusPlaygroundDir = path.join(repoRoot, 'test', 'playgrounds', 'vite-plus-application')
+const localVpBin = path.join(
+  repoRoot,
+  'node_modules',
+  '.bin',
+  process.platform === 'win32' ? 'vp.cmd' : 'vp'
+)
 
 export type E2EProject = {
   name: string
@@ -33,10 +40,20 @@ export type CliRunOptions = {
   env?: NodeJS.ProcessEnv
 }
 
+function commandName(base: string) {
+  return process.platform === 'win32' ? `${base}.cmd` : base
+}
+
+function quoteWindowsArg(value: string) {
+  if (value.length === 0) return '""'
+  if (!/[\s"&()^<>|]/.test(value)) return value
+  return `"${value.replace(/["^]/g, '^$&')}"`
+}
+
 export async function createE2EWorkspace(
   projectNames: string[] = ['project-a', 'project-b']
 ): Promise<E2EWorkspace> {
-  const rootDir = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-vite-e2e-'))
+  const rootDir = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-vite-plus-e2e-'))
   const homeDir = path.join(rootDir, 'home')
   const packsRoot = path.join(rootDir, 'packs')
   const distRoot = path.join(rootDir, 'dist')
@@ -48,7 +65,7 @@ export async function createE2EWorkspace(
 
   for (const name of projectNames) {
     const dir = path.join(rootDir, name)
-    await fs.cp(vitePlaygroundDir, dir, { recursive: true })
+    await fs.cp(vitePlusPlaygroundDir, dir, { recursive: true })
     projects.push({ name, dir })
   }
 
@@ -60,26 +77,28 @@ export async function cleanupE2EWorkspace(workspace: E2EWorkspace | null) {
   await fs.rm(workspace.rootDir, { recursive: true, force: true })
 }
 
-export async function runBuiltCli(args: string[], options: CliRunOptions) {
-  try {
-    await fs.access(builtCliPath)
-  } catch {
-    throw new Error(`Built CLI not found at ${builtCliPath}. Run \`pnpm build\` in packages/cli first.`)
-  }
-
+async function runCommand(command: string, args: string[], options: CliRunOptions) {
   const env = {
     ...process.env,
     ...options.env,
     HOME: options.homeDir ?? options.env?.HOME ?? process.env.HOME,
+    USERPROFILE: options.homeDir ?? options.env?.USERPROFILE ?? process.env.USERPROFILE,
     NO_COLOR: '1',
   }
 
   try {
-    const result = await execFile(process.execPath, [builtCliPath, ...args], {
+    const execOptions = {
       cwd: options.cwd,
       env,
       maxBuffer: 10 * 1024 * 1024,
-    })
+      windowsHide: true,
+    }
+    const result = process.platform === 'win32' && command.endsWith('.cmd')
+      ? await exec(
+        [quoteWindowsArg(command), ...args.map((arg) => quoteWindowsArg(String(arg)))].join(' '),
+        execOptions
+      )
+      : await execFile(command, args, execOptions)
 
     return {
       stdout: result.stdout.trim(),
@@ -89,7 +108,7 @@ export async function runBuiltCli(args: string[], options: CliRunOptions) {
     const failed = error as Error & { stdout?: string; stderr?: string }
     throw new Error(
       [
-        `CLI command failed: node ${builtCliPath} ${args.join(' ')}`,
+        `Command failed: ${command} ${args.join(' ')}`,
         failed.stdout ? `stdout:\n${failed.stdout.trim()}` : '',
         failed.stderr ? `stderr:\n${failed.stderr.trim()}` : '',
         failed.message,
@@ -98,6 +117,34 @@ export async function runBuiltCli(args: string[], options: CliRunOptions) {
         .join('\n\n')
     )
   }
+}
+
+export async function runBuiltCli(args: string[], options: CliRunOptions) {
+  try {
+    await fs.access(builtCliPath)
+  } catch {
+    throw new Error(`Built CLI not found at ${builtCliPath}. Run \`vp pack\` in packages/cli first.`)
+  }
+
+  return runCommand(process.execPath, [builtCliPath, ...args], options)
+}
+
+export async function runProjectVp(args: string[], options: CliRunOptions) {
+  return runCommand(localVpBin, args, options)
+}
+
+export async function validateVpProject(project: E2EProject, workspace: E2EWorkspace) {
+  await fs.access(localVpBin)
+
+  await runProjectVp(['install'], {
+    cwd: project.dir,
+    homeDir: workspace.homeDir,
+  })
+
+  await runProjectVp(['build'], {
+    cwd: project.dir,
+    homeDir: workspace.homeDir,
+  })
 }
 
 export async function readJsonFile<T>(filePath: string): Promise<T> {
@@ -121,7 +168,7 @@ export async function appendTextFile(filePath: string, contents: string) {
 export async function populateFullPackContents(packDir: string) {
   await writeTextFile(
     path.join(packDir, 'README.md'),
-    '# Full E2E Pack\n\nThis pack is used by AgentRig Vite E2E tests.\n'
+    '# Full E2E Pack\n\nThis pack is used by AgentRig Vite+ E2E tests.\n'
   )
 
   await writeTextFile(

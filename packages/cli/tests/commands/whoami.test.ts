@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/whoami'
 import { clearAuthSession, loadAuthSession } from '../../src/lib/auth'
 import { CommunityApiError, resolveCommunityBaseUrl, whoAmI } from '../../src/lib/community-api'
