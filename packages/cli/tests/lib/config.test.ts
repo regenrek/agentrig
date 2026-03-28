@@ -35,24 +35,16 @@ describe('config', () => {
 
   it('merges global and project config with defaults', async () => {
     const globalCfg: AgentRigConfig = {
-      skillsDir: '.codex/skills',
-      registries: [{ name: 'shared', url: 'https://global/{name}.json' }],
-      namespacedRegistries: {
-        '@acme': { url: 'https://global/{name}.json' },
-      },
+      registries: [{ name: 'official', url: 'https://agentrig.ai/registry' }],
       rigs: { base: { packs: ['core'] } },
       defaultRig: 'base',
       $schema: 'schema:global',
     }
     const projectCfg: AgentRigConfig = {
-      skillsDir: '.custom/skills',
       registries: [
-        { name: 'shared', url: 'https://project/{name}.json' },
-        { name: 'extra', url: 'https://extra/{name}.json' },
+        { name: 'official', url: 'https://agentrig.ai/registry' },
+        { name: 'georg', url: 'https://georg.dev/agentrig' },
       ],
-      namespacedRegistries: {
-        '@acme': { url: 'https://project/{name}.json' },
-      },
       rigs: { extra: { packs: ['extra'] } },
       defaultRig: 'extra',
       $schema: 'schema:project',
@@ -64,14 +56,10 @@ describe('config', () => {
 
     const cfg = await loadConfig('/repo')
 
-    expect(cfg.skillsDir).toBe('.custom/skills')
     expect(cfg.registries).toEqual([
-      { name: 'shared', url: 'https://project/{name}.json' },
-      { name: 'extra', url: 'https://extra/{name}.json' },
+      { name: 'official', url: 'https://agentrig.ai/registry' },
+      { name: 'georg', url: 'https://georg.dev/agentrig' },
     ])
-    expect(cfg.namespacedRegistries).toEqual({
-      '@acme': { url: 'https://project/{name}.json' },
-    })
     expect(cfg.rigs).toEqual({
       base: { packs: ['core'] },
       extra: { packs: ['extra'] },
@@ -84,24 +72,23 @@ describe('config', () => {
     })
   })
 
-  it('uses default skillsDir when configs are empty', async () => {
+  it('uses empty registry and rig defaults when configs are empty', async () => {
     vi.mocked(readJsonFile).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
     const cfg = await loadConfig('/repo')
-    expect(cfg.skillsDir).toBe('.codex/skills')
     expect(cfg.registries).toEqual([])
-    expect(cfg.namespacedRegistries).toBeUndefined()
     expect(cfg.rigs).toEqual({})
+    expect(cfg.defaultRig).toBeUndefined()
   })
 
   it('writes project config to expected path', async () => {
-    const cfg: AgentRigConfig = { skillsDir: '.codex/skills' }
+    const cfg: AgentRigConfig = { registries: [{ name: 'official', url: 'https://agentrig.ai/registry' }] }
     await writeProjectConfig('/repo', cfg)
     expect(writeJsonFile).toHaveBeenCalledWith('/repo/agentrig.config.json', cfg)
   })
 
   it('writes global config and ensures directory exists', async () => {
     const homedirSpy = vi.spyOn(os, 'homedir').mockReturnValue('/home/tester')
-    const cfg: AgentRigConfig = { skillsDir: '.codex/skills' }
+    const cfg: AgentRigConfig = { registries: [{ name: 'official', url: 'https://agentrig.ai/registry' }] }
     await writeGlobalConfig(cfg)
     expect(ensureDir).toHaveBeenCalledWith('/home/tester/.agentrig')
     expect(writeJsonFile).toHaveBeenCalledWith('/home/tester/.agentrig/config.json', cfg)

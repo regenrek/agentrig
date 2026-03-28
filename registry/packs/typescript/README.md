@@ -5,16 +5,16 @@ TypeScript patterns and guardrails for agentic coding.
 ## Installation
 
 ```bash
-agentrig add typescript
+agentrig plugin install codex typescript
 ```
 
 ## What's included
 
 - `skills/typescript/SKILL.md`
 
-## Requirements
+## Provider install
 
-- Installs to `{{skillsDir}}` (default `.codex/skills`).
+- Install with any supported provider: `codex`, `claude`, or `cursor`.
 
 ## Usage
 

@@ -5,7 +5,7 @@ Adds a security check skill that runs lightweight checks before shipping.
 ## Installation
 
 ```bash
-agentrig add security-check
+agentrig plugin install codex security-check
 ```
 
 ## What's included
@@ -13,9 +13,9 @@ agentrig add security-check
 - `skills/security-check/SKILL.md`
 - `skills/security-check/security-check.sh`
 
-## Requirements
+## Provider install
 
-- Installs to `{{skillsDir}}` (default `.codex/skills`).
+- Install with any supported provider: `codex`, `claude`, or `cursor`.
 
 ## Usage
 

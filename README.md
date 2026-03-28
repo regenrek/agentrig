@@ -2,164 +2,116 @@
 
 ![Agentrig banner](public/banner_opt.png)
 
-**Reusable AI workflow packs, portable across projects and shipped as native plugins for Claude Code, Codex, and Cursor.**
+**Install reusable AI workflow packs from registries as native Claude Code, Codex, and Cursor plugins.**
 
-Agentrig helps you package the prompts, skills, rules, commands, hooks, MCP config, and agent setup that already work for your team, then reuse them across projects without rebuilding the same workflow for every repo or tool.
+AgentRig has one consumer story:
 
-At its core, AgentRig gives you three layers: packs as the building blocks, rigs as the team-ready composition layer, and provider-native delivery for where people actually work.
+- `agentrig init`
+- `agentrig list --available`
+- `agentrig plugin install <provider> <spec>`
 
-This repo includes the `agentrig` CLI, the docs and registry site, and a publishable pack registry.
+Third-party registries are explicit:
 
-![How Agentrig standardizes and reuses AI workflows across projects and tools](public/agentrig_explanation.jpg)
+- `agentrig registry add <alias> <baseUrl>`
+- `agentrig list --available --registry <alias>`
+- `agentrig plugin install <provider> <alias>/<pack>`
 
-> Warning: Agentrig is under active development. Expect breaking changes, evolving behavior, and rough edges. Use it at your own risk.
+Rigs and pack authoring still exist, but they are secondary workflows for teams and publishers.
 
-## Why AgentRig
+This repo contains the `agentrig` CLI, the docs site, and the official registry source.
 
-- `Reusable workflow packs`: Package skills, MCP config, agents, hooks, commands, rules, and setup into registry-installable packs that can be shared across projects.
-- `Composable rigs for teams`: Group packs into opinionated setups so repos and teams can adopt a consistent workflow without copy-pasting configuration.
-- `Native delivery where people work`: Export the same packs and rigs as provider-native integrations for Claude Code, Codex, and Cursor, with tracked installs and safe cleanup.
+> Warning: AgentRig is under active development. Expect breaking changes while the product contract settles.
 
 ## Install the CLI
 
-Install the official CLI from npm:
-
 ```bash
 npm install -g agentrig
-```
-
-Then:
-
-```bash
 agentrig --help
 ```
 
-Full documentation and examples live at [docs.agentrig.ai](https://docs.agentrig.ai/).
+Full documentation lives at [docs.agentrig.ai](https://docs.agentrig.ai/).
 
-## What is a pack?
+## Consumer Quickstart
 
-A pack is a folder that contains:
-
-- `meta.json` (metadata + file install plan)
-- Any files you want to distribute (for example `skills/**/SKILL.md` + scripts)
-
-The CLI can install a pack from:
-
-- A configured registry (`registry.json` + `r/<name>.json`)
-- A direct `meta.json` URL
-- A direct local `meta.json` path
-
-## Quickstart
+Use the official registry:
 
 ```bash
 agentrig init
 agentrig list --available
-agentrig add <pack-name>
+agentrig plugin install codex core-committer
 ```
 
-The default pack install target directory is `.codex/skills` (configurable).
+Inspect a pack before installing it:
 
-## Plugin export
+```bash
+agentrig view core-committer
+```
 
-If you want your packs to be installable as local plugins, agentrig can export each pack as a provider-native plugin for Claude Code, Codex, Cursor, or all three at once.
+Add a third-party registry before using it:
 
-### How plugin export and install works
+```bash
+agentrig registry add georg https://georg.dev/agentrig
+agentrig list --available --registry georg
+agentrig plugin install cursor georg/ts-master-pack
+```
 
-![How AgentRig converts packs into native plugins and tracks installs safely](public/agentrig_plugin.jpeg)
+Direct URLs and local `meta.json` files are treated as unlisted sources and require confirmation:
 
-- Start with an AgentRig pack as the portable source of truth for prompts, assets, scripts, MCP config, and other workflow files.
-- `agentrig pack plugin export` converts that pack into each provider's native plugin marketplace layout for Claude Code, Codex, or Cursor.
-- `agentrig pack plugin install` installs the native output into the provider-specific target location instead of inventing a separate runtime format.
-- AgentRig records install state in its ledger so uninstall can remove only tracked files, preserve user-modified files, and keep plugin cleanup auditable.
-Export all supported providers:
+```bash
+agentrig plugin install codex ./my-pack/meta.json --yes
+```
+
+## Core Model
+
+- `packs` are the portable unit
+- `registries` are how packs are discovered and distributed
+- `provider plugins` are the consumer delivery target
+- `rigs` are an advanced named set of pack specs for teams
+
+The CLI can resolve a pack spec from:
+
+- the seeded `official` registry
+- an explicitly added third-party registry via `registryAlias/pack-name`
+- a direct `meta.json` URL
+- a direct local `meta.json` path
+
+## Provider Plugins
+
+Consumers install and remove plugins from resolved pack specs:
+
+```bash
+agentrig plugin install claude core-committer
+agentrig plugin install codex georg/ts-master-pack --scope workspace
+agentrig plugin uninstall codex georg/ts-master-pack --scope workspace
+```
+
+AgentRig tracks plugin installs in its own ledger so uninstall keeps working even if a registry is later removed or temporarily offline.
+
+## Author Packs
+
+Scaffold a local pack:
+
+```bash
+agentrig pack init my-pack
+agentrig pack create my-pack
+```
+
+Export local packs as provider-native plugin marketplaces:
 
 ```bash
 agentrig pack plugin export --agent all --packsDir registry/packs --out dist/plugins
 ```
 
-Or export a single provider directly:
+Advanced teams can apply multiple pack specs at once with rigs:
 
 ```bash
-agentrig pack plugin export --agent claude --packsDir registry/packs --out dist/claude-marketplace
-agentrig pack plugin export --agent codex --packsDir registry/packs --out dist/codex-marketplace
-agentrig pack plugin export --agent cursor --packsDir registry/packs --out dist/cursor-marketplace
+agentrig rig apply codex my-rig --scope workspace
 ```
-
-This generates provider-native outputs such as:
-
-```text
-dist/plugins/
-  claude/
-    .claude-plugin/marketplace.json
-    plugins/agentrig-<pack>/
-  codex/
-    .agents/plugins/marketplace.json
-    plugins/agentrig-<pack>/
-  cursor/
-    .cursor-plugin/marketplace.json
-    plugins/agentrig-<pack>/
-```
-
-Install into local providers:
-
-```bash
-agentrig pack plugin install --agent claude --pack my-pack
-agentrig pack plugin install --agent codex --pack my-pack --scope auto
-agentrig pack plugin install --agent cursor --pack my-pack --scope workspace
-agentrig pack plugin uninstall --agent codex --pack my-pack
-```
-
-For Claude, agentrig calls the native `claude plugin marketplace add` and `claude plugin install` commands.
-For Codex, it updates a local marketplace manifest and copies plugins into `~/.codex/plugins/` or `./plugins/`.
-For Cursor, `--scope personal` copies plugins into `~/.cursor/plugins/local/`.
-For Cursor, explicit `--scope workspace` copies plugins into `<cwd>/.cursor/plugins/local/` using AgentRig's project-local convention.
-Cursor `--scope auto` still resolves to `personal`.
-
-You can customize marketplace names, owners, and prefixes in `agentrig.plugins.json`.
-
-AgentRig also tracks the plugin installs it manages, so uninstall can remove only what AgentRig added, keep modified files in place, and reduce hidden plugin/config bloat over time.
-
-## Create a pack
-
-Create a new folder:
-
-```
-registry/packs/<your-pack>/
-  meta.json
-  skills/<skill-name>/SKILL.md
-  skills/<skill-name>/<scripts>
-```
-
-If your pack also needs provider-specific plugin components, add these folders at the pack root:
-
-```
-registry/packs/<your-pack>/
-  commands/
-    <command>.md
-  agents/
-    <agent>.md
-  rules/
-    <rule>.mdc
-  hooks/
-    hooks.json
-  .mcp.json
-  .app.json
-```
-
-They'll be copied into exported provider plugins when that provider supports them.
 
 ## Documentation
 
 - [Getting Started](https://docs.agentrig.ai/getting-started)
-- [CLI Reference](https://docs.agentrig.ai/cli)
 - [Integrations](https://docs.agentrig.ai/integrations)
+- [CLI Reference](https://docs.agentrig.ai/cli)
 - [Packs](https://docs.agentrig.ai/packs)
 - [Registry](https://docs.agentrig.ai/registry)
-
-## Registry model
-
-This project follows the same shape as the shadcn registry concept:
-
-- A `registry.json` index at the registry root
-- Per-item JSON documents under `r/<name>.json`
-- Item JSON references file paths instead of inlining file content

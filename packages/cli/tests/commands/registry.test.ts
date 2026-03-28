@@ -33,8 +33,7 @@ describe('command:registry', () => {
 
   it('lists configured registries', async () => {
     const cfg: ResolvedConfig = {
-      skillsDir: '.codex/skills',
-      registries: [{ name: 'default', url: 'https://registry.example.com' }],
+      registries: [{ name: 'official', url: 'https://agentrig.ai/registry' }],
       rigs: {},
       paths: {
         projectConfigPath: '/repo/agentrig.config.json',
@@ -50,13 +49,13 @@ describe('command:registry', () => {
   it('adds or updates a registry in project config', async () => {
     vi.mocked(getProjectConfigPath).mockReturnValue('/repo/agentrig.config.json')
     vi.mocked(readJsonFile).mockResolvedValue({
-      $schema: 'https://agentrig.dev/schema/config.json',
-      registries: [{ name: 'default', url: 'https://old.example.com' }],
+      $schema: 'https://agentrig.ai/schema/config.json',
+      registries: [{ name: 'georg', url: 'https://old.example.com' }],
     })
 
     await runAdd({
       args: {
-        name: 'default',
+        name: 'georg',
         url: 'https://new.example.com',
         cwd: '/repo',
         global: false,
@@ -66,8 +65,8 @@ describe('command:registry', () => {
 
     expect(ensureDir).toHaveBeenCalled()
     expect(writeJsonFile).toHaveBeenCalledWith('/repo/agentrig.config.json', {
-      $schema: 'https://agentrig.dev/schema/config.json',
-      registries: [{ name: 'default', url: 'https://new.example.com' }],
+      $schema: 'https://agentrig.ai/schema/config.json',
+      registries: [{ name: 'georg', url: 'https://new.example.com' }],
     })
   })
 })

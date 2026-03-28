@@ -242,9 +242,9 @@ export async function buildRegistry({ repoRoot, packsRoot, outputRoot }: BuildRe
   }
 
   const registryIndex = {
-    $schema: 'https://agentrig.dev/schema/registry.json',
+    $schema: 'https://agentrig.ai/schema/registry.json',
     name: 'agentrig',
-    homepage: 'https://agentrig.dev',
+    homepage: 'https://agentrig.ai',
     generatedAt: new Date().toISOString(),
     items,
   }

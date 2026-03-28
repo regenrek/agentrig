@@ -45,7 +45,7 @@
 
 ### Changed
 - Hosted upload docs now document the CLI-first publish flow for reviewed community uploads.
-- `agentrig pack plugin install` now requires explicit broad installs in non-interactive mode, prompts in interactive mode, and prints a preflight install summary before writing.
+- Provider plugin installs now require explicit broad installs in non-interactive mode, prompt in interactive mode, and print a preflight install summary before writing.
 - Cursor now supports explicit workspace installs via `.cursor/plugins/local/`.
 - The docs and README now document the published npm CLI flow plus provider-specific integration guides for Claude Code, Codex, and Cursor.
 

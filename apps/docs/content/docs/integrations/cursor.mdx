@@ -1,31 +1,15 @@
 ---
 title: Cursor integration
-description: Manage Cursor rules and helpers via packs.
+description: Install resolved packs as local Cursor plugins.
 icon: Monitor
 ---
 
 # Cursor integration
 
-Agentrig can export packs as local Cursor plugins so you can distribute rules, prompts, agents, MCP config, and related tooling in one installable bundle.
-
-## Export Cursor plugins
+Install a resolved pack into Cursor:
 
 ```bash
-agentrig pack plugin export --agent cursor --packsDir registry/packs --out dist/cursor-marketplace
-```
-
-For a single pack:
-
-```bash
-agentrig pack plugin export --agent cursor --pack my-pack --packsDir registry/packs --out dist/cursor-marketplace
-```
-
-This generates a Cursor marketplace repo with `.cursor-plugin/marketplace.json` plus one plugin directory per pack.
-
-## Install local Cursor plugins
-
-```bash
-agentrig pack plugin install --agent cursor --pack my-pack --scope personal
+agentrig plugin install cursor core-committer --scope personal
 ```
 
 This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor after installing.
@@ -33,21 +17,18 @@ This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor
 ## Install project-local Cursor plugins
 
 ```bash
-agentrig pack plugin install --agent cursor --pack my-pack --scope workspace
+agentrig plugin install cursor georg/ts-master-pack --scope workspace
 ```
 
 This copies each generated plugin into `<cwd>/.cursor/plugins/local/`.
 Workspace scope is an AgentRig project-local convention so the plugin stays inside the repo instead of your global Cursor profile.
 
-If you omit `--scope`, `auto` still resolves Cursor installs to `personal` for now.
-
-In interactive terminals, AgentRig can prompt for the provider, pack, and scope.
-In non-interactive runs, pass `--pack <folder>` or `--all`.
+If you omit `--scope`, `auto` resolves Cursor installs to `personal`.
 
 ## Uninstall Cursor plugins
 
 ```bash
-agentrig pack plugin uninstall --agent cursor --pack my-pack
+agentrig plugin uninstall cursor core-committer
 ```
 
 Uninstall is safe by default:
@@ -69,5 +50,5 @@ Uninstall is safe by default:
 ## Best practices
 
 - Keep Cursor-specific files isolated in a pack.
-- Combine with rigs to apply the same Cursor setup across multiple repos.
+- Install third-party packs through explicit registry aliases such as `georg/ts-master-pack`.
 - Use `--scope workspace` when you want the Cursor plugin to stay repo-local and easy to remove with the project.

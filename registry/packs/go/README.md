@@ -5,7 +5,7 @@ Go quality checks: fmt, vet, tests.
 ## Installation
 
 ```bash
-agentrig add go
+agentrig plugin install codex go
 ```
 
 ## What's included
@@ -13,9 +13,9 @@ agentrig add go
 - `skills/go/SKILL.md`
 - `skills/go/go-check.sh`
 
-## Requirements
+## Provider install
 
-- Installs to `{{skillsDir}}` (default `.codex/skills`).
+- Install with any supported provider: `codex`, `claude`, or `cursor`.
 
 ## Usage
 

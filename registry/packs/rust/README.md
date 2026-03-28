@@ -5,7 +5,7 @@ Rust quality checks: fmt, clippy, tests.
 ## Installation
 
 ```bash
-agentrig add rust
+agentrig plugin install codex rust
 ```
 
 ## What's included
@@ -13,9 +13,9 @@ agentrig add rust
 - `skills/rust/SKILL.md`
 - `skills/rust/rust-check.sh`
 
-## Requirements
+## Provider install
 
-- Installs to `{{skillsDir}}` (default `.codex/skills`).
+- Install with any supported provider: `codex`, `claude`, or `cursor`.
 
 ## Usage
 

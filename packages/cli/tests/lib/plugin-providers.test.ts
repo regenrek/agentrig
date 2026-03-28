@@ -59,6 +59,21 @@ async function createWorkspace(): Promise<TempWorkspace> {
   return { rootDir, packsRoot }
 }
 
+function installPluginProvidersWithSpecIdentities(
+  workspace: TempWorkspace,
+  options: Omit<Parameters<typeof installPluginProviders>[0], 'specIdentitiesByPackName'>
+) {
+  return installPluginProviders({
+    ...options,
+    specIdentitiesByPackName: {
+      'sample-pack': {
+        kind: 'file',
+        metaPath: path.join(workspace.packsRoot, 'sample-pack', 'meta.json'),
+      },
+    },
+  })
+}
+
 describe('plugin providers', () => {
   let workspace: TempWorkspace | null = null
   let originalHome = ''
@@ -227,7 +242,7 @@ describe('plugin providers', () => {
       calls.push({ command, args })
     }
 
-    const results = await installPluginProviders({
+    const results = await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'all',
       packsDir: workspace.packsRoot,
@@ -272,7 +287,7 @@ describe('plugin providers', () => {
     const fakeHome = path.join(workspace.rootDir, 'home')
     process.env.HOME = fakeHome
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'codex',
       packsDir: workspace.packsRoot,
@@ -287,12 +302,146 @@ describe('plugin providers', () => {
     expect(Object.keys(ledgers.workspace.installs)).toEqual(['codex:workspace:agentrig-sample-pack'])
   })
 
+  it('requires --force to repair an existing Codex plugin directory without a ledger entry', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const codexPluginDir = path.join(fakeHome, '.codex', 'plugins', 'agentrig-sample-pack')
+    await fs.mkdir(codexPluginDir, { recursive: true })
+
+    await expect(
+      installPluginProvidersWithSpecIdentities(workspace, {
+        cwd: workspace.rootDir,
+        agent: 'codex',
+        packsDir: workspace.packsRoot,
+        out: path.join(workspace.rootDir, 'generated'),
+        scope: 'personal',
+        force: false,
+        clean: true,
+      })
+    ).rejects.toThrow('without a matching AgentRig ledger entry')
+  })
+
+  it('requires --force when an existing Codex plugin ledger entry has a different spec identity', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    await installPluginProvidersWithSpecIdentities(workspace, {
+      cwd: workspace.rootDir,
+      agent: 'codex',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+    })
+
+    const ledgerPath = path.join(fakeHome, '.agentrig', 'plugin-installs.json')
+    const ledger = JSON.parse(await fs.readFile(ledgerPath, 'utf-8')) as {
+      schemaVersion: number
+      installs: Record<string, Record<string, unknown>>
+    }
+    ledger.installs['codex:personal:agentrig-sample-pack'] = {
+      ...ledger.installs['codex:personal:agentrig-sample-pack'],
+      specIdentity: {
+        kind: 'registry',
+        registryUrl: 'https://other.example.com/registry',
+        packName: 'sample-pack',
+      },
+    }
+    await writeJson(ledgerPath, ledger)
+
+    await expect(
+      installPluginProvidersWithSpecIdentities(workspace, {
+        cwd: workspace.rootDir,
+        agent: 'codex',
+        packsDir: workspace.packsRoot,
+        out: path.join(workspace.rootDir, 'generated'),
+        scope: 'personal',
+        force: false,
+        clean: true,
+      })
+    ).rejects.toThrow('different AgentRig source')
+  })
+
+  it('requires --force to repair an existing Cursor plugin directory without a ledger entry', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    const cursorPluginDir = path.join(
+      fakeHome,
+      '.cursor',
+      'plugins',
+      'local',
+      'agentrig-sample-pack'
+    )
+    await fs.mkdir(cursorPluginDir, { recursive: true })
+
+    await expect(
+      installPluginProvidersWithSpecIdentities(workspace, {
+        cwd: workspace.rootDir,
+        agent: 'cursor',
+        packsDir: workspace.packsRoot,
+        out: path.join(workspace.rootDir, 'generated'),
+        scope: 'personal',
+        force: false,
+        clean: true,
+      })
+    ).rejects.toThrow('without a matching AgentRig ledger entry')
+  })
+
+  it('requires --force when an existing Cursor plugin ledger entry has a different spec identity', async () => {
+    workspace = await createWorkspace()
+    const fakeHome = path.join(workspace.rootDir, 'home')
+    process.env.HOME = fakeHome
+
+    await installPluginProvidersWithSpecIdentities(workspace, {
+      cwd: workspace.rootDir,
+      agent: 'cursor',
+      packsDir: workspace.packsRoot,
+      out: path.join(workspace.rootDir, 'generated'),
+      scope: 'personal',
+      force: true,
+      clean: true,
+    })
+
+    const ledgerPath = path.join(fakeHome, '.agentrig', 'plugin-installs.json')
+    const ledger = JSON.parse(await fs.readFile(ledgerPath, 'utf-8')) as {
+      schemaVersion: number
+      installs: Record<string, Record<string, unknown>>
+    }
+    ledger.installs['cursor:personal:agentrig-sample-pack'] = {
+      ...ledger.installs['cursor:personal:agentrig-sample-pack'],
+      specIdentity: {
+        kind: 'registry',
+        registryUrl: 'https://other.example.com/registry',
+        packName: 'sample-pack',
+      },
+    }
+    await writeJson(ledgerPath, ledger)
+
+    await expect(
+      installPluginProvidersWithSpecIdentities(workspace, {
+        cwd: workspace.rootDir,
+        agent: 'cursor',
+        packsDir: workspace.packsRoot,
+        out: path.join(workspace.rootDir, 'generated'),
+        scope: 'personal',
+        force: false,
+        clean: true,
+      })
+    ).rejects.toThrow('different AgentRig source')
+  })
+
   it('installs Cursor workspace plugins into the repo-local convention and records the workspace ledger', async () => {
     workspace = await createWorkspace()
     const fakeHome = path.join(workspace.rootDir, 'home')
     process.env.HOME = fakeHome
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'cursor',
       packsDir: workspace.packsRoot,
@@ -336,7 +485,7 @@ describe('plugin providers', () => {
     const fakeHome = path.join(workspace.rootDir, 'home')
     process.env.HOME = fakeHome
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'cursor',
       packsDir: workspace.packsRoot,
@@ -371,7 +520,7 @@ describe('plugin providers', () => {
     const fakeHome = path.join(workspace.rootDir, 'home')
     process.env.HOME = fakeHome
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'cursor',
       packsDir: workspace.packsRoot,
@@ -434,7 +583,7 @@ describe('plugin providers', () => {
       installCalls.push({ command, args })
     }
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'all',
       packsDir: workspace.packsRoot,
@@ -523,7 +672,7 @@ describe('plugin providers', () => {
       }
     }
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'claude',
       packsDir: workspace.packsRoot,
@@ -592,7 +741,7 @@ describe('plugin providers', () => {
       plugins: [],
     })
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'codex',
       packsDir: workspace.packsRoot,
@@ -673,7 +822,7 @@ describe('plugin providers', () => {
       ],
     })
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'codex',
       packsDir: workspace.packsRoot,
@@ -728,7 +877,7 @@ describe('plugin providers', () => {
       ],
     })
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'codex',
       packsDir: workspace.packsRoot,
@@ -769,7 +918,7 @@ describe('plugin providers', () => {
     })
 
     await expect(
-      installPluginProviders({
+      installPluginProvidersWithSpecIdentities(workspace, {
         cwd: workspace.rootDir,
         agent: 'codex',
         packsDir: workspace.packsRoot,
@@ -786,7 +935,7 @@ describe('plugin providers', () => {
     const fakeHome = path.join(workspace.rootDir, 'home')
     process.env.HOME = fakeHome
 
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'codex',
       packsDir: workspace.packsRoot,
@@ -825,7 +974,7 @@ describe('plugin providers', () => {
     process.env.HOME = fakeHome
 
     const codexMarketplacePath = path.join(fakeHome, '.agents', 'plugins', 'marketplace.json')
-    await installPluginProviders({
+    await installPluginProvidersWithSpecIdentities(workspace, {
       cwd: workspace.rootDir,
       agent: 'codex',
       packsDir: workspace.packsRoot,

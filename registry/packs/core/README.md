@@ -5,7 +5,7 @@ Adds a PR committer skill with a safe commit helper script.
 ## Installation
 
 ```bash
-agentrig add core-committer
+agentrig plugin install codex core-committer
 ```
 
 ## What's included
@@ -13,9 +13,9 @@ agentrig add core-committer
 - `skills/pr-commiter/SKILL.md`
 - `skills/pr-commiter/scripts/pr-commiter.sh`
 
-## Requirements
+## Provider install
 
-- Installs to `{{skillsDir}}` (default `.codex/skills`).
+- Install with any supported provider: `codex`, `claude`, or `cursor`.
 
 ## Usage
 

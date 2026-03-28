@@ -12,13 +12,22 @@ Project config lives at:
 <repo>/agentrig.config.json
 ```
 
-Use it for repo-specific registries, rigs, or overrides.
+Use it for repo-specific registries and advanced rig definitions.
 
 ```json
 {
-  "skillsDir": ".codex/skills",
-  "registries": [{ "name": "default", "url": "https://agentrig.ai/registry" }],
-  "defaultRig": "core"
+  "registries": [{ "name": "official", "url": "https://agentrig.ai/registry" }]
+}
+```
+
+You can also add third-party registries at the project level:
+
+```json
+{
+  "registries": [
+    { "name": "official", "url": "https://agentrig.ai/registry" },
+    { "name": "georg", "url": "https://georg.dev/agentrig" }
+  ]
 }
 ```
 

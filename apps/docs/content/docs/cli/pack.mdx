@@ -1,12 +1,21 @@
 ---
 title: pack
-description: Pack utilities for scaffolding and exports.
+description: Authoring utilities for creating, packaging, and exporting packs.
 icon: PackagePlus
 ---
 
 # `agentrig pack`
 
-Pack utilities help you scaffold and export packs.
+`agentrig pack` is the author workflow.
+Use it when you are creating or exporting local packs.
+
+If you are consuming packs from registries, use the top-level commands instead:
+
+```bash
+agentrig list --available
+agentrig view <pack-spec>
+agentrig plugin install <provider> <pack-spec>
+```
 
 ## init
 
@@ -22,7 +31,7 @@ Options: `--template`, `--dir`, `--title`, `--description`, `--author`, `--force
 agentrig pack create . --out meta.json
 ```
 
-Scans a directory, hashes files, and writes `meta.json`.
+Scans a pack directory, hashes files, and writes `meta.json`.
 
 ## plugin export
 
@@ -30,60 +39,7 @@ Scans a directory, hashes files, and writes `meta.json`.
 agentrig pack plugin export --agent all --packsDir registry/packs --out dist/plugins
 ```
 
-Exports each pack as a plugin for `claude`, `codex`, `cursor`, or `all`.
+Exports local pack directories as provider-native plugin marketplaces for `claude`, `codex`, `cursor`, or `all`.
 
 Options: `--agent`, `--packsDir`, `--out`, `--config`, `--marketplaceName`, `--ownerName`, `--ownerEmail`, `--pluginPrefix`, `--pack`, `--clean`.
-
-## plugin install
-
-```bash
-agentrig pack plugin install --agent cursor --pack my-pack --scope workspace
-```
-
-Builds plugin output and installs it into the selected provider surfaces.
-In interactive terminals, the CLI prompts for provider and pack selection.
-In non-interactive runs, pass an explicit `--pack` or use `--all`.
-
-`--scope auto` remains the default selector. For Cursor, `auto` still resolves to `personal`; use `--scope workspace` to install into the repo-local AgentRig convention at `.cursor/plugins/local/`.
-For Codex and Claude, `auto` resolves to `workspace`.
-
-Before writing anything, the command prints an install plan showing:
-
-- selected packs
-- requested scope
-- provider-specific target locations
-- provider-specific actions
-
-### Safety and reversibility
-
-AgentRig treats plugin installs as tracked state, not fire-and-forget file copies.
-
-- AgentRig records what it installs in its own install ledger
-- uninstall only targets AgentRig-managed installs
-- tracked files are removed only when they still match the recorded hashes
-- modified files are kept instead of being deleted
-- provider-specific cleanup is limited to managed entries so pre-existing user state is preserved where possible
-
-Options: `--agent`, `--packsDir`, `--out`, `--config`, `--marketplaceName`, `--ownerName`, `--ownerEmail`, `--pluginPrefix`, `--pack`, `--scope`, `--force`, `--dryRun`, `--clean`.
-
-## plugin uninstall
-
-```bash
-agentrig pack plugin uninstall --agent codex --pack my-pack
-```
-
-Removes AgentRig-managed plugin installs using the install ledger.
-In interactive terminals, the CLI can prompt for provider, pack, and scope selection.
-In non-interactive runs, pass an explicit `--agent` and `--pack`, or use `--all`.
-
-Uninstall is safe by default:
-
-- only AgentRig-managed installs are considered
-- tracked files are removed only when they still match the recorded hashes
-- modified files are kept
-- provider-specific cleanup is limited to AgentRig-managed entries
-
-This is part of AgentRig's design goal for reversible, low-bloat integrations: installs stay auditable, cleanup stays narrow, and trialing provider plugins does not have to mean leaving hidden config behind.
-
-Options: `--agent`, `--all`, `--pack`, `--scope`, `--dryRun`.
 

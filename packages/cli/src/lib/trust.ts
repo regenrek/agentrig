@@ -3,13 +3,13 @@
  *
  * Trust tiers:
  * - official: The official agentrig.ai registry (implicit trust)
- * - listed: Registries in the directory index (verified community registries)
- * - unlisted: Direct URLs or unverified registries (requires confirmation)
+ * - listed: A registry the user explicitly configured in AgentRig
+ * - unlisted: Direct URLs or unknown sources (requires confirmation)
  */
 
-import type { TrustTier, DirectoryEntry } from './types'
-import { OFFICIAL_REGISTRY_URL, DIRECTORY_INDEX_URL, fetchDirectoryIndex, isUrl } from './registry'
-import { isNamespacedPack, parseRegistryAndItemFromString } from './namespace'
+import path from 'node:path'
+import type { TrustTier, RegistryRef } from './types'
+import { OFFICIAL_REGISTRY_URL, normalizeRegistryUrl, isUrl } from './registry'
 
 /**
  * Allowed target path prefixes for file installation.
@@ -20,65 +20,28 @@ export const ALLOWED_TARGET_PREFIXES = [
   '.claude/',
   '.cursor/',
   '.agentrig/',
-  'scripts/',
-  'tools/',
 ]
-
-/**
- * Determine the trust tier for a pack source.
- */
-let cachedDirectoryPromise: Promise<DirectoryEntry[]> | null = null
-
-function normalizeComparableUrl(url: string) {
-  return url.replace(/\/+$/, '')
-}
-
-async function getDirectoryIndex(url: string = DIRECTORY_INDEX_URL): Promise<DirectoryEntry[]> {
-  if (url === DIRECTORY_INDEX_URL) {
-    cachedDirectoryPromise ??= fetchDirectoryIndex(url)
-    return cachedDirectoryPromise
-  }
-  return fetchDirectoryIndex(url)
-}
 
 export async function determineTrustTier(
   source: string,
-  namespacedRegistries?: Record<string, unknown>,
-  directoryUrl: string = DIRECTORY_INDEX_URL
+  registries: RegistryRef[] = []
 ): Promise<TrustTier> {
-  // Official registry
-  if (source.startsWith(OFFICIAL_REGISTRY_URL)) {
+  const normalizedOfficial = normalizeRegistryUrl(OFFICIAL_REGISTRY_URL)
+  const normalizedSource = normalizeRegistryUrl(source)
+
+  if (normalizedSource === normalizedOfficial || normalizedSource.startsWith(`${normalizedOfficial}/`)) {
     return 'official'
   }
 
-  // Namespaced pack from configured registries
-  if (isNamespacedPack(source) && namespacedRegistries) {
-    const { registry } = parseRegistryAndItemFromString(source)
-    if (registry && registry in namespacedRegistries) {
-      try {
-        const directory = await getDirectoryIndex(directoryUrl)
-        const entry = directory.find((e) => e.name === registry)
-        return entry?.verified ? 'listed' : 'unlisted'
-      } catch {
-        return 'unlisted'
-      }
-    }
-  }
-
-  // Check if the URL matches any listed registry in the directory
   if (isUrl(source)) {
-    try {
-      const directory = await getDirectoryIndex(directoryUrl)
-      for (const entry of directory) {
-        // Extract base URL from the template
-        const baseUrl = normalizeComparableUrl(entry.url.replace(/\{name\}.*$/, ''))
-        const normalizedSource = normalizeComparableUrl(source)
-        if (normalizedSource === baseUrl || normalizedSource.startsWith(`${baseUrl}/`)) {
-          return entry?.verified ? 'listed' : 'unlisted'
-        }
+    for (const registry of registries) {
+      const normalizedRegistry = normalizeRegistryUrl(registry.url)
+      if (
+        normalizedSource === normalizedRegistry ||
+        normalizedSource.startsWith(`${normalizedRegistry}/`)
+      ) {
+        return registry.url === OFFICIAL_REGISTRY_URL ? 'official' : 'listed'
       }
-    } catch {
-      return 'unlisted'
     }
   }
 
@@ -92,6 +55,24 @@ export function isAllowedTargetPath(targetPath: string): boolean {
   const normalized = targetPath.startsWith('/') ? targetPath.slice(1) : targetPath
 
   return ALLOWED_TARGET_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+}
+
+function normalizeRelativeTargetPath(targetPath: string): string | null {
+  if (!targetPath || targetPath.startsWith('/') || targetPath.startsWith('\\')) {
+    return null
+  }
+
+  const slashNormalized = targetPath.replace(/\\/g, '/')
+  if (slashNormalized.split('/').some((segment) => segment === '..')) {
+    return null
+  }
+
+  const normalized = path.posix.normalize(slashNormalized)
+  if (normalized === '.' || normalized === '..' || normalized.startsWith('../')) {
+    return null
+  }
+
+  return normalized
 }
 
 /**
@@ -109,7 +90,8 @@ export function validateTargetPaths(
       .replace(/\{\{skillsDir\}\}/g, '.codex/skills')
       .replace(/\{\{[^}]+\}\}/g, '') // Remove other placeholders for validation
 
-    if (!isAllowedTargetPath(resolved)) {
+    const normalized = normalizeRelativeTargetPath(resolved)
+    if (!normalized || !isAllowedTargetPath(normalized)) {
       disallowed.push(file.target)
     }
   }
@@ -128,7 +110,7 @@ export function describeTrustTier(tier: TrustTier): string {
     case 'official':
       return 'Official agentrig.ai registry'
     case 'listed':
-      return 'Community registry (listed in directory)'
+      return 'Configured registry'
     case 'unlisted':
       return 'Unlisted source (requires confirmation)'
   }

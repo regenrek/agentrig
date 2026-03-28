@@ -1,78 +1,86 @@
 ---
 title: Getting started
-description: How agentrig can make AI help more useful, repeatable, and easier to share.
+description: Install AgentRig, connect to registries, and install your first provider plugin.
 icon: Rocket
 ---
 
 # Getting started
 
-Agentrig helps you turn isolated AI habits into a shared way of working.
-Instead of every person reinventing prompts, tools, and repo setup from scratch, you can keep what works, reuse it, and roll it out across projects.
+AgentRig starts with a simple consumer flow:
 
-## How it helps
+1. initialize config
+2. browse available packs
+3. inspect a pack if needed
+4. install it as a native provider plugin
 
-- Get to useful AI help faster without rebuilding your setup in every repo.
-- Spend less time repeating instructions, preferred tools, and team conventions.
-- Start from proven workflows instead of trial and error.
-- Carry the same working setup from project to project.
-- Improve your setup once, then share it with everyone who needs it.
-
-## How it can help your team
-
-- Faster onboarding for new teammates.
-- More consistent outputs across repos and contributors.
-- An easier way to spread good practices without long setup docs.
-- Shared defaults without forcing everyone into a rigid workflow.
-- A cleaner path from "one person found something that works" to "the whole team can use it."
-
-## Start small
-
-You do not need to redesign your whole workflow on day one.
-A common first step is to install agentrig, try one useful pack in one real repo, and keep only what helps.
-
-## Try it
+## Official registry flow
 
 <Steps>
   <Step>
     <h3>Install agentrig</h3>
-    <p>Make agentrig available in any repo so you can reuse the same setup wherever you work.</p>
+    <p>Install the CLI once so you can use the same pack workflow in any repo.</p>
 
     ```bash
     npm install -g agentrig
-    # or
-    pnpm add -g agentrig
     ```
   </Step>
   <Step>
-    <h3>Connect to the official registry</h3>
-    <p>Create the default config so agentrig knows where to pull shared packs from.</p>
+    <h3>Initialize config</h3>
+    <p>Seed a minimal config with the official registry.</p>
 
     ```bash
-    agentrig init --registry https://agentrig.ai/registry
-    # or
-    agentrig init --global --registry https://agentrig.ai/registry
+    agentrig init
     ```
   </Step>
   <Step>
-    <h3>Add one useful pack</h3>
-    <p>Start with a pack that solves a real problem for you instead of trying to model everything at once.</p>
+    <h3>Browse the official registry</h3>
+    <p>See what packs are available before you install anything.</p>
 
     ```bash
-    agentrig add core-committer
+    agentrig list --available
     ```
   </Step>
   <Step>
-    <h3>Apply it (optional)</h3>
-    <p>If the pack writes files into your repo, apply it and see the setup land in a real project.</p>
+    <h3>Inspect the pack</h3>
+    <p>Optional, but useful if you want to review dependencies, files, and trust before installing.</p>
 
     ```bash
-    agentrig rig apply
+    agentrig view core-committer
+    ```
+  </Step>
+  <Step>
+    <h3>Install it as a provider plugin</h3>
+    <p>Choose the provider you actually use in Claude Code, Codex, or Cursor.</p>
+
+    ```bash
+    agentrig plugin install codex core-committer
     ```
   </Step>
 </Steps>
 
+## Third-party registry flow
+
+Third-party registries are explicit.
+Add the registry first, then install packs from it with `registryAlias/pack-name`.
+
+```bash
+agentrig registry add georg https://georg.dev/agentrig
+agentrig list --available --registry georg
+agentrig plugin install cursor georg/ts-master-pack
+```
+
+## Direct URL or local file flow
+
+Direct `meta.json` URLs and local `meta.json` files are treated as unlisted sources.
+Install them only when you trust the source:
+
+```bash
+agentrig plugin install codex ./hello-skills/meta.json --yes
+```
+
 ## Where to go next
 
-- Want the fastest setup path? Start with [Installation](/getting-started/installation) and then [Your first pack](/getting-started/first-pack).
-- Want to understand the technical model behind packs, registries, and rigs? Read [Core concepts](/getting-started/concepts).
-- Contributing to AgentRig itself? See [Contribute](/contribute).
+- Want the config details? Read [`agentrig init`](/cli/init) and [Project config](/configuration/project).
+- Want to add a third-party source? Read [`agentrig registry`](/cli/registry).
+- Want provider-native installs? Read [Integrations](/integrations).
+- Want to author a pack instead of consuming one? Start with [Your first pack](/getting-started/first-pack).

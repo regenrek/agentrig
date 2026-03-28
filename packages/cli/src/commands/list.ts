@@ -2,7 +2,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../lib/config'
-import { loadManifest } from '../lib/manifest'
+import { loadPluginInstallLedgers, listPluginInstallRecords } from '../lib/plugin-install-ledger'
 import { isUrl, readRegistryIndex } from '../lib/registry'
 
 const args = {
@@ -22,7 +22,7 @@ const args = {
   },
   registry: {
     type: 'string',
-    description: 'Registry name (from config) OR a registry base URL',
+    description: 'Registry alias (from config) or a registry base URL',
   },
   help: {
     type: 'boolean',
@@ -35,7 +35,7 @@ const args = {
 const command = defineCommand({
   meta: {
     name: 'list',
-    description: 'List installed packs and/or available packs in registries.',
+    description: 'List installed plugin packs and/or available packs in registries.',
   },
   args,
   async run({ args }) {
@@ -43,15 +43,18 @@ const command = defineCommand({
 
     const cwd = args.cwd ? path.resolve(args.cwd) : process.cwd()
     const cfg = await loadConfig(cwd)
-    const manifest = await loadManifest(cwd)
 
     if (args.installed) {
-      const names = Object.keys(manifest.installed).sort()
-      console.log('Installed packs:')
-      if (!names.length) console.log('  (none)')
-      for (const name of names) {
-        const p = manifest.installed[name]
-        console.log(`  - ${p.name}@${p.version} (${p.source})`)
+      const ledgers = await loadPluginInstallLedgers(cwd)
+      const records = listPluginInstallRecords(ledgers).sort((left, right) =>
+        `${left.provider}:${left.scope}:${left.packName}`.localeCompare(
+          `${right.provider}:${right.scope}:${right.packName}`
+        )
+      )
+      console.log('Installed plugin packs:')
+      if (!records.length) console.log('  (none)')
+      for (const record of records) {
+        console.log(`  - ${record.packName}@${record.packVersion} (${record.provider}, ${record.scope})`)
       }
       console.log('')
     }
@@ -63,7 +66,13 @@ const command = defineCommand({
       if (isUrl(args.registry)) registryUrls.push(args.registry)
       else {
         const match = cfg.registries.find((r) => r.name === args.registry)
-        registryUrls.push(match ? match.url : args.registry)
+        if (!match) {
+          throw new Error(
+            `Registry "${args.registry}" is not configured. Add it first with:\n` +
+              `agentrig registry add ${args.registry} <baseUrl>`
+          )
+        }
+        registryUrls.push(match.url)
       }
     } else {
       for (const r of cfg.registries) registryUrls.push(r.url)

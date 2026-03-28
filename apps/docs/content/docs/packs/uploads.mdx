@@ -64,8 +64,6 @@ Targets in `meta.json` must stay within allowed prefixes:
 - `.claude/`
 - `.cursor/`
 - `.agentrig/`
-- `scripts/`
-- `tools/`
 
 Only the most recent published version of a pack is retained.
 
@@ -87,5 +85,5 @@ Scan status is tracked separately as `pass`, `warn`, or `fail`.
 
 ```bash
 agentrig registry add community https://agentrig.ai/api/community
-agentrig add <pack-name> --registry community --yes
+agentrig plugin install codex community/<pack-name>
 ```
