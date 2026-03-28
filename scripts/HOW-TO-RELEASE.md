@@ -15,10 +15,14 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - Include detailed descriptions of changes (Added/Changed/Fixed sections) so users can easily see what's included in the release
   - The release script extracts this section automatically for the GitHub Release description
 - Ensure any user-facing docs (README, templates) are committed.
-- Run tests and ensure coverage is healthy:
-  - Run tests (one-shot): `pnpm --filter ./packages/cli test:run`
-  - Check test coverage: `pnpm --filter ./packages/cli coverage`
-  - **Release bar**: keep overall coverage **> 80%** (raise it if you touch core installer/config paths)
+- Run the mandatory local pre-publish validation:
+  - `pnpm test:release:local`
+  - This runs the CLI coverage suite, the Vite playground subprocess E2E suite, the latest-Vite fixture check, then builds/packs the CLI and smoke-tests the installed tarball with `--version` and `--help`.
+  - Do not publish if this command fails.
+- **Release bar**: keep overall coverage **> 80%** (raise it if you touch core installer/config paths)
+- CI coverage after this change is split intentionally:
+  - Ubuntu on Node 24 runs the full coverage and Vite playground E2E jobs.
+  - Ubuntu, macOS, and Windows run the packaged CLI smoke check on Node 24.
 
 ## Quick Release
 - Patch/minor/major bump and release:
@@ -45,6 +49,8 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - `pnpm --filter ./packages/cli build`
   - `pnpm --filter ./packages/cli pack`
   - `tar -tf packages/cli/agentrig-*.tgz | grep -E 'package/(templates/|README.md|LICENSE)'`
+- Run only the packaged CLI smoke test:
+  - `pnpm test:release:smoke`
 - Verify after publish:
   - npm page renders README banner
   - `templates/` are present in the tarball
