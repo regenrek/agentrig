@@ -52,6 +52,13 @@ export type InstallConfig = {
   namespacedRegistries?: Record<string, NamespacedRegistryConfig>
 }
 
+function resolveTrustSource(spec: string, resolved: ResolvedPack) {
+  if (resolved.source.type === 'url') {
+    return resolved.source.baseUrl
+  }
+  return spec
+}
+
 export async function installPack(
   spec: string,
   config: InstallConfig,
@@ -78,7 +85,7 @@ export async function installPack(
 
   // Determine trust tier
   const trustTier = resolved.trustTier ?? await determineTrustTier(
-    spec,
+    resolveTrustSource(spec, resolved),
     config.namespacedRegistries
   )
 
@@ -163,12 +170,23 @@ export async function installPack(
   }
 
   if (!opts.dryRun) {
+    const previousInstall = manifest.installed[meta.name]
+    const mergedFiles = new Map(
+      (previousInstall?.files ?? []).map((file) => [file.target, file] as const)
+    )
+    for (const file of installedTargets) {
+      mergedFiles.set(file.target, file)
+    }
+
     manifest.installed[meta.name] = {
       name: meta.name,
       version: meta.version,
       source: resolved.sourceLabel,
-      installedAt: new Date().toISOString(),
-      files: installedTargets,
+      installedAt:
+        installedTargets.length > 0 || !previousInstall
+          ? new Date().toISOString()
+          : previousInstall.installedAt,
+      files: [...mergedFiles.values()],
     }
   }
 

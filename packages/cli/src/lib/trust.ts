@@ -29,6 +29,10 @@ export const ALLOWED_TARGET_PREFIXES = [
  */
 let cachedDirectoryPromise: Promise<DirectoryEntry[]> | null = null
 
+function normalizeComparableUrl(url: string) {
+  return url.replace(/\/+$/, '')
+}
+
 async function getDirectoryIndex(url: string = DIRECTORY_INDEX_URL): Promise<DirectoryEntry[]> {
   if (url === DIRECTORY_INDEX_URL) {
     cachedDirectoryPromise ??= fetchDirectoryIndex(url)
@@ -67,8 +71,9 @@ export async function determineTrustTier(
       const directory = await getDirectoryIndex(directoryUrl)
       for (const entry of directory) {
         // Extract base URL from the template
-        const baseUrl = entry.url.replace(/\{name\}.*$/, '')
-        if (source.startsWith(baseUrl)) {
+        const baseUrl = normalizeComparableUrl(entry.url.replace(/\{name\}.*$/, ''))
+        const normalizedSource = normalizeComparableUrl(source)
+        if (normalizedSource === baseUrl || normalizedSource.startsWith(`${baseUrl}/`)) {
           return entry?.verified ? 'listed' : 'unlisted'
         }
       }

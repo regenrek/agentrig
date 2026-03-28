@@ -1,4 +1,5 @@
 import path from 'node:path'
+import process from 'node:process'
 import { readJsonFile } from './fs'
 import {
   parseRegistryAndItemFromString,
@@ -16,10 +17,12 @@ import type {
 } from './types'
 
 /** Default official registry URL */
-export const OFFICIAL_REGISTRY_URL = 'https://agentrig.ai/registry'
+export const OFFICIAL_REGISTRY_URL =
+  process.env.AGENTRIG_OFFICIAL_REGISTRY_URL ?? 'https://agentrig.ai/registry'
 
 /** Default directory index URL */
-export const DIRECTORY_INDEX_URL = 'https://agentrig.ai/directory/index.json'
+export const DIRECTORY_INDEX_URL =
+  process.env.AGENTRIG_DIRECTORY_INDEX_URL ?? 'https://agentrig.ai/directory/index.json'
 
 export type SourceBase =
   | { type: 'url'; baseUrl: string }
