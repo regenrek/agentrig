@@ -1,9 +1,10 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
     testTimeout: 20_000,
     hookTimeout: 20_000,
+    exclude: [...configDefaults.exclude, 'tests/e2e/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

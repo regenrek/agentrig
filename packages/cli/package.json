@@ -20,7 +20,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest",
     "test:run": "vitest --run",
-    "coverage": "vitest --run --coverage"
+    "coverage": "vitest --run --coverage",
+    "test:e2e:run": "pnpm build && vitest --run --config vitest.e2e.config.ts"
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.8.23",

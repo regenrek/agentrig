@@ -1,6 +1,6 @@
 import path from 'node:path'
 import process from 'node:process'
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { defineCommand, showUsage } from 'citty'
@@ -8,7 +8,12 @@ import { downloadTemplate } from 'giget'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_TEMPLATE = 'github:agentrig-ai/pack-starter'
-const LOCAL_TEMPLATE = path.resolve(__dirname, '../../../../templates/pack-starter')
+const LOCAL_TEMPLATE_CANDIDATES = [
+  path.resolve(__dirname, '../../../../../templates/pack-starter'),
+  path.resolve(__dirname, '../../../templates/pack-starter'),
+]
+const LOCAL_TEMPLATE = LOCAL_TEMPLATE_CANDIDATES.find((candidate) => existsSync(candidate))
+  ?? LOCAL_TEMPLATE_CANDIDATES[0]
 
 /** Text file extensions for substitution (hoisted for performance) */
 const TEXT_EXTENSIONS = new Set([
