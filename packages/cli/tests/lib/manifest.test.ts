@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import type { Manifest } from '../../src/lib/types'
 import { getManifestPath, loadManifest, saveManifest } from '../../src/lib/manifest'
 import { ensureDir, readJsonFile, writeJsonFile } from '../../src/lib/fs'

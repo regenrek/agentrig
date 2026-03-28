@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { clearAuthSession, loadAuthSession, saveAuthSession } from '../../src/lib/auth'
 import { chmodIfPossible, readJsonFile, removeIfExists, writeJsonFile } from '../../src/lib/fs'
 import { getGlobalAuthPath } from '../../src/lib/config'

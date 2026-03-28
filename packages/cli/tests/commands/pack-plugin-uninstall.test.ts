@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/pack/plugin-uninstall'
 import {
   parsePluginInstallScopeSelector,

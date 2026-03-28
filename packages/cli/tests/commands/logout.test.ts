@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/logout'
 import { clearAuthSession, loadAuthSession } from '../../src/lib/auth'
 import { CommunityApiError, logout as logoutRequest, resolveCommunityBaseUrl } from '../../src/lib/community-api'

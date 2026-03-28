@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { defineCommand, runMain, showUsage } from 'citty'
 import packageJson from '../package.json'
 import { shouldShowParentUsage } from './lib/command'

@@ -39,31 +39,22 @@ mkdir -p "$AGENTRIG_E2E_PACKS_ROOT"
 cd "$AGENTRIG_E2E_ROOT"
 ```
 
-## Step 0: Create Disposable Test Projects
+## Step 0: Seed Disposable Vite+ Projects
 
-Create one primary workspace-install target and one secondary clean project.
-Both live under `/tmp`, so this layout works locally and in CI runners.
+Create one primary workspace-install target and one secondary clean project by copying the committed Vite+ playground fixture.
+This is the canonical consumer-app baseline used by the automated subprocess tests, so the manual and automated flows stay aligned.
 
 ```bash
 mkdir -p "$AGENTRIG_E2E_PROJECT_A" "$AGENTRIG_E2E_PROJECT_B"
 
+cp -R "/absolute/path/to/agentrig-public/test/playgrounds/vite-plus-application/." "$AGENTRIG_E2E_PROJECT_A/"
+cp -R "/absolute/path/to/agentrig-public/test/playgrounds/vite-plus-application/." "$AGENTRIG_E2E_PROJECT_B/"
+
 for project in "$AGENTRIG_E2E_PROJECT_A" "$AGENTRIG_E2E_PROJECT_B"; do
-  mkdir -p "$project"
-  cat > "$project/README.md" <<'EOF'
-# AgentRig manual test project
-EOF
-
-  cat > "$project/package.json" <<'EOF'
-{
-  "name": "agentrig-manual-test-project",
-  "private": true,
-  "version": "0.0.0"
-}
-EOF
-
   (
     cd "$project"
-    git init
+    pnpm install
+    pnpm run build
     agentrig init --registry https://agentrig.ai/registry
   )
 done
@@ -71,18 +62,10 @@ done
 
 Expected result:
 
-- `project-a/` exists and is a disposable repo-like test project.
-- `project-b/` exists and is a second clean test project.
+- `project-a/` exists as a disposable Vite+ application project.
+- `project-b/` exists as a second clean Vite+ application project.
+- Both projects build successfully before AgentRig writes its config.
 - Both projects contain `agentrig.config.json`.
-
-If you want the manual flow to mirror the automated Vite E2E tests exactly, seed the disposable projects from the committed playground fixture before running `agentrig init`:
-
-```bash
-cp -R "/absolute/path/to/agentrig-public/test/playgrounds/vite-basic/." "$AGENTRIG_E2E_PROJECT_A/"
-cp -R "/absolute/path/to/agentrig-public/test/playgrounds/vite-basic/." "$AGENTRIG_E2E_PROJECT_B/"
-```
-
-That playground is the canonical consumer-project fixture used by the automated subprocess tests.
 
 Recommended usage:
 

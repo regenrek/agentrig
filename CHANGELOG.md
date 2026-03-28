@@ -3,13 +3,17 @@
 ## [Unreleased]
 
 ### Added
-- Added a committed Vite playground fixture plus subprocess E2E coverage for `agentrig init`, pack scaffolding, multi-provider export, and Codex/Cursor install-uninstall flows.
-- Added a local pre-publish smoke command, `pnpm test:release:local`, that runs coverage, Vite E2E, fixture freshness checks, and a packed CLI install smoke test.
+- Added a committed Vite+ application fixture plus subprocess E2E coverage for `agentrig init`, pack scaffolding, multi-provider export, and Codex/Cursor install-uninstall flows.
+- Added a local Vite+ toolchain entrypoint at the repo root via `vite.config.ts` and `vp run`-backed root scripts for validation and fixture maintenance.
+- Added a local pre-publish smoke command, `pnpm test:release:local`, that runs coverage, Vite+ E2E, fixture freshness checks, and a packed CLI install smoke test against the installed `agentrig` bin.
 - Added packaged CLI smoke coverage across Ubuntu, macOS, and Windows in CI on Node 24.
+- Added a non-blocking Node 25 packaged-smoke canary in CI.
 
 ### Changed
-- Release documentation now requires the local pre-publish validation command to pass before shipping a release.
-- The default CI coverage and Vite playground E2E jobs now run on Node 24 LTS instead of Node 20.
+- Migrated the CLI build from `tsup` to a Vite+/tsdown-backed `vp pack` configuration.
+- Replaced the old plain-Vite playground story with a Vite+ application baseline generated from `vp create vite:application`.
+- Release documentation now requires the local pre-publish validation command to pass before shipping a release, and the validation now depends on the local Vite+ toolchain.
+- The default CI coverage and Vite+ playground E2E jobs now run on Node 24 LTS instead of Node 20.
 
 ## [0.2.2] - 2026-03-27
 

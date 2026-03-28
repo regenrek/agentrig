@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import rigCommand from '../../src/commands/rig'
 import listCommand from '../../src/commands/rig/list'
 import applyCommand from '../../src/commands/rig/apply'

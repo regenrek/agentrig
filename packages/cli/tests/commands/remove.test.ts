@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/remove'
 import { loadManifest, saveManifest } from '../../src/lib/manifest'
 import { removePack } from '../../src/lib/install'

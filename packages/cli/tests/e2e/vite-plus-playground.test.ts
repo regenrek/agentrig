@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vite-plus/test'
 import {
   appendTextFile,
   cleanupE2EWorkspace,
@@ -10,12 +10,13 @@ import {
   runBuiltCli,
   type E2EProject,
   type E2EWorkspace,
+  validateVpProject,
 } from '../helpers/e2e'
 
 const registryUrl = 'https://agentrig.ai/registry'
 const packName = 'full-e2e-pack'
 const packTitle = 'Full E2E Pack'
-const packDescription = 'Fixture pack for Vite E2E tests.'
+const packDescription = 'Fixture pack for Vite+ E2E tests.'
 const pluginName = `agentrig-${packName}`
 
 async function pathExists(filePath: string) {
@@ -25,6 +26,11 @@ async function pathExists(filePath: string) {
   } catch {
     return false
   }
+}
+
+async function assertVpBuildWorks(project: E2EProject, workspace: E2EWorkspace) {
+  await validateVpProject(project, workspace)
+  expect(await pathExists(path.join(project.dir, 'dist', 'index.html'))).toBe(true)
 }
 
 async function initializeProject(project: E2EProject, workspace: E2EWorkspace) {
@@ -87,7 +93,7 @@ async function scaffoldPack(project: E2EProject, workspace: E2EWorkspace) {
   return { packDir }
 }
 
-describe.sequential('e2e:vite-playground', () => {
+describe.sequential('e2e:vite-plus-playground', () => {
   let workspace: E2EWorkspace | null = null
 
   afterEach(async () => {
@@ -95,11 +101,12 @@ describe.sequential('e2e:vite-playground', () => {
     workspace = null
   })
 
-  it('initializes a Vite project, scaffolds a pack, and exports all provider layouts', async () => {
+  it('validates the Vite+ app, scaffolds a pack, and exports all provider layouts', async () => {
     workspace = await createE2EWorkspace()
     const project = workspace.projects[0]
     if (!project) throw new Error('Missing project-a fixture')
 
+    await assertVpBuildWorks(project, workspace)
     const { packDir } = await scaffoldPack(project, workspace)
     const generatedMetaPath = path.join(packDir, 'meta.generated.json')
 
@@ -193,6 +200,7 @@ describe.sequential('e2e:vite-playground', () => {
     const project = workspace.projects[0]
     if (!project) throw new Error('Missing project-a fixture')
 
+    await assertVpBuildWorks(project, workspace)
     await scaffoldPack(project, workspace)
 
     await runBuiltCli(
@@ -310,6 +318,7 @@ describe.sequential('e2e:vite-playground', () => {
     const project = workspace.projects[0]
     if (!project) throw new Error('Missing project-a fixture')
 
+    await assertVpBuildWorks(project, workspace)
     await scaffoldPack(project, workspace)
 
     await runBuiltCli(
@@ -354,7 +363,14 @@ describe.sequential('e2e:vite-playground', () => {
       }
     )
 
-    const codexPluginPath = path.join(workspace.homeDir, '.codex', 'plugins', pluginName, '.codex-plugin', 'plugin.json')
+    const codexPluginPath = path.join(
+      workspace.homeDir,
+      '.codex',
+      'plugins',
+      pluginName,
+      '.codex-plugin',
+      'plugin.json'
+    )
     const cursorPluginPath = path.join(
       workspace.homeDir,
       '.cursor',
@@ -422,12 +438,14 @@ describe.sequential('e2e:vite-playground', () => {
     expect(Object.keys(personalLedgerAfterUninstall.installs)).toHaveLength(0)
   })
 
-  it('keeps workspace installs isolated between copied Vite projects', async () => {
+  it('keeps workspace installs isolated between copied Vite+ projects', async () => {
     workspace = await createE2EWorkspace()
     const projectA = workspace.projects[0]
     const projectB = workspace.projects[1]
     if (!projectA || !projectB) throw new Error('Expected both project-a and project-b fixtures')
 
+    await assertVpBuildWorks(projectA, workspace)
+    await assertVpBuildWorks(projectB, workspace)
     await scaffoldPack(projectA, workspace)
     await initializeProject(projectB, workspace)
 

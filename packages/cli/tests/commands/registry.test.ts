@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import registryCommand from '../../src/commands/registry'
 import listCommand from '../../src/commands/registry/list'
 import addCommand from '../../src/commands/registry/add'

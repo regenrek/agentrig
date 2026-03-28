@@ -46,13 +46,12 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
-    "@vitest/coverage-v8": "^4.1.2",
     "tailwindcss": "latest",
     "typescript": "^5.9.3",
     "unplugin-icons": "^23.0.1",
-    "vite": "latest",
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vite-plus": "^0.1.14",
     "vite-tsconfig-paths": "latest",
-    "vitest": "^4.1.2",
     "workerd": "^1.20260317.1",
     "wrangler": "^4.78.0"
   }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/login'
 import { saveAuthSession } from '../../src/lib/auth'
 import { openExternalUrl } from '../../src/lib/browser'

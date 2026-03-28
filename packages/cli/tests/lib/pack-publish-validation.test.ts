@@ -4,7 +4,7 @@ import {
   Uint8ArrayWriter,
   ZipWriter,
 } from '@zip.js/zip.js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import {
   PackPublishValidationError,
   validatePackBundle,
