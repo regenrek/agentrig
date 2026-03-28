@@ -6,28 +6,25 @@ icon: Users
 
 # Run a team registry
 
-Teams can host their own registries and publish packs under a namespace.
+Teams can host their own registry and publish private packs without changing the core consumer flow.
 
 ## 1. Host the registry
 
 Publish the `registry.json`, `<pack>.json`, and `packs/<pack>/**` files on a static host.
 
-## 2. Configure the namespace
-
-```json
-{
-  "namespacedRegistries": {
-    "@acme": "https://acme.example/registry/{name}.json"
-  }
-}
-```
-
-## 3. Install packs
+## 2. Add the registry explicitly
 
 ```bash
-agentrig add @acme/infra-safety
+agentrig registry add acme https://acme.example/registry
+```
+
+## 3. Browse and install packs
+
+```bash
+agentrig list --available --registry acme
+agentrig plugin install codex acme/infra-safety
 ```
 
 ## 4. (Optional) Get listed
 
-Submit your namespace to the directory so others can find your registry.
+Submit your registry to the public directory if you want discovery on agentrig.ai.

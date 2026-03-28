@@ -3,6 +3,7 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { pathExists } from '../lib/fs'
 import { getGlobalConfigPath, getProjectConfigPath, writeGlobalConfig, writeProjectConfig } from '../lib/config'
+import { normalizeRegistryUrl, OFFICIAL_REGISTRY_URL } from '../lib/registry'
 import type { AgentRigConfig } from '../lib/types'
 
 const args = {
@@ -10,22 +11,9 @@ const args = {
     type: 'string',
     description: 'Working directory (defaults to current directory)',
   },
-  skillsDir: {
-    type: 'string',
-    description: 'Where skills are installed (defaults to .codex/skills)',
-  },
   registry: {
     type: 'string',
-    description: 'Default registry base URL (ex: http://localhost:5173/registry)',
-  },
-  defaultRig: {
-    type: 'string',
-    description: 'Default rig name to apply when none is specified',
-  },
-  minimal: {
-    type: 'boolean',
-    description: 'Write a minimal project config (useful when rigs live in global config)',
-    default: false,
+    description: 'Seeded primary registry base URL (defaults to the official registry)',
   },
   global: {
     type: 'boolean',
@@ -45,6 +33,21 @@ const args = {
   },
 } as const
 
+function createConfig(registryUrl: string): AgentRigConfig {
+  return {
+    $schema: 'https://agentrig.ai/schema/config.json',
+    registries: [{ name: 'official', url: registryUrl }],
+  }
+}
+
+function printNextSteps() {
+  console.log('')
+  console.log('Next steps:')
+  console.log('  agentrig list --available')
+  console.log('  agentrig registry add <alias> <baseUrl>')
+  console.log('  agentrig plugin install <provider> <pack-name>')
+}
+
 const command = defineCommand({
   meta: {
     name: 'init',
@@ -55,31 +58,8 @@ const command = defineCommand({
     if (args.help) return showUsage(command)
 
     const cwd = args.cwd ? path.resolve(args.cwd) : process.cwd()
-    const skillsDir = args.skillsDir ?? '.codex/skills'
-
-    // This default is great for this monorepo because the web app serves /registry during dev.
-    // In your own projects you will likely override this with a hosted registry URL.
-    const defaultRegistry = args.registry ?? 'http://localhost:5173/registry'
-
-    const cfg: AgentRigConfig = args.minimal
-      ? {
-          $schema: 'https://agentrig.dev/schema/config.json',
-          skillsDir,
-          defaultRig: args.defaultRig ?? 'core',
-          registries: defaultRegistry ? [{ name: 'default', url: defaultRegistry }] : [],
-        }
-      : {
-          $schema: 'https://agentrig.dev/schema/config.json',
-          skillsDir,
-          registries: defaultRegistry ? [{ name: 'default', url: defaultRegistry }] : [],
-          rigs: {
-            core: { packs: ['core-committer', 'security-check'] },
-            'tauri-agentic': { extends: ['core'], packs: ['solidjs', 'rust'] },
-            tui: { extends: ['core'], packs: ['go'] },
-            website: { extends: ['core'], packs: ['typescript'] },
-          },
-          defaultRig: args.defaultRig ?? 'core',
-        }
+    const seededRegistryUrl = normalizeRegistryUrl(String(args.registry ?? OFFICIAL_REGISTRY_URL))
+    const cfg = createConfig(seededRegistryUrl)
 
     if (args.global) {
       const p = getGlobalConfigPath()
@@ -88,6 +68,7 @@ const command = defineCommand({
       }
       await writeGlobalConfig(cfg)
       console.log(`Wrote global config: ${p}`)
+      printNextSteps()
       return
     }
 
@@ -97,6 +78,7 @@ const command = defineCommand({
     }
     await writeProjectConfig(cwd, cfg)
     console.log(`Wrote project config: ${p}`)
+    printNextSteps()
   },
 })
 

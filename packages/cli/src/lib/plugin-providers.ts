@@ -111,6 +111,12 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
   }
 
   const packs = await buildPackEntries(packsRoot, cfg.pluginPrefix, options.pack)
+  const specIdentitiesByPackName = options.specIdentitiesByPackName
+  for (const pack of packs) {
+    if (!specIdentitiesByPackName[pack.meta.name]) {
+      throw new Error(`Missing canonical install spec identity for pack: ${pack.meta.name}`)
+    }
+  }
   const requestedScope = options.scope ?? 'auto'
   const baseOut = options.out
     ? path.resolve(options.cwd, options.out)
@@ -141,6 +147,7 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
     clean: options.clean ?? true,
     force: Boolean(options.force),
     dryRun: Boolean(options.dryRun),
+    specIdentitiesByPackName,
     requestedScope,
     providers,
     commandRunner: options.commandRunner ?? defaultCommandRunner,
@@ -184,6 +191,7 @@ export async function installPreparedPluginProviders(plan: PreparedPluginInstall
           cfg: plan.cfg,
           scope: providerPlan.scope,
           requestedScope: plan.requestedScope,
+          specIdentitiesByPackName: plan.specIdentitiesByPackName,
           force: plan.force,
           dryRun: plan.dryRun,
           runner: plan.commandRunner,

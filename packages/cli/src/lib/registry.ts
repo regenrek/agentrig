@@ -1,17 +1,10 @@
 import path from 'node:path'
 import process from 'node:process'
 import { readJsonFile } from './fs'
-import {
-  parseRegistryAndItemFromString,
-  buildRegistryUrl,
-  expandEnvVars,
-  isValidPackName,
-} from './namespace'
 import type {
   PackMeta,
   RegistryIndex,
   RegistryRef,
-  NamespacedRegistryConfig,
   DirectoryEntry,
   TrustTier,
 } from './types'
@@ -33,6 +26,7 @@ export type ResolvedPack = {
   source: SourceBase
   sourceLabel: string
   trustTier?: TrustTier
+  registry?: RegistryRef
 }
 
 export function isUrl(spec: string) {
@@ -52,6 +46,14 @@ export function joinUrl(baseUrl: string, rel: string) {
     throw new Error(`External URLs are not allowed for pack files: ${rel}`)
   }
   return resolved.toString()
+}
+
+export function normalizeRegistryUrl(url: string) {
+  return url.replace(/\/+$/, '')
+}
+
+export function isOfficialRegistry(registry: RegistryRef) {
+  return normalizeRegistryUrl(registry.url) === normalizeRegistryUrl(OFFICIAL_REGISTRY_URL)
 }
 
 const DEFAULT_FETCH_TIMEOUT_MS = 15000
@@ -122,115 +124,62 @@ export async function findRegistryInDirectory(
   return entries.find((e) => e.name === namespace) ?? null
 }
 
-/**
- * Build URL and headers for a namespaced registry item.
- */
-export function buildUrlAndHeadersForNamespacedItem(
-  packName: string,
-  registryConfig: NamespacedRegistryConfig
-): { url: string; headers: Record<string, string> } {
-  if (typeof registryConfig === 'string') {
-    return {
-      url: buildRegistryUrl(registryConfig, packName),
-      headers: {},
-    }
-  }
-
-  const url = buildRegistryUrl(registryConfig.url, packName)
-  const headers: Record<string, string> = {}
-
-  if (registryConfig.headers) {
-    for (const [key, value] of Object.entries(registryConfig.headers)) {
-      headers[key] = expandEnvVars(value)
-    }
-  }
-
-  // Add query params if specified
-  if (registryConfig.params) {
-    const urlObj = new URL(url)
-    for (const [key, value] of Object.entries(registryConfig.params)) {
-      urlObj.searchParams.set(key, expandEnvVars(value))
-    }
-    return { url: urlObj.toString(), headers }
-  }
-
-  return { url, headers }
-}
-
-/**
- * Resolve a pack from namespaced registries configuration.
- */
-export async function resolvePackFromNamespacedRegistry(
-  spec: string,
-  namespacedRegistries: Record<string, NamespacedRegistryConfig>
-): Promise<ResolvedPack> {
-  const { registry, item } = parseRegistryAndItemFromString(spec)
-
-  if (!registry) {
-    throw new Error(`Invalid namespaced pack spec: ${spec}`)
-  }
-
-  if (!isValidPackName(item)) {
-    throw new Error(`Invalid pack name in namespaced spec: ${spec}`)
-  }
-
-  const registryConfig = namespacedRegistries[registry]
-  if (!registryConfig) {
-    throw new Error(
-      `Registry "${registry}" is not configured. Add it to your config:\n` +
-        `{\n  "namespacedRegistries": {\n    "${registry}": "https://example.com/{name}.json"\n  }\n}`
-    )
-  }
-
-  const { url, headers } = buildUrlAndHeadersForNamespacedItem(item, registryConfig)
-  const meta = await fetchJson<PackMeta>(url, headers)
-
-  // Determine base URL for file fetching
-  const baseUrl = url.replace(/\/[^/]*\.json$/, '/')
-
-  return {
-    meta,
-    source: { type: 'url', baseUrl },
-    sourceLabel: `${registry}/${item}`,
-  }
-}
-
 export async function readRegistryIndex(registryUrl: string): Promise<RegistryIndex> {
   const u = joinUrl(registryUrl, 'registry.json')
   return fetchJson<RegistryIndex>(u)
 }
 
-export async function resolvePackByName(name: string, registries: RegistryRef[], preferredRegistry?: string): Promise<ResolvedPack> {
-  const candidates: RegistryRef[] = []
+function getRegistryByName(name: string, registries: RegistryRef[]) {
+  return registries.find((registry) => registry.name === name)
+}
 
-  if (preferredRegistry) {
-    const byName = registries.find((r) => r.name === preferredRegistry)
-    if (byName) candidates.push(byName)
-    else if (isUrl(preferredRegistry)) candidates.push({ name: preferredRegistry, url: preferredRegistry })
-    else candidates.push({ name: preferredRegistry, url: preferredRegistry })
+function getPrimaryRegistry(registries: RegistryRef[]) {
+  return registries.find((registry) => registry.name === 'official')
+}
+
+export async function resolvePackFromRegistryRef(
+  registry: RegistryRef,
+  packName: string
+): Promise<ResolvedPack> {
+  const metaUrl = joinUrl(registry.url, `${packName}.json`)
+  const meta = await fetchJson<PackMeta>(metaUrl)
+  return {
+    meta,
+    source: { type: 'url', baseUrl: registry.url },
+    sourceLabel: `registry:${registry.name}`,
+    trustTier: isOfficialRegistry(registry) ? 'official' : 'listed',
+    registry,
+  }
+}
+
+export async function resolvePackByName(
+  name: string,
+  registries: RegistryRef[]
+): Promise<ResolvedPack> {
+  const primaryRegistry = getPrimaryRegistry(registries)
+  if (!primaryRegistry) {
+    throw new Error(
+      'No primary registry is configured. Run `agentrig init` to create a fresh config.'
+    )
   }
 
-  for (const r of registries) {
-    if (!candidates.find((c) => c.url === r.url)) candidates.push(r)
+  return resolvePackFromRegistryRef(primaryRegistry, name)
+}
+
+export async function resolvePackFromRegistryAlias(
+  alias: string,
+  packName: string,
+  registries: RegistryRef[]
+): Promise<ResolvedPack> {
+  const registry = getRegistryByName(alias, registries)
+  if (!registry) {
+    throw new Error(
+      `Registry "${alias}" is not configured. Add it first with:\n` +
+        `agentrig registry add ${alias} <baseUrl>`
+    )
   }
 
-  const errors: string[] = []
-  for (const r of candidates) {
-    try {
-      const metaUrl = joinUrl(r.url, `${name}.json`)
-      const meta = await fetchJson<PackMeta>(metaUrl)
-      const trustTier: TrustTier | undefined = r.url.startsWith(OFFICIAL_REGISTRY_URL) ? 'official' : undefined
-      return {
-        meta,
-        source: { type: 'url', baseUrl: r.url },
-        sourceLabel: `registry:${r.name}`,
-        trustTier,
-      }
-    } catch (e) {
-      errors.push(String(e))
-    }
-  }
-  throw new Error(`Unable to resolve pack "${name}" from registries.\n${errors.join('\n')}`)
+  return resolvePackFromRegistryRef(registry, packName)
 }
 
 export async function resolvePackFromMetaSpec(spec: string, cwd: string): Promise<ResolvedPack> {

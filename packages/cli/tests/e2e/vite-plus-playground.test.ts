@@ -8,6 +8,7 @@ import {
   populateFullPackContents,
   readJsonFile,
   runBuiltCli,
+  writeTextFile,
   type E2EProject,
   type E2EWorkspace,
   validateVpProject,
@@ -45,7 +46,33 @@ async function initializeProject(project: E2EProject, workspace: E2EWorkspace) {
   })
 }
 
-async function scaffoldPack(project: E2EProject, workspace: E2EWorkspace) {
+async function writeInstallablePackContents(packDir: string) {
+  await fs.rm(path.join(packDir, '.gitignore'), { force: true })
+  await fs.rm(path.join(packDir, 'README.md'), { force: true })
+  await fs.rm(path.join(packDir, 'agents'), { recursive: true, force: true })
+  await fs.rm(path.join(packDir, 'hooks'), { recursive: true, force: true })
+  await fs.rm(path.join(packDir, 'scripts'), { recursive: true, force: true })
+
+  await writeTextFile(
+    path.join(packDir, 'skills', 'reviewer', 'SKILL.md'),
+    [
+      '---',
+      'name: reviewer',
+      'description: Review code changes for bugs and missing tests.',
+      '---',
+      '',
+      'Review code carefully.',
+      'Prioritize regressions, behavioral risks, and missing coverage.',
+      '',
+    ].join('\n')
+  )
+}
+
+async function scaffoldPack(
+  project: E2EProject,
+  workspace: E2EWorkspace,
+  options: { consumerSafe?: boolean } = {}
+) {
   await initializeProject(project, workspace)
 
   await runBuiltCli(
@@ -71,7 +98,13 @@ async function scaffoldPack(project: E2EProject, workspace: E2EWorkspace) {
   )
 
   const packDir = path.join(workspace.packsRoot, packName)
-  await populateFullPackContents(packDir)
+  if (options.consumerSafe) {
+    await writeInstallablePackContents(packDir)
+  } else {
+    await populateFullPackContents(packDir)
+  }
+
+  const generatedMetaPath = path.join(packDir, 'meta.generated.json')
 
   await runBuiltCli(
     [
@@ -87,7 +120,7 @@ async function scaffoldPack(project: E2EProject, workspace: E2EWorkspace) {
       '--version',
       '1.0.0',
       '--out',
-      path.join(packDir, 'meta.generated.json'),
+      generatedMetaPath,
     ],
     {
       cwd: project.dir,
@@ -95,7 +128,7 @@ async function scaffoldPack(project: E2EProject, workspace: E2EWorkspace) {
     }
   )
 
-  return { packDir }
+  return { packDir, generatedMetaPath }
 }
 
 async function createFakeClaudeEnv(workspace: E2EWorkspace) {
@@ -294,23 +327,10 @@ describe.sequential('e2e:vite-plus-playground', () => {
     if (!project) throw new Error('Missing project-a fixture')
 
     await assertVpBuildWorks(project, workspace)
-    await scaffoldPack(project, workspace)
+    const { generatedMetaPath } = await scaffoldPack(project, workspace, { consumerSafe: true })
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'codex',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-        '--clean',
-      ],
+      ['plugin', 'install', 'codex', generatedMetaPath, '--scope', 'workspace', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -318,20 +338,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-        '--clean',
-      ],
+      ['plugin', 'install', 'cursor', generatedMetaPath, '--scope', 'workspace', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -357,17 +364,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     await appendTextFile(path.join(cursorPluginDir, 'README.md'), 'manual edit\n')
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'uninstall',
-        '--agent',
-        'codex',
-        '--pack',
-        packName,
-        '--scope',
-        'workspace',
-      ],
+      ['plugin', 'uninstall', 'codex', generatedMetaPath, '--scope', 'workspace'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -375,17 +372,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'uninstall',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--scope',
-        'workspace',
-      ],
+      ['plugin', 'uninstall', 'cursor', generatedMetaPath, '--scope', 'workspace'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -398,12 +385,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     expect(await pathExists(path.join(cursorPluginDir, '.cursor-plugin', 'plugin.json'))).toBe(false)
 
     const ledgerAfterUninstall = await readJsonFile<{ installs: Record<string, unknown> }>(ledgerPath)
-    expect(Object.keys(ledgerAfterUninstall.installs)).toEqual(
-      expect.arrayContaining([
-        `codex:workspace:${pluginName}`,
-        `cursor:workspace:${pluginName}`,
-      ])
-    )
+    expect(Object.keys(ledgerAfterUninstall.installs)).toHaveLength(0)
   })
 
   it('installs and uninstalls personal plugins inside an isolated HOME', async () => {
@@ -412,23 +394,10 @@ describe.sequential('e2e:vite-plus-playground', () => {
     if (!project) throw new Error('Missing project-a fixture')
 
     await assertVpBuildWorks(project, workspace)
-    await scaffoldPack(project, workspace)
+    const { generatedMetaPath } = await scaffoldPack(project, workspace, { consumerSafe: true })
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'codex',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'personal',
-        '--clean',
-      ],
+      ['plugin', 'install', 'codex', generatedMetaPath, '--scope', 'personal', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -436,20 +405,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'personal',
-        '--clean',
-      ],
+      ['plugin', 'install', 'cursor', generatedMetaPath, '--scope', 'personal', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -487,17 +443,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'uninstall',
-        '--agent',
-        'codex',
-        '--pack',
-        packName,
-        '--scope',
-        'personal',
-      ],
+      ['plugin', 'uninstall', 'codex', generatedMetaPath, '--scope', 'personal'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -505,17 +451,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'uninstall',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--scope',
-        'personal',
-      ],
+      ['plugin', 'uninstall', 'cursor', generatedMetaPath, '--scope', 'personal'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -537,25 +473,12 @@ describe.sequential('e2e:vite-plus-playground', () => {
     if (!project) throw new Error('Missing project-a fixture')
 
     await assertVpBuildWorks(project, workspace)
-    await scaffoldPack(project, workspace)
+    const { generatedMetaPath } = await scaffoldPack(project, workspace, { consumerSafe: true })
 
     const fakeClaude = await createFakeClaudeEnv(workspace)
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'claude',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-        '--clean',
-      ],
+      ['plugin', 'install', 'claude', generatedMetaPath, '--scope', 'workspace', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -564,20 +487,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'claude',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'personal',
-        '--clean',
-      ],
+      ['plugin', 'install', 'claude', generatedMetaPath, '--scope', 'personal', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -595,17 +505,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     expect(Object.keys(personalLedger.installs)).toContain(`claude:personal:${pluginName}`)
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'uninstall',
-        '--agent',
-        'claude',
-        '--pack',
-        packName,
-        '--scope',
-        'workspace',
-      ],
+      ['plugin', 'uninstall', 'claude', generatedMetaPath, '--scope', 'workspace'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -614,17 +514,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'uninstall',
-        '--agent',
-        'claude',
-        '--pack',
-        packName,
-        '--scope',
-        'personal',
-      ],
+      ['plugin', 'uninstall', 'claude', generatedMetaPath, '--scope', 'personal'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -684,25 +574,12 @@ describe.sequential('e2e:vite-plus-playground', () => {
     if (!project) throw new Error('Missing project-a fixture')
 
     await assertVpBuildWorks(project, workspace)
-    await scaffoldPack(project, workspace)
+    const { generatedMetaPath } = await scaffoldPack(project, workspace, { consumerSafe: true })
 
     const fakeClaude = await createFakeClaudeEnv(workspace)
 
     const dryRun = await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'claude',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-        '--dryRun',
-      ],
+      ['plugin', 'install', 'claude', generatedMetaPath, '--scope', 'workspace', '--dryRun', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -718,20 +595,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     expect(await pathExists(fakeClaude.logPath)).toBe(false)
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-        '--clean',
-      ],
+      ['plugin', 'install', 'cursor', generatedMetaPath, '--scope', 'workspace', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -739,19 +603,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     const skipped = await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-      ],
+      ['plugin', 'install', 'cursor', generatedMetaPath, '--scope', 'workspace', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -760,20 +612,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     expect(skipped.stdout).toContain('cursor [workspace]: installed 0, skipped 1')
 
     const forced = await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-        '--force',
-      ],
+      ['plugin', 'install', 'cursor', generatedMetaPath, '--scope', 'workspace', '--force', '--yes'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -786,17 +625,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
 
     await expect(
       runBuiltCli(
-        [
-          'pack',
-          'plugin',
-          'uninstall',
-          '--agent',
-          'cursor',
-          '--pack',
-          packName,
-          '--scope',
-          'workspace',
-        ],
+        ['plugin', 'uninstall', 'cursor', generatedMetaPath, '--scope', 'workspace'],
         {
           cwd: project.dir,
           homeDir: workspace.homeDir,
@@ -813,24 +642,11 @@ describe.sequential('e2e:vite-plus-playground', () => {
 
     await assertVpBuildWorks(projectA, workspace)
     await assertVpBuildWorks(projectB, workspace)
-    await scaffoldPack(projectA, workspace)
+    const { generatedMetaPath } = await scaffoldPack(projectA, workspace, { consumerSafe: true })
     await initializeProject(projectB, workspace)
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-        '--clean',
-      ],
+      ['plugin', 'install', 'cursor', generatedMetaPath, '--scope', 'workspace', '--yes'],
       {
         cwd: projectA.dir,
         homeDir: workspace.homeDir,
@@ -838,20 +654,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     )
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'install',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--packsDir',
-        workspace.packsRoot,
-        '--scope',
-        'workspace',
-        '--clean',
-      ],
+      ['plugin', 'install', 'cursor', generatedMetaPath, '--scope', 'workspace', '--yes'],
       {
         cwd: projectB.dir,
         homeDir: workspace.homeDir,
@@ -865,17 +668,7 @@ describe.sequential('e2e:vite-plus-playground', () => {
     expect(await pathExists(path.join(projectBCursorPlugin, '.cursor-plugin', 'plugin.json'))).toBe(true)
 
     await runBuiltCli(
-      [
-        'pack',
-        'plugin',
-        'uninstall',
-        '--agent',
-        'cursor',
-        '--pack',
-        packName,
-        '--scope',
-        'workspace',
-      ],
+      ['plugin', 'uninstall', 'cursor', generatedMetaPath, '--scope', 'workspace'],
       {
         cwd: projectA.dir,
         homeDir: workspace.homeDir,

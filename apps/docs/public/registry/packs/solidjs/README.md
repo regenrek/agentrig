@@ -5,16 +5,16 @@ SolidJS patterns and guardrails for agentic coding.
 ## Installation
 
 ```bash
-agentrig add solidjs
+agentrig plugin install codex solidjs
 ```
 
 ## What's included
 
 - `skills/solidjs/SKILL.md`
 
-## Requirements
+## Provider install
 
-- Installs to `{{skillsDir}}` (default `.codex/skills`).
+- Install with any supported provider: `codex`, `claude`, or `cursor`.
 
 ## Usage
 

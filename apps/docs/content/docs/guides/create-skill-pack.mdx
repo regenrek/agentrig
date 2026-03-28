@@ -26,10 +26,10 @@ agentrig pack create . --out meta.json
 
 ## 4. Test locally
 
-Install your pack directly from the local path:
+Install your pack from the local `meta.json` as a provider plugin:
 
 ```bash
-agentrig add ./my-skill-pack/meta.json
+agentrig plugin install codex ./my-skill-pack/meta.json --yes
 ```
 
 ## 5. Publish

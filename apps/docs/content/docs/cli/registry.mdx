@@ -1,12 +1,15 @@
 ---
 title: registry
-description: Add or list registries in config.
+description: Add or list configured registries.
 icon: Database
 ---
 
 # `agentrig registry`
 
-Manage registries in your config file.
+Manage the registries in your config file.
+
+The official registry is seeded by `agentrig init`.
+Third-party registries are explicit: add the registry first, then install packs from it with `registryAlias/pack-name`.
 
 ## List registries
 
@@ -17,25 +20,25 @@ agentrig registry list
 ## Add or update a registry
 
 ```bash
-agentrig registry add acme https://example.com/registry
+agentrig registry add georg https://georg.dev/agentrig
 ```
 
-Examples:
+After adding a registry:
 
 ```bash
-# Official
-agentrig registry add official https://agentrig.ai/registry
-
-# Community Packs (hosted)
-agentrig registry add community https://agentrig.ai/api/community
-
-# Self-hosted registry
-agentrig registry add acme https://example.com/registry
+agentrig list --available --registry georg
+agentrig plugin install codex georg/ts-master-pack
 ```
 
-Options:
+Direct URLs and local files stay outside this listed path. Those installs are treated as unlisted and require `--yes`.
+
+## Options
 
 - `--cwd <path>` - working directory.
 - `--global` - write to global config.
 
-The CLI updates `agentrig.config.json` or `~/.agentrig/config.json`.
+## Notes
+
+- Registry aliases use lowercase letters, numbers, and hyphens.
+- Registry URLs must point at a base URL that serves `registry.json` at the root.
+- Use `--global` when you want a registry available across repos instead of only in the current project.

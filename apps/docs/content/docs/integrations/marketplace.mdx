@@ -1,21 +1,26 @@
 ---
 title: Marketplace exports
-description: Configure and export plugin marketplaces.
+description: Export local packs as provider-native marketplaces.
 icon: Store
 ---
 
 # Marketplace exports
 
-Use `agentrig pack plugin export` to export packs as individual plugins for Claude, Codex, Cursor, or all three at once.
+Use `agentrig pack plugin export` when you are authoring local packs and want provider-native marketplace output.
 
-## How plugin export and install works
+Consumers do not need this command for normal installs.
+They should use:
+
+```bash
+agentrig plugin install <provider> <pack-spec>
+```
+
+## How export works
 
 ![How AgentRig converts packs into native plugins and tracks installs safely](/agentrig_plugin.jpeg)
 
 - Start with an AgentRig pack as the portable source of truth for prompts, assets, scripts, MCP config, and other workflow files.
 - `agentrig pack plugin export` converts that pack into each provider's native plugin marketplace layout for Claude, Codex, or Cursor.
-- `agentrig pack plugin install` installs the native output into the provider-specific target location instead of inventing a separate runtime format.
-- AgentRig records install state in its ledger so uninstall can remove only tracked files, preserve user-modified files, and keep plugin cleanup auditable.
 
 ```bash
 agentrig pack plugin export --agent all --packsDir registry/packs --out dist/plugins
@@ -66,28 +71,3 @@ Create `agentrig.plugins.json` to customize output:
 ```
 
 The exporter reads this file automatically when present.
-
-## Install and uninstall after export
-
-Most users will use the generic install and uninstall commands instead of manually copying the exported files:
-
-```bash
-agentrig pack plugin install --agent codex --pack my-pack
-agentrig pack plugin uninstall --agent codex --pack my-pack
-```
-
-The install command always prints a preflight summary before writing anything.
-In interactive terminals, it can prompt for provider, pack, and scope.
-In non-interactive runs, pass `--pack <folder>` or `--all`.
-
-## Tracked installs and safe cleanup
-
-AgentRig's plugin workflow is designed to stay auditable and reversible.
-
-- installs are recorded in an AgentRig-managed ledger
-- uninstall only targets installs that AgentRig previously recorded
-- tracked files are removed only when their hashes still match what AgentRig installed
-- modified files are kept instead of being deleted
-- provider-specific cleanup tries to preserve unrelated or pre-existing entries where possible
-
-This is part of the core concept behind AgentRig integrations: they should feel native in Claude Code, Codex, and Cursor without turning into hidden plugin or config bloat that is hard to unwind later.

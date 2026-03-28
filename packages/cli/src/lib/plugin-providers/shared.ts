@@ -8,6 +8,7 @@ import { sha256Hex } from '../hash'
 import { isValidPackName, isValidPackVersion } from '../pack-validation'
 import type {
   PluginInstallRecord,
+  PluginInstallSpecIdentity,
   PluginInstalledFile,
   PluginInstallScopeSelectorName,
 } from '../types'
@@ -148,6 +149,7 @@ export type ExternalCommandRunner = (command: string, args: string[]) => Promise
 
 export type PluginInstallOptions = PluginExportOptions & {
   scope?: PluginInstallScopeSelector
+  specIdentitiesByPackName: Record<string, PluginInstallSpecIdentity>
   force?: boolean
   dryRun?: boolean
   commandRunner?: ExternalCommandRunner
@@ -169,6 +171,7 @@ export type PreparedPluginInstall = {
   clean: boolean
   force: boolean
   dryRun: boolean
+  specIdentitiesByPackName: Record<string, PluginInstallSpecIdentity>
   requestedScope: PluginInstallScopeSelector
   providers: PreparedProviderInstall[]
   commandRunner: ExternalCommandRunner
@@ -209,6 +212,7 @@ export type ProviderInstallContext = {
   cfg: ResolvedPluginConfig
   scope: PluginInstallScope
   requestedScope: PluginInstallScopeSelector
+  specIdentitiesByPackName: Record<string, PluginInstallSpecIdentity>
   force: boolean
   dryRun: boolean
   runner: ExternalCommandRunner

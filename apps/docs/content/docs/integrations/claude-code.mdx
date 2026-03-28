@@ -1,76 +1,40 @@
 ---
 title: Claude Code
-description: Export packs for Claude Code marketplace.
+description: Install resolved packs as Claude Code plugins.
 icon: Sparkles
 ---
 
 # Claude Code integration
 
-Agentrig can export packs as Claude Code plugins and install them through Claude's native marketplace commands.
-
-## Export a Claude marketplace
+Consumers install resolved packs into Claude with the top-level plugin command:
 
 ```bash
-agentrig pack plugin export --agent claude --packsDir registry/packs --out dist/claude-marketplace
+agentrig plugin install claude core-committer
+agentrig plugin install claude georg/ts-master-pack
 ```
 
-For a single pack:
-
-```bash
-agentrig pack plugin export --agent claude --pack my-pack --packsDir registry/packs --out dist/claude-marketplace
-```
-
-This generates a Claude-compatible marketplace:
-
-```text
-dist/claude-marketplace/
-  .claude-plugin/marketplace.json
-  plugins/
-    agentrig-<pack>/
-      .claude-plugin/plugin.json
-      skills/...
-      commands/...
-      agents/...
-```
-
-## Install in Claude Code
-
-```bash
-agentrig pack plugin install --agent claude --pack my-pack
-```
-
-In interactive terminals, `agentrig` can prompt for the provider and pack.
-In non-interactive runs, pass `--pack <folder>` or `--all`.
-
-Under the hood, AgentRig calls Claude's native commands:
-
-```text
-claude plugin marketplace add <export-dir>
-claude plugin install <plugin>@<marketplace> --scope user|project
-```
-
-`--scope auto` remains the default selector for the generic plugin installer.
-For Claude, that resolves to `workspace`, so Claude installs default to the project scope unless you pass `--scope personal`.
+Claude installs use Claude's native marketplace commands under the hood.
 
 ## Uninstall from Claude Code
 
 ```bash
-agentrig pack plugin uninstall --agent claude --pack my-pack
+agentrig plugin uninstall claude core-committer
 ```
 
-Uninstall uses the AgentRig install ledger to find only AgentRig-managed Claude installs.
-If AgentRig did not add the Claude marketplace itself, uninstall leaves the pre-existing marketplace in place.
+## What AgentRig does
+
+```text
+claude plugin marketplace add <generated-marketplace-dir>
+claude plugin install <plugin>@<marketplace> --scope user|project
+```
+
+By default, `--scope auto` resolves to `workspace` for Claude.
+Use `--scope personal` when you want a user-level install instead.
 
 ## What Claude plugins include
 
-Claude exports can include:
+Claude plugins can include:
 
 - `skills/`
 - `commands/`
 - `agents/`
-
-Claude commands and skills are namespaced under the plugin name, for example:
-
-```text
-/agentrig-core-committer:committer
-```

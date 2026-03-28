@@ -2,15 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/list'
 import type { ResolvedConfig } from '../../src/lib/config'
 import { loadConfig } from '../../src/lib/config'
-import { loadManifest } from '../../src/lib/manifest'
+import { loadPluginInstallLedgers, listPluginInstallRecords } from '../../src/lib/plugin-install-ledger'
 import { isUrl, readRegistryIndex } from '../../src/lib/registry'
-import type { Manifest } from '../../src/lib/types'
 
 vi.mock('../../src/lib/config', () => ({
   loadConfig: vi.fn(),
 }))
-vi.mock('../../src/lib/manifest', () => ({
-  loadManifest: vi.fn(),
+vi.mock('../../src/lib/plugin-install-ledger', () => ({
+  loadPluginInstallLedgers: vi.fn(),
+  listPluginInstallRecords: vi.fn(),
 }))
 vi.mock('../../src/lib/registry', () => ({
   isUrl: vi.fn(),
@@ -27,8 +27,7 @@ describe('command:list', () => {
 
   it('lists installed and available packs', async () => {
     const cfg: ResolvedConfig = {
-      skillsDir: '.codex/skills',
-      registries: [{ name: 'default', url: 'https://registry.example.com' }],
+      registries: [{ name: 'official', url: 'https://registry.example.com' }],
       rigs: {},
       paths: {
         projectConfigPath: '/repo/agentrig.config.json',
@@ -36,13 +35,40 @@ describe('command:list', () => {
       },
     }
     vi.mocked(loadConfig).mockResolvedValue(cfg)
-    const manifest: Manifest = {
-      schemaVersion: 1,
-      installed: {
-        core: { name: 'core', version: '1.0.0', source: 'registry:default', installedAt: '', files: [] },
+    vi.mocked(loadPluginInstallLedgers).mockResolvedValue({
+      personal: { schemaVersion: 1, installs: {} },
+      workspace: { schemaVersion: 1, installs: {} },
+    })
+    vi.mocked(listPluginInstallRecords).mockReturnValue([
+      {
+        id: 'codex:workspace:agentrig-core',
+        provider: 'codex',
+        requestedScope: 'workspace',
+        specIdentity: {
+          kind: 'registry',
+          registryUrl: 'https://agentrig.ai/registry',
+          packName: 'core',
+        },
+        scope: 'workspace',
+        packName: 'core',
+        packVersion: '1.0.0',
+        pluginName: 'agentrig-core',
+        sourceLocation: '/tmp/agentrig-core',
+        targetPaths: ['/repo/.codex/plugins/agentrig-core'],
+        installedAt: new Date().toISOString(),
+        files: [],
+        metadata: {
+          pluginPath: '/repo/.codex/plugins/agentrig-core',
+          marketplacePath: '/repo/.codex/marketplace.json',
+          marketplaceEntry: {
+            name: 'agentrig-core',
+            source: { source: 'local', path: './plugins/agentrig-core' },
+            policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+            category: 'Productivity',
+          },
+        },
       },
-    }
-    vi.mocked(loadManifest).mockResolvedValue(manifest)
+    ])
     vi.mocked(isUrl).mockReturnValue(false)
     vi.mocked(readRegistryIndex).mockResolvedValue({
       name: 'registry',
@@ -56,11 +82,12 @@ describe('command:list', () => {
         cwd: '/repo',
         installed: true,
         available: true,
-        registry: 'default',
+        registry: 'official',
         help: false,
       },
     })
 
+    expect(loadPluginInstallLedgers).toHaveBeenCalledWith('/repo')
     expect(readRegistryIndex).toHaveBeenCalledWith('https://registry.example.com')
   })
 })

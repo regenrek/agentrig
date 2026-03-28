@@ -5,18 +5,19 @@ __PACK_DESCRIPTION__
 ## Installation
 
 ```bash
-agentrig add __PACK_NAME__
+agentrig plugin install codex __PACK_NAME__
 ```
 
 Or install from a custom registry:
 
 ```bash
-agentrig add @your-namespace/__PACK_NAME__
+agentrig registry add your-registry https://example.com/agentrig
+agentrig plugin install codex your-registry/__PACK_NAME__
 ```
 
 ## Usage
 
-After installation, the skill will be available in your project. The agent will automatically apply it when relevant tasks are detected.
+After installation, the provider plugin will expose the pack's skills, commands, agents, and related assets in the target environment.
 
 ## Structure
 

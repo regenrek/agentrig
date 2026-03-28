@@ -324,7 +324,7 @@ describe.sequential('e2e:registry-rig-security', () => {
       homeDir: workspace.homeDir,
       env,
     })
-    expect(registryList.stdout).toContain(`default: ${officialRegistryUrl(server)}`)
+    expect(registryList.stdout).toContain(`official: ${officialRegistryUrl(server)}`)
     expect(registryList.stdout).toContain(`listed: ${listedRegistryUrl(server)}`)
 
     const available = await runBuiltCli(['list', '--available', '--registry', 'listed'], {
@@ -334,7 +334,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     })
     expect(available.stdout).toContain('listed-pack@1.0.0  Listed Pack')
 
-    const viewed = await runBuiltCli(['view', 'listed-pack', '--registry', 'listed', '--json'], {
+    const viewed = await runBuiltCli(['view', 'listed/listed-pack', '--json'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
@@ -348,7 +348,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     expect(viewedJson.source).toBe('registry:listed')
     expect(viewedJson.files[0]?.target).toBe('.codex/skills/listed/SKILL.md')
 
-    await runBuiltCli(['add', 'listed-pack', '--registry', 'listed'], {
+    await runBuiltCli(['add', 'listed/listed-pack'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
@@ -408,9 +408,9 @@ describe.sequential('e2e:registry-rig-security', () => {
     const env = buildTrustEnv(server)
 
     await writeJsonFile(path.join(project.dir, 'agentrig.config.json'), {
-      $schema: 'https://agentrig.dev/schema/config.json',
+      $schema: 'https://agentrig.ai/schema/config.json',
       skillsDir: '.codex/skills',
-      registries: [{ name: 'listed', url: listedRegistryUrl(server) }],
+      registries: [{ name: 'official', url: listedRegistryUrl(server) }],
       defaultRig: 'layered',
       rigs: {
         base: { packs: ['core-pack'] },
@@ -427,7 +427,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     expect(listedRigs.stdout).toContain('  - layered (default)')
     expect(listedRigs.stdout).toContain('extends: base | packs: overlay-pack, extra-pack, core-pack')
 
-    const firstApply = await runBuiltCli(['rig', 'apply', '--registry', 'listed'], {
+    const firstApply = await runBuiltCli(['rig', 'apply'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
@@ -438,7 +438,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     ).toBe('# core\n')
     expect(await pathExists(path.join(project.dir, '.codex', 'skills', 'extra', 'SKILL.md'))).toBe(true)
 
-    const secondApply = await runBuiltCli(['rig', 'apply', '--registry', 'listed'], {
+    const secondApply = await runBuiltCli(['rig', 'apply'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
@@ -455,7 +455,7 @@ describe.sequential('e2e:registry-rig-security', () => {
       manifestAfterReapply.installed['extra-pack']?.files.map((file) => file.target)
     ).toContain('.codex/skills/extra/SKILL.md')
 
-    const prunedApply = await runBuiltCli(['rig', 'apply', 'pruneOnly', '--registry', 'listed'], {
+    const prunedApply = await runBuiltCli(['rig', 'apply', 'pruneOnly'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
@@ -493,45 +493,47 @@ describe.sequential('e2e:registry-rig-security', () => {
     const env = buildTrustEnv(server)
 
     await writeJsonFile(path.join(project.dir, 'agentrig.config.json'), {
-      $schema: 'https://agentrig.dev/schema/config.json',
+      $schema: 'https://agentrig.ai/schema/config.json',
       skillsDir: '.codex/skills',
       registries: [
         { name: 'official', url: officialRegistryUrl(server) },
         { name: 'listed', url: listedRegistryUrl(server) },
-        { name: 'unlisted', url: unlistedRegistryUrl(server) },
       ],
     })
 
-    const officialView = await runBuiltCli(['view', 'official-pack', '--registry', 'official', '--json'], {
+    const officialView = await runBuiltCli(['view', 'official-pack', '--json'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
     })
     expect(JSON.parse(officialView.stdout).trustTier).toBe('official')
 
-    const listedView = await runBuiltCli(['view', 'listed-pack', '--registry', 'listed', '--json'], {
+    const listedView = await runBuiltCli(['view', 'listed/listed-pack', '--json'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
     })
     expect(JSON.parse(listedView.stdout).trustTier).toBe('listed')
 
-    const unlistedView = await runBuiltCli(['view', 'unlisted-pack', '--registry', 'unlisted', '--json'], {
-      cwd: project.dir,
-      homeDir: workspace.homeDir,
-      env,
-    })
+    const unlistedView = await runBuiltCli(
+      ['view', `${unlistedRegistryUrl(server)}/unlisted-pack.json`, '--json'],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+        env,
+      }
+    )
     expect(JSON.parse(unlistedView.stdout).trustTier).toBe('unlisted')
 
     await expect(
-      runBuiltCli(['add', 'unlisted-pack', '--registry', 'unlisted'], {
+      runBuiltCli(['add', `${unlistedRegistryUrl(server)}/unlisted-pack.json`], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,
       })
     ).rejects.toThrow('This pack is from an unlisted source. Re-run with --yes to confirm install.')
 
-    await runBuiltCli(['add', 'unlisted-pack', '--registry', 'unlisted', '--yes'], {
+    await runBuiltCli(['add', `${unlistedRegistryUrl(server)}/unlisted-pack.json`, '--yes'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
@@ -569,13 +571,13 @@ describe.sequential('e2e:registry-rig-security', () => {
     const env = buildTrustEnv(server)
 
     await writeJsonFile(path.join(project.dir, 'agentrig.config.json'), {
-      $schema: 'https://agentrig.dev/schema/config.json',
+      $schema: 'https://agentrig.ai/schema/config.json',
       skillsDir: '.codex/skills',
       registries: [{ name: 'listed', url: listedRegistryUrl(server) }],
     })
 
     const unsafeView = await runBuiltCli(
-      ['view', 'unsafe-target-pack', '--registry', 'listed', '--json'],
+      ['view', 'listed/unsafe-target-pack', '--json'],
       {
         cwd: project.dir,
         homeDir: workspace.homeDir,
@@ -585,7 +587,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     expect(JSON.parse(unsafeView.stdout).pathValidation.valid).toBe(false)
 
     await expect(
-      runBuiltCli(['view', 'malformed-pack', '--registry', 'listed'], {
+      runBuiltCli(['view', 'listed/malformed-pack'], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,
@@ -593,7 +595,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     ).rejects.toThrow('Invalid pack meta: missing title')
 
     await expect(
-      runBuiltCli(['add', 'unsafe-target-pack', '--registry', 'listed'], {
+      runBuiltCli(['add', 'listed/unsafe-target-pack'], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,
@@ -601,7 +603,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     ).rejects.toThrow('contains disallowed target paths')
 
     await expect(
-      runBuiltCli(['add', 'bad-hash-pack', '--registry', 'listed'], {
+      runBuiltCli(['add', 'listed/bad-hash-pack'], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,
@@ -609,7 +611,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     ).rejects.toThrow('Integrity check failed')
 
     await expect(
-      runBuiltCli(['add', 'cross-origin-pack', '--registry', 'listed'], {
+      runBuiltCli(['add', 'listed/cross-origin-pack'], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,

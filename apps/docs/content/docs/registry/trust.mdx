@@ -6,34 +6,30 @@ icon: Shield
 
 # Trust tiers
 
-Agentrig assigns each pack source a trust tier to protect your filesystem.
+Agentrig assigns each pack source a trust tier before plugin installation.
 
 | Tier | Source | Behavior |
 | --- | --- | --- |
 | `official` | `https://agentrig.ai/registry` | Always trusted. |
-| `listed` | Namespaces in the directory index | Trusted, no prompt. |
-| `unlisted` | Direct URLs or unknown registries | Requires confirmation (`--yes`). |
+| `listed` | Explicitly configured registries in your config | Trusted, no prompt. |
+| `unlisted` | Direct URLs, local files, or unknown registries | Requires confirmation (`--yes`). |
 
-## How trust is determined (current CLI behavior)
+## How trust is determined
 
-- **Official**: if the pack is resolved from the official registry (`https://agentrig.ai/registry`).
-- **Listed**:
-  - Installing `@namespace/pack` **and** `namespacedRegistries` includes `@namespace`, **and** the directory entry for `@namespace` is marked `verified: true`.
-  - Installing a direct meta URL that matches the base URL of a verified directory entry.
-- **Unlisted**: everything else (including plain pack names from non-official registries).
-
-If the directory index cannot be fetched, sources fall back to `unlisted`.
+- **Official**: the pack resolves from the official registry seeded by `agentrig init`.
+- **Listed**: the pack resolves from a registry you explicitly added with `agentrig registry add`.
+- **Unlisted**: the pack resolves from a direct URL, local file, or some other source outside your configured registries.
 
 ## Confirmation for unlisted sources
 
-If a pack comes from an unlisted source, the CLI shows the install plan and exits:
+If a pack comes from an unlisted source, AgentRig refuses to continue until you confirm it:
 
 ```bash
-agentrig add https://example.com/some-pack.json
+agentrig plugin install codex https://example.com/some-pack.json
 # Re-run with:
-agentrig add https://example.com/some-pack.json --yes
+agentrig plugin install codex https://example.com/some-pack.json --yes
 ```
 
 ## Path validation
 
-Regardless of trust tier, all targets are validated against a safe prefix list to prevent path traversal.
+Regardless of trust tier, pack metadata is still validated against AgentRig's allowed target prefixes to block unsafe or non-standardized install targets.

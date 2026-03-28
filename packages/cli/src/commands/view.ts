@@ -2,28 +2,18 @@ import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../lib/config'
-import { isNamespacedPack } from '../lib/namespace'
-import {
-  resolvePackByName,
-  resolvePackFromMetaSpec,
-  resolvePackFromNamespacedRegistry,
-  isUrl,
-} from '../lib/registry'
+import { resolvePackSpec } from '../lib/pack-resolver'
 import { determineTrustTier, describeTrustTier, validateTargetPaths } from '../lib/trust'
 
 const args = {
   spec: {
     type: 'positional',
-    description: 'Pack name, @namespace/pack, or a meta.json URL/path',
+    description: 'Pack name, registryAlias/pack, or a meta.json URL/path',
     required: true,
   },
   cwd: {
     type: 'string',
     description: 'Working directory (defaults to current directory)',
-  },
-  registry: {
-    type: 'string',
-    description: 'Registry name (from config) OR a registry base URL',
   },
   json: {
     type: 'boolean',
@@ -80,21 +70,13 @@ const command = defineCommand({
 
     const spec = args.spec
 
-    // Resolve the pack
-    let resolved
-    if (isUrl(spec) || spec.endsWith('.json') || spec.startsWith('.') || spec.startsWith('/')) {
-      resolved = await resolvePackFromMetaSpec(spec, cwd)
-    } else if (isNamespacedPack(spec) && cfg.namespacedRegistries) {
-      resolved = await resolvePackFromNamespacedRegistry(spec, cfg.namespacedRegistries)
-    } else {
-      resolved = await resolvePackByName(spec, cfg.registries ?? [], args.registry)
-    }
+    const resolved = await resolvePackSpec(spec, cwd, cfg.registries)
 
     const meta = resolved.meta
     assertPackMeta(meta)
     const trustTier = resolved.trustTier ?? await determineTrustTier(
       resolveTrustSource(spec, resolved),
-      cfg.namespacedRegistries
+      cfg.registries
     )
 
     // Validate target paths

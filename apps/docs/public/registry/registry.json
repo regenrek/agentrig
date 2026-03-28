@@ -1,8 +1,8 @@
 {
-  "$schema": "https://agentrig.dev/schema/registry.json",
+  "$schema": "https://agentrig.ai/schema/registry.json",
   "name": "agentrig",
-  "homepage": "https://agentrig.dev",
-  "generatedAt": "2026-03-28T13:34:19.764Z",
+  "homepage": "https://agentrig.ai",
+  "generatedAt": "2026-03-28T20:30:02.197Z",
   "items": [
     {
       "name": "core-committer",

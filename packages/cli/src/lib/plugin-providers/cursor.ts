@@ -1,7 +1,8 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { ensureDir, writeJsonFile } from '../fs'
-import { getPluginInstallRecordId } from '../plugin-install-ledger'
+import { ensureDir, pathExists, writeJsonFile } from '../fs'
+import { getPluginInstallRecordId, loadPluginInstallLedger } from '../plugin-install-ledger'
+import { isSamePluginInstallSpecIdentity } from '../plugin-install-spec'
 import type { CursorPluginInstallRecord } from '../types'
 import type {
   PackEntry,
@@ -128,12 +129,37 @@ export const cursorProvider: PluginProviderAdapter = {
       actions: packs.map((pack) => `copy ${pack.pluginName} -> ${path.join(pluginRoot, pack.pluginName)}`),
     }
   },
-  async install({ cwd, result, scope, requestedScope, force, dryRun }) {
+  async install({ cwd, result, scope, requestedScope, specIdentitiesByPackName, force, dryRun }) {
     const installed: string[] = []
     const skipped: string[] = []
     const ledgerEntries: CursorPluginInstallRecord[] = []
     const pluginRoot = resolveCursorInstallRoot(cwd, scope)
     const pluginSourceRoot = path.join(result.outRoot, 'plugins')
+    const installLedger = dryRun ? null : await loadPluginInstallLedger(cwd, scope)
+
+    for (const pack of result.plugins) {
+      const specIdentity = specIdentitiesByPackName[pack.meta.name]
+      if (!specIdentity) {
+        throw new Error(`Missing install spec identity for pack: ${pack.meta.name}`)
+      }
+
+      const destinationDir = path.join(pluginRoot, pack.pluginName)
+      const existingRecordId = getPluginInstallRecordId('cursor', scope, pack.pluginName)
+      const destinationExists = dryRun ? false : await pathExists(destinationDir)
+      if (!destinationExists || force) continue
+
+      const existingRecord = installLedger?.installs[existingRecordId]
+      if (!existingRecord) {
+        throw new Error(
+          `Cursor plugin ${pack.pluginName} already exists at ${destinationDir} without a matching AgentRig ledger entry. Re-run with --force to repair.`
+        )
+      }
+      if (!isSamePluginInstallSpecIdentity(existingRecord.specIdentity, specIdentity)) {
+        throw new Error(
+          `Cursor plugin ${pack.pluginName} already exists at ${destinationDir} for a different AgentRig source. Re-run with --force to replace it.`
+        )
+      }
+    }
 
     for (const pack of result.plugins) {
       const sourceDir = path.join(pluginSourceRoot, pack.pluginName)
@@ -149,10 +175,12 @@ export const cursorProvider: PluginProviderAdapter = {
       }
 
       if (changed) {
+        const specIdentity = specIdentitiesByPackName[pack.meta.name]
         ledgerEntries.push({
           id: getPluginInstallRecordId('cursor', scope, pack.pluginName),
           provider: 'cursor',
           requestedScope,
+          specIdentity,
           scope,
           packName: pack.meta.name,
           packVersion: pack.meta.version,

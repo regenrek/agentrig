@@ -5,17 +5,18 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { PackMeta, RegistryIndex } from '../../src/lib/types'
 import {
   OFFICIAL_REGISTRY_URL,
-  buildUrlAndHeadersForNamespacedItem,
   fetchDirectoryIndex,
   findRegistryInDirectory,
   isFileish,
   isUrl,
+  isOfficialRegistry,
   joinUrl,
+  normalizeRegistryUrl,
   readRegistryIndex,
   readSourceFile,
   resolvePackByName,
   resolvePackFromMetaSpec,
-  resolvePackFromNamespacedRegistry,
+  resolvePackFromRegistryAlias,
 } from '../../src/lib/registry'
 import { readJsonFile } from '../../src/lib/fs'
 
@@ -81,49 +82,31 @@ describe('registry', () => {
   })
 
   it('fetches directory index', async () => {
-    const entries = [{ name: '@acme', url: 'https://acme/{name}.json', verified: true }]
+    const entries = [{ name: 'georg', url: 'https://georg.dev/agentrig', verified: true }]
     vi.mocked(fetch).mockResolvedValueOnce(okResponse(entries))
     await expect(fetchDirectoryIndex('https://example.com/index.json')).resolves.toEqual(entries)
   })
 
   it('finds a registry in directory', async () => {
     const entries = [
-      { name: '@acme', url: 'https://acme/{name}.json', verified: true },
-      { name: '@other', url: 'https://other/{name}.json', verified: false },
+      { name: 'georg', url: 'https://georg.dev/agentrig', verified: true },
+      { name: 'other', url: 'https://other.dev/agentrig', verified: false },
     ]
     vi.mocked(fetch).mockResolvedValueOnce(okResponse(entries))
-    await expect(findRegistryInDirectory('@acme', 'https://example.com/index.json')).resolves.toEqual(
+    await expect(findRegistryInDirectory('georg', 'https://example.com/index.json')).resolves.toEqual(
       entries[0]
     )
     vi.mocked(fetch).mockResolvedValueOnce(okResponse(entries))
-    await expect(findRegistryInDirectory('@missing', 'https://example.com/index.json')).resolves.toBeNull()
+    await expect(findRegistryInDirectory('missing', 'https://example.com/index.json')).resolves.toBeNull()
   })
 
-  it('builds URL and headers for namespaced registries', () => {
-    process.env.API_TOKEN = 'secret'
-    process.env.VERSION = 'v1'
-
-    const result = buildUrlAndHeadersForNamespacedItem('pack', {
-      url: 'https://example.com/{name}.json',
-      headers: { Authorization: 'Bearer ${API_TOKEN}' },
-      params: { version: '${VERSION}' },
-    })
-
-    expect(result.headers).toEqual({ Authorization: 'Bearer secret' })
-    expect(result.url).toBe('https://example.com/pack.json?version=v1')
+  it('normalizes registry URLs and detects the official registry', () => {
+    expect(normalizeRegistryUrl('https://agentrig.ai/registry/')).toBe('https://agentrig.ai/registry')
+    expect(isOfficialRegistry({ name: 'official', url: OFFICIAL_REGISTRY_URL })).toBe(true)
+    expect(isOfficialRegistry({ name: 'georg', url: 'https://georg.dev/agentrig' })).toBe(false)
   })
 
-  it('rejects missing env vars for headers', () => {
-    delete process.env.MISSING_VAR
-    expect(() =>
-      buildUrlAndHeadersForNamespacedItem('pack', {
-        url: 'https://example.com/{name}.json',
-        headers: { Authorization: 'Bearer ${MISSING_VAR}' },
-      })
-    ).toThrow('Environment variable MISSING_VAR is not set')
-  })
-
-  it('resolves a namespaced registry pack', async () => {
+  it('resolves a pack from a configured registry alias', async () => {
     const meta: PackMeta = {
       name: 'pack',
       title: 'Pack',
@@ -133,26 +116,19 @@ describe('registry', () => {
     }
     vi.mocked(fetch).mockResolvedValueOnce(okResponse(meta))
 
-    const result = await resolvePackFromNamespacedRegistry('@acme/pack', {
-      '@acme': 'https://example.com/{name}.json',
-    })
+    const result = await resolvePackFromRegistryAlias('georg', 'pack', [
+      { name: 'georg', url: 'https://example.com/registry' },
+    ])
 
     expect(result.meta).toEqual(meta)
-    expect(result.source).toEqual({ type: 'url', baseUrl: 'https://example.com/' })
-    expect(result.sourceLabel).toBe('@acme/pack')
+    expect(result.source).toEqual({ type: 'url', baseUrl: 'https://example.com/registry' })
+    expect(result.sourceLabel).toBe('registry:georg')
+    expect(result.trustTier).toBe('listed')
   })
 
-  it('rejects invalid namespaced specs', async () => {
-    await expect(
-      resolvePackFromNamespacedRegistry('pack', { '@acme': 'https://example.com/{name}.json' })
-    ).rejects.toThrow('Invalid namespaced pack spec')
-
-    await expect(
-      resolvePackFromNamespacedRegistry('@acme/Bad', { '@acme': 'https://example.com/{name}.json' })
-    ).rejects.toThrow('Invalid pack name in namespaced spec')
-
-    await expect(resolvePackFromNamespacedRegistry('@missing/pack', {})).rejects.toThrow(
-      'Registry "@missing" is not configured'
+  it('rejects unknown registry aliases', async () => {
+    await expect(resolvePackFromRegistryAlias('missing', 'pack', [])).rejects.toThrow(
+      'Registry "missing" is not configured'
     )
   })
 
@@ -172,7 +148,7 @@ describe('registry', () => {
     await expect(readRegistryIndex('https://example.com/registry')).resolves.toEqual(registryIndex)
   })
 
-  it('resolves a pack by name with fallback', async () => {
+  it('resolves an official pack by name from the primary registry', async () => {
     const meta: PackMeta = {
       name: 'pack',
       title: 'Pack',
@@ -180,28 +156,21 @@ describe('registry', () => {
       version: '1.0.0',
       files: [],
     }
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(errorResponse(404))
-      .mockResolvedValueOnce(okResponse(meta))
+    vi.mocked(fetch).mockResolvedValueOnce(okResponse(meta))
 
-    const result = await resolvePackByName(
-      'pack',
-      [
-        { name: 'broken', url: 'https://broken.example.com' },
-        { name: 'working', url: OFFICIAL_REGISTRY_URL },
-      ],
-      'broken'
-    )
+    const result = await resolvePackByName('pack', [
+      { name: 'official', url: OFFICIAL_REGISTRY_URL },
+      { name: 'georg', url: 'https://georg.dev/agentrig' },
+    ])
 
     expect(result.meta).toEqual(meta)
     expect(result.source).toEqual({ type: 'url', baseUrl: OFFICIAL_REGISTRY_URL })
     expect(result.trustTier).toBe('official')
   })
 
-  it('throws when pack cannot be resolved', async () => {
-    vi.mocked(fetch).mockResolvedValue(errorResponse(404))
-    await expect(resolvePackByName('pack', [{ name: 'broken', url: 'https://broken.example.com' }])).rejects.toThrow(
-      'Unable to resolve pack "pack"'
+  it('throws when there is no primary registry configured', async () => {
+    await expect(resolvePackByName('pack', [{ name: 'georg', url: 'https://georg.dev/agentrig' }])).rejects.toThrow(
+      'No primary registry is configured'
     )
   })
 

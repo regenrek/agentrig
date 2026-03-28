@@ -1,24 +1,35 @@
 ---
 title: Integrations
-description: Connect agentrig with other tools.
+description: Install resolved packs as native plugins for supported providers.
 icon: Plug
 ---
 
 # Integrations
 
-Agentrig packs can target editor-specific directories and export to provider-native plugin formats.
+AgentRig can take a resolved pack and install it as a native plugin for:
 
-This section covers:
+- `Claude Code`
+- `Codex`
+- `Cursor`
 
-- `Claude Code`: export and install Claude marketplace plugins
-- `Codex`: export, install, and uninstall local Codex plugins for personal or workspace scope
-- `Cursor`: export, install, and uninstall local Cursor plugins for personal or workspace scope
-- `Marketplace exports`: shared config and output structure for multi-provider plugin exports
-
-The generic plugin workflow is:
+## Consumer flow
 
 ```bash
-agentrig pack plugin export --agent <provider|all>
-agentrig pack plugin install --agent <provider> --pack <pack>
-agentrig pack plugin uninstall --agent <provider> --pack <pack>
+agentrig plugin install <provider> <pack-spec>
+agentrig plugin uninstall <provider> <pack-spec>
+```
+
+`<pack-spec>` can be:
+
+- an official pack name such as `core-committer`
+- a third-party pack from an added registry such as `georg/ts-master-pack`
+- a direct `meta.json` URL
+- a local `meta.json` path
+
+## Author flow
+
+If you are publishing or testing local packs, export provider-native marketplaces from pack directories:
+
+```bash
+agentrig pack plugin export --agent <provider|all> --packsDir registry/packs
 ```

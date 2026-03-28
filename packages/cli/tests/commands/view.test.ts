@@ -2,22 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/view'
 import type { ResolvedConfig } from '../../src/lib/config'
 import { loadConfig } from '../../src/lib/config'
-import {
-  resolvePackByName,
-  resolvePackFromMetaSpec,
-  resolvePackFromNamespacedRegistry,
-  isUrl,
-} from '../../src/lib/registry'
+import { resolvePackSpec } from '../../src/lib/pack-resolver'
 import { describeTrustTier, determineTrustTier, validateTargetPaths } from '../../src/lib/trust'
 
 vi.mock('../../src/lib/config', () => ({
   loadConfig: vi.fn(),
 }))
-vi.mock('../../src/lib/registry', () => ({
-  resolvePackByName: vi.fn(),
-  resolvePackFromMetaSpec: vi.fn(),
-  resolvePackFromNamespacedRegistry: vi.fn(),
-  isUrl: vi.fn(),
+vi.mock('../../src/lib/pack-resolver', () => ({
+  resolvePackSpec: vi.fn(),
 }))
 vi.mock('../../src/lib/trust', () => ({
   determineTrustTier: vi.fn(),
@@ -35,7 +27,6 @@ describe('command:view', () => {
 
   it('prints JSON output for URL specs', async () => {
     const cfg: ResolvedConfig = {
-      skillsDir: '.codex/skills',
       registries: [],
       rigs: {},
       paths: {
@@ -44,7 +35,6 @@ describe('command:view', () => {
       },
     }
     vi.mocked(loadConfig).mockResolvedValue(cfg)
-    vi.mocked(isUrl).mockReturnValue(true)
     const meta = {
       name: 'core',
       title: 'Core',
@@ -52,7 +42,7 @@ describe('command:view', () => {
       version: '1.0.0',
       files: [],
     }
-    vi.mocked(resolvePackFromMetaSpec).mockResolvedValue({
+    vi.mocked(resolvePackSpec).mockResolvedValue({
       meta,
       source: { type: 'url', baseUrl: 'https://example.com/' },
       sourceLabel: 'url:https://example.com/core.json',
@@ -77,11 +67,9 @@ describe('command:view', () => {
     expect(parsed.trustTier).toBe('listed')
   })
 
-  it('prints human output for namespaced specs', async () => {
+  it('prints human output for aliased registry specs', async () => {
     const cfg: ResolvedConfig = {
-      skillsDir: '.codex/skills',
-      registries: [],
-      namespacedRegistries: { '@acme': 'https://acme/{name}.json' },
+      registries: [{ name: 'georg', url: 'https://georg.dev/agentrig' }],
       rigs: {},
       paths: {
         projectConfigPath: '/repo/agentrig.config.json',
@@ -89,7 +77,6 @@ describe('command:view', () => {
       },
     }
     vi.mocked(loadConfig).mockResolvedValue(cfg)
-    vi.mocked(isUrl).mockReturnValue(false)
     const meta = {
       name: 'pack',
       title: 'Pack',
@@ -97,25 +84,25 @@ describe('command:view', () => {
       version: '1.0.0',
       files: [{ path: 'skills/foo.md', target: '{{skillsDir}}/foo.md' }],
     }
-    vi.mocked(resolvePackFromNamespacedRegistry).mockResolvedValue({
+    vi.mocked(resolvePackSpec).mockResolvedValue({
       meta,
-      source: { type: 'url', baseUrl: 'https://acme/' },
-      sourceLabel: '@acme/pack',
+      source: { type: 'url', baseUrl: 'https://georg.dev/agentrig' },
+      sourceLabel: 'registry:georg',
       trustTier: undefined,
     })
-    vi.mocked(determineTrustTier).mockResolvedValue('unlisted')
-    vi.mocked(describeTrustTier).mockReturnValue('Unlisted source')
+    vi.mocked(determineTrustTier).mockResolvedValue('listed')
+    vi.mocked(describeTrustTier).mockReturnValue('Configured registry')
     vi.mocked(validateTargetPaths).mockReturnValue({ valid: false, disallowed: ['etc/passwd'] })
 
     await run({
       args: {
-        spec: '@acme/pack',
+        spec: 'georg/pack',
         cwd: '/repo',
         json: false,
         help: false,
       },
     })
 
-    expect(describeTrustTier).toHaveBeenCalledWith('unlisted')
+    expect(describeTrustTier).toHaveBeenCalledWith('listed')
   })
 })

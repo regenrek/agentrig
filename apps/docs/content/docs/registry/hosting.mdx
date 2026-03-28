@@ -33,8 +33,9 @@ https://example.com/registry/
 
 ## Test locally
 
-Start any static server at the registry root and install from it:
+Start any static server at the registry root and add it as a registry:
 
 ```bash
-agentrig add core-committer --registry https://example.com/registry
+agentrig registry add example https://example.com/registry
+agentrig plugin install codex example/core-committer
 ```

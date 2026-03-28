@@ -110,7 +110,7 @@ const command = defineCommand({
     }
 
     const meta: PackMeta = {
-      $schema: 'https://agentrig.dev/schema/pack.json',
+      $schema: 'https://agentrig.ai/schema/pack.json',
       kind: 'agentrig:pack',
       name: packName,
       title: args.title ?? packName,

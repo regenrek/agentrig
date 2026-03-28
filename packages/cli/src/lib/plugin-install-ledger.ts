@@ -13,6 +13,21 @@ import type {
 const pluginProviderSchema = z.enum(['claude', 'codex', 'cursor'])
 const pluginInstallScopeSchema = z.enum(['personal', 'workspace'])
 const pluginInstallScopeSelectorSchema = z.enum(['auto', 'personal', 'workspace'])
+const pluginInstallSpecIdentitySchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('registry'),
+    registryUrl: z.string().min(1),
+    packName: z.string().min(1),
+  }),
+  z.strictObject({
+    kind: z.literal('url'),
+    metaUrl: z.string().min(1),
+  }),
+  z.strictObject({
+    kind: z.literal('file'),
+    metaPath: z.string().min(1),
+  }),
+])
 const pluginInstalledFileSchema = z.strictObject({
   path: z.string().min(1),
   sha256: z.string().min(1),
@@ -21,6 +36,7 @@ const pluginInstallRecordBaseSchema = z.strictObject({
   id: z.string().min(1),
   provider: pluginProviderSchema,
   requestedScope: pluginInstallScopeSelectorSchema,
+  specIdentity: pluginInstallSpecIdentitySchema,
   scope: pluginInstallScopeSchema,
   packName: z.string().min(1),
   packVersion: z.string().min(1),

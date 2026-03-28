@@ -122,7 +122,7 @@ export const claudeProvider: PluginProviderAdapter = {
       ],
     }
   },
-  async install({ result, dryRun, runner, scope, requestedScope }) {
+  async install({ result, dryRun, runner, scope, requestedScope, specIdentitiesByPackName }) {
     const installed: string[] = []
     const skipped: string[] = []
     const locations = [result.outRoot]
@@ -152,6 +152,10 @@ export const claudeProvider: PluginProviderAdapter = {
     }
 
     for (const plugin of result.plugins) {
+      const specIdentity = specIdentitiesByPackName[plugin.meta.name]
+      if (!specIdentity) {
+        throw new Error(`Missing install spec identity for pack: ${plugin.meta.name}`)
+      }
       const pluginRef = `${plugin.pluginName}@${result.marketplaceName}`
       await runner('claude', ['plugin', 'install', pluginRef, '--scope', scopeArg])
       installed.push(plugin.pluginName)
@@ -159,6 +163,7 @@ export const claudeProvider: PluginProviderAdapter = {
         id: getPluginInstallRecordId('claude', scope, plugin.pluginName),
         provider: 'claude',
         requestedScope,
+        specIdentity,
         scope,
         packName: plugin.meta.name,
         packVersion: plugin.meta.version,

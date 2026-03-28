@@ -1,4 +1,3 @@
-/** @deprecated Use NamespacedRegistry instead */
 export type RegistryRef = {
   name: string
   url: string
@@ -6,28 +5,17 @@ export type RegistryRef = {
 
 export type RigDefinition = {
   extends?: string[]
+  /** Pack specs: official pack, registryAlias/pack, or explicit spec */
   packs?: string[]
 }
-
-/**
- * Namespaced registry configuration (shadcn-style).
- * Can be a simple URL template string or an object with auth options.
- */
-export type NamespacedRegistryConfig =
-  | string // URL template with {name} placeholder, e.g. "https://example.com/{name}.json"
-  | {
-      url: string
-      headers?: Record<string, string>
-      params?: Record<string, string>
-    }
 
 /**
  * Directory index entry for a community registry.
  */
 export type DirectoryEntry = {
-  name: string // Namespace identifier, e.g. "@acme"
+  name: string
   homepage?: string
-  url: string // URL template with {name} placeholder
+  url: string
   description?: string
   logo?: string
   verified?: boolean
@@ -41,11 +29,7 @@ export type TrustTier = 'official' | 'listed' | 'unlisted'
 
 export type AgentRigConfig = {
   $schema?: string
-  skillsDir?: string
-  /** @deprecated Use namespacedRegistries instead */
   registries?: RegistryRef[]
-  /** Namespaced registries: @namespace -> URL template or config object */
-  namespacedRegistries?: Record<string, NamespacedRegistryConfig>
   rigs?: Record<string, RigDefinition>
   defaultRig?: string
 }
@@ -70,7 +54,7 @@ export type RegistryIndex = {
 export type PackFile = {
   /** File path in the pack source (registry, repo, local folder) */
   path: string
-  /** Target path in the consuming project (supports placeholders like {{skillsDir}}) */
+  /** Standardized install target metadata */
   target: string
   /** Optional file mode as a string, ex: "755" */
   mode?: string
@@ -166,25 +150,6 @@ export type PackMeta = {
   components?: PackComponents
 }
 
-export type InstalledFile = {
-  target: string
-  sha256?: string
-  mode?: string
-}
-
-export type InstalledPack = {
-  name: string
-  version: string
-  source: string
-  installedAt: string
-  files: InstalledFile[]
-}
-
-export type Manifest = {
-  schemaVersion: 1
-  installed: Record<string, InstalledPack>
-}
-
 export type PluginProviderName = 'claude' | 'codex' | 'cursor'
 export type PluginInstallScopeName = 'personal' | 'workspace'
 export type PluginInstallScopeSelectorName = 'auto' | PluginInstallScopeName
@@ -211,10 +176,26 @@ export type CodexMarketplacePluginRecord = {
   category: string
 }
 
+export type PluginInstallSpecIdentity =
+  | {
+      kind: 'registry'
+      registryUrl: string
+      packName: string
+    }
+  | {
+      kind: 'url'
+      metaUrl: string
+    }
+  | {
+      kind: 'file'
+      metaPath: string
+    }
+
 type PluginInstallRecordBase = {
   id: string
   provider: PluginProviderName
   requestedScope: PluginInstallScopeSelectorName
+  specIdentity: PluginInstallSpecIdentity
   scope: PluginInstallScopeName
   packName: string
   packVersion: string

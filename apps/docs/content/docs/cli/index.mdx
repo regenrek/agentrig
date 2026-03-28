@@ -12,9 +12,11 @@ Run `agentrig --help` for global help.
 ## Common commands
 
 - `agentrig init` - create config file.
-- `agentrig add <pack>` - install a pack.
-- `agentrig list` - list installed or available packs.
-- `agentrig rig apply` - apply a rig.
+- `agentrig list --available` - browse available packs.
+- `agentrig view <pack>` - inspect a pack before installing.
+- `agentrig plugin install <provider> <pack>` - install a provider plugin.
+- `agentrig plugin uninstall <provider> <pack>` - remove a provider plugin.
+- `agentrig rig apply <provider> <rig>` - apply an advanced rig.
 - `agentrig registry add` - add a registry.
 - `agentrig pack init` - scaffold a new pack.
 

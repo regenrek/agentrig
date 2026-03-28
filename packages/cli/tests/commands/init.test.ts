@@ -29,10 +29,7 @@ describe('command:init', () => {
     await run({
       args: {
         cwd: '/repo',
-        skillsDir: 'custom-skills',
         registry: 'https://registry.example.com',
-        defaultRig: 'custom',
-        minimal: true,
         global: true,
         force: false,
         help: false,
@@ -40,10 +37,8 @@ describe('command:init', () => {
     })
 
     expect(writeGlobalConfig).toHaveBeenCalledWith({
-      $schema: 'https://agentrig.dev/schema/config.json',
-      skillsDir: 'custom-skills',
-      defaultRig: 'custom',
-      registries: [{ name: 'default', url: 'https://registry.example.com' }],
+      $schema: 'https://agentrig.ai/schema/config.json',
+      registries: [{ name: 'official', url: 'https://registry.example.com' }],
     })
   })
 
@@ -55,7 +50,6 @@ describe('command:init', () => {
       run({
         args: {
           cwd: '/repo',
-          minimal: false,
           global: false,
           force: false,
           help: false,
@@ -64,16 +58,13 @@ describe('command:init', () => {
     ).rejects.toThrow('Project config already exists')
   })
 
-  it('writes a full project config when allowed', async () => {
+  it('writes a minimal project config when allowed', async () => {
     vi.mocked(getProjectConfigPath).mockReturnValue('/repo/agentrig.config.json')
     vi.mocked(pathExists).mockResolvedValue(false)
 
     await run({
       args: {
         cwd: '/repo',
-        skillsDir: '.codex/skills',
-        defaultRig: 'core',
-        minimal: false,
         global: false,
         force: true,
         help: false,
@@ -81,10 +72,8 @@ describe('command:init', () => {
     })
 
     expect(writeProjectConfig).toHaveBeenCalledWith('/repo', expect.objectContaining({
-      $schema: 'https://agentrig.dev/schema/config.json',
-      skillsDir: '.codex/skills',
-      defaultRig: 'core',
-      rigs: expect.any(Object),
+      $schema: 'https://agentrig.ai/schema/config.json',
+      registries: [{ name: 'official', url: 'https://agentrig.ai/registry' }],
     }))
   })
 })

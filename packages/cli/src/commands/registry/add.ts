@@ -3,6 +3,8 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { readJsonFile, writeJsonFile, ensureDir } from '../../lib/fs'
 import { getGlobalConfigPath, getProjectConfigPath } from '../../lib/config'
+import { isValidRegistryAlias } from '../../lib/registry-spec'
+import { normalizeRegistryUrl } from '../../lib/registry'
 import type { AgentRigConfig } from '../../lib/types'
 
 const args = {
@@ -34,11 +36,20 @@ const args = {
 } as const
 
 function upsertRegistry(cfg: AgentRigConfig, name: string, url: string) {
-  const regs = cfg.registries ?? []
+  const regs = [...(cfg.registries ?? [])]
   const idx = regs.findIndex((r) => r.name === name)
   if (idx >= 0) regs[idx] = { name, url }
   else regs.push({ name, url })
-  cfg.registries = regs
+  return regs
+}
+
+function sanitizeConfig(cfg: AgentRigConfig, registries: AgentRigConfig['registries']): AgentRigConfig {
+  return {
+    $schema: cfg.$schema,
+    registries,
+    rigs: cfg.rigs,
+    defaultRig: cfg.defaultRig,
+  }
 }
 
 const command = defineCommand({
@@ -49,17 +60,27 @@ const command = defineCommand({
 
     const cwd = args.cwd ? path.resolve(args.cwd) : process.cwd()
     const p = args.global ? getGlobalConfigPath() : getProjectConfigPath(cwd)
+    const registryName = String(args.name)
+    const registryUrl = normalizeRegistryUrl(String(args.url))
+
+    if (!isValidRegistryAlias(registryName)) {
+      throw new Error(
+        `Invalid registry alias: ${registryName}\n` +
+          'Registry aliases must use lowercase letters, numbers, and hyphens.'
+      )
+    }
 
     await ensureDir(path.dirname(p))
     const cfg = (await readJsonFile<AgentRigConfig>(p)) ?? {
-      $schema: 'https://agentrig.dev/schema/config.json',
+      $schema: 'https://agentrig.ai/schema/config.json',
     }
+    const registries = upsertRegistry(cfg, registryName, registryUrl)
+    const nextConfig = sanitizeConfig(cfg, registries)
 
-    upsertRegistry(cfg, args.name, args.url)
-    await writeJsonFile(p, cfg)
+    await writeJsonFile(p, nextConfig)
 
     console.log(`Updated config: ${p}`)
-    console.log(`Registry: ${args.name} -> ${args.url}`)
+    console.log(`Registry: ${registryName} -> ${registryUrl}`)
   },
 })
 
