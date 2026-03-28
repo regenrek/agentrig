@@ -1,4 +1,4 @@
-import { execFile as execFileCallback } from 'node:child_process'
+import { exec as execCallback, execFile as execFileCallback } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
 const execFile = promisify(execFileCallback)
+const exec = promisify(execCallback)
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const smokeOnly = process.argv.includes('--smoke-only')
@@ -15,9 +16,15 @@ function commandName(base) {
   return process.platform === 'win32' ? `${base}.cmd` : base
 }
 
+function quoteWindowsArg(value) {
+  if (value.length === 0) return '""'
+  if (!/[\s"&()^<>|]/.test(value)) return value
+  return `"${value.replace(/["^]/g, '^$&')}"`
+}
+
 async function run(command, args, cwd = repoRoot) {
   console.log(`\n$ ${command} ${args.join(' ')}`)
-  const result = await execFile(command, args, {
+  const options = {
     cwd,
     env: {
       ...process.env,
@@ -25,7 +32,15 @@ async function run(command, args, cwd = repoRoot) {
       TMPDIR: process.env.TMPDIR || os.tmpdir(),
     },
     maxBuffer: 20 * 1024 * 1024,
-  })
+    windowsHide: true,
+  }
+
+  const result = process.platform === 'win32' && command.endsWith('.cmd')
+    ? await exec(
+      [quoteWindowsArg(command), ...args.map((arg) => quoteWindowsArg(String(arg)))].join(' '),
+      options
+    )
+    : await execFile(command, args, options)
 
   if (result.stdout.trim()) {
     console.log(result.stdout.trim())
