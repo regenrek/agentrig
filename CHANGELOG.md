@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-27
+
 ### Added
 - Added a committed Vite+ application fixture plus subprocess E2E coverage for `agentrig init`, pack scaffolding, multi-provider export, and Codex/Cursor install-uninstall flows.
 - Added a local Vite+ toolchain entrypoint at the repo root via `vite.config.ts` and `vp run`-backed root scripts for validation and fixture maintenance.
