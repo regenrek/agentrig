@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "alchemy dev",
-    "build": "vite build",
-    "preview": "vite preview",
+    "build": "vp build",
+    "preview": "vp preview",
     "deploy": "alchemy deploy",
     "destroy": "alchemy destroy"
   },

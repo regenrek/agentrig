@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-28
+
+### Added
+- Added top-level `agentrig plugin install` and `agentrig plugin uninstall` commands as the canonical consumer workflow for Claude, Codex, and Cursor plugins.
+- Added canonical install `specIdentity` tracking plus shared normalization for registry, URL, and file specs so uninstall, rig prune, and repair behavior stay deterministic.
+- Added plugin pack graph resolution and materialization coverage for registry-backed plugin installs, including dedicated regression coverage for published registry path rewriting.
+
+### Changed
+- Hard-cut the consumer contract to a plugin-first model: removed the old `agentrig add` / `remove` flow and the consumer-facing `pack plugin install` / `pack plugin uninstall` commands.
+- Simplified configuration and docs around minimal `agentrig init`, flat registries, advanced rigs, and the canonical `agentrig.ai` schema/domain surface.
+- Reworked rig application to install provider plugins from resolved pack specs and prune by canonical install identity instead of legacy pack-name matching.
+
+### Fixed
+- Existing provider plugin directories without a matching ledger entry now require `--force` instead of silently skipping repair.
+- Existing provider plugin directories from a conflicting canonical spec identity now fail safely and require `--force` before replacement.
+- Registry-backed plugin installs now correctly materialize published pack file paths from generated registry metadata.
+
 ## [0.3.0] - 2026-03-27
 
 ### Added

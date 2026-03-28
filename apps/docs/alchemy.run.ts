@@ -19,8 +19,11 @@ export const website = await TanStackStart("website", {
   name: `agentrig-docs-${app.stage}`,
   domains: app.stage === "prod" ? prodDomains : undefined,
   adopt: true,
+  build: {
+    command: "vp build",
+  },
   dev: {
-    command: "vite dev --port 5174",
+    command: "vp dev --port 5174",
   },
 });
 
