@@ -40,6 +40,15 @@ function resolvePackSourcePath(packDir: string, relativePath: string) {
   return destinationPath
 }
 
+function normalizeMaterializedPackFilePath(packName: string, relativePath: string) {
+  const slashNormalized = relativePath.replace(/\\/g, '/')
+  const publishedPrefix = `packs/${packName}/`
+  if (slashNormalized.startsWith(publishedPrefix)) {
+    return slashNormalized.slice(publishedPrefix.length)
+  }
+  return relativePath
+}
+
 function isExplicitPackSpec(spec: string) {
   return isUrl(spec) || isFileish(spec) || spec.includes('/')
 }
@@ -139,7 +148,10 @@ export async function materializeResolvedPackGraph(graph: ResolvedPackGraph) {
         )
       }
 
-      const destinationPath = resolvePackSourcePath(packDir, file.path)
+      const destinationPath = resolvePackSourcePath(
+        packDir,
+        normalizeMaterializedPackFilePath(resolved.meta.name, file.path)
+      )
       await ensureDir(path.dirname(destinationPath))
       await fs.writeFile(destinationPath, bytes)
     }

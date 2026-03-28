@@ -41,6 +41,14 @@ async function pathExists(filePath: string) {
   }
 }
 
+function codexPluginName(packName: string) {
+  return `agentrig-${packName}`
+}
+
+function codexPluginDir(projectDir: string, packName: string) {
+  return path.join(projectDir, 'plugins', codexPluginName(packName))
+}
+
 async function writeRegistryPack(registryRoot: string, spec: RegistryPackSpec) {
   const files = []
   for (const file of spec.files) {
@@ -348,36 +356,38 @@ describe.sequential('e2e:registry-rig-security', () => {
     expect(viewedJson.source).toBe('registry:listed')
     expect(viewedJson.files[0]?.target).toBe('.codex/skills/listed/SKILL.md')
 
-    await runBuiltCli(['add', 'listed/listed-pack'], {
+    await runBuiltCli(['plugin', 'install', 'codex', 'listed/listed-pack', '--scope', 'workspace'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
     })
 
-    const installedPath = path.join(project.dir, '.codex', 'skills', 'listed', 'SKILL.md')
+    const installedPath = path.join(codexPluginDir(project.dir, 'listed-pack'), 'skills', 'listed', 'SKILL.md')
     expect(await pathExists(installedPath)).toBe(true)
+    expect(
+      await pathExists(path.join(codexPluginDir(project.dir, 'listed-pack'), '.codex-plugin', 'plugin.json'))
+    ).toBe(true)
 
     const installedList = await runBuiltCli(['list'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
     })
-    expect(installedList.stdout).toContain('listed-pack@1.0.0 (registry:listed)')
+    expect(installedList.stdout).toContain('listed-pack@1.0.0 (codex, workspace)')
 
     await fs.appendFile(installedPath, 'manual edit\n', 'utf-8')
-    const removed = await runBuiltCli(['remove', 'listed-pack'], {
+    const removed = await runBuiltCli(['plugin', 'uninstall', 'codex', 'listed/listed-pack', '--scope', 'workspace'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
     })
-    expect(removed.stdout).toContain('Kept (changed since install):')
-    expect(removed.stdout).toContain('.codex/skills/listed/SKILL.md')
+    expect(removed.stdout).toContain('codex: removed 0, kept 1, missing 0')
     expect(await pathExists(installedPath)).toBe(true)
 
-    const manifest = await readJsonFile<{ installed: Record<string, unknown> }>(
-      path.join(project.dir, '.agentrig', 'manifest.json')
+    const ledger = await readJsonFile<{ installs: Record<string, unknown> }>(
+      path.join(project.dir, '.agentrig', 'plugin-installs.json')
     )
-    expect(Object.keys(manifest.installed)).toHaveLength(0)
+    expect(Object.keys(ledger.installs)).toContain('codex:workspace:agentrig-listed-pack')
   })
 
   it('applies rigs with extends, prune, and idempotent re-apply behavior', async () => {
@@ -409,7 +419,6 @@ describe.sequential('e2e:registry-rig-security', () => {
 
     await writeJsonFile(path.join(project.dir, 'agentrig.config.json'), {
       $schema: 'https://agentrig.ai/schema/config.json',
-      skillsDir: '.codex/skills',
       registries: [{ name: 'official', url: listedRegistryUrl(server) }],
       defaultRig: 'layered',
       rigs: {
@@ -427,42 +436,57 @@ describe.sequential('e2e:registry-rig-security', () => {
     expect(listedRigs.stdout).toContain('  - layered (default)')
     expect(listedRigs.stdout).toContain('extends: base | packs: overlay-pack, extra-pack, core-pack')
 
-    const firstApply = await runBuiltCli(['rig', 'apply'], {
+    const firstApply = await runBuiltCli(['rig', 'apply', 'codex'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
     })
-    expect(firstApply.stdout).toContain('packs: core-pack, overlay-pack, extra-pack')
+    expect(firstApply.stdout).toContain('pack specs: core-pack, overlay-pack, extra-pack')
+    expect(firstApply.stdout).toContain('codex [workspace]: installed 3, skipped 0')
     expect(
-      await fs.readFile(path.join(project.dir, '.codex', 'skills', 'shared', 'SKILL.md'), 'utf-8')
+      await fs.readFile(path.join(codexPluginDir(project.dir, 'core-pack'), 'skills', 'shared', 'SKILL.md'), 'utf-8')
     ).toBe('# core\n')
-    expect(await pathExists(path.join(project.dir, '.codex', 'skills', 'extra', 'SKILL.md'))).toBe(true)
+    expect(
+      await fs.readFile(
+        path.join(codexPluginDir(project.dir, 'overlay-pack'), 'skills', 'shared', 'SKILL.md'),
+        'utf-8'
+      )
+    ).toBe('# overlay\n')
+    expect(
+      await pathExists(path.join(codexPluginDir(project.dir, 'extra-pack'), '.codex-plugin', 'plugin.json'))
+    ).toBe(true)
 
-    const secondApply = await runBuiltCli(['rig', 'apply'], {
+    const secondApply = await runBuiltCli(['rig', 'apply', 'codex'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
     })
-    expect(secondApply.stdout).toContain('skipped:')
+    expect(secondApply.stdout).toContain('codex [workspace]: installed 0, skipped 3')
 
-    const manifestAfterReapply = await readJsonFile<{
-      installed: Record<string, { files: Array<{ target: string }> }>
-    }>(path.join(project.dir, '.agentrig', 'manifest.json'))
-    expect(
-      manifestAfterReapply.installed['core-pack']?.files.map((file) => file.target)
-    ).toContain('.codex/skills/shared/SKILL.md')
-    expect(
-      manifestAfterReapply.installed['extra-pack']?.files.map((file) => file.target)
-    ).toContain('.codex/skills/extra/SKILL.md')
+    const ledgerAfterReapply = await readJsonFile<{ installs: Record<string, unknown> }>(
+      path.join(project.dir, '.agentrig', 'plugin-installs.json')
+    )
+    expect(Object.keys(ledgerAfterReapply.installs)).toEqual(
+      expect.arrayContaining([
+        'codex:workspace:agentrig-core-pack',
+        'codex:workspace:agentrig-overlay-pack',
+        'codex:workspace:agentrig-extra-pack',
+      ])
+    )
 
-    const prunedApply = await runBuiltCli(['rig', 'apply', 'pruneOnly'], {
+    const prunedApply = await runBuiltCli(['rig', 'apply', 'codex', 'pruneOnly'], {
       cwd: project.dir,
       homeDir: workspace.homeDir,
       env,
     })
-    expect(prunedApply.stdout).toContain('Pruning 3 pack(s): core-pack, overlay-pack, extra-pack')
-    expect(await pathExists(path.join(project.dir, '.codex', 'skills', 'prune', 'SKILL.md'))).toBe(true)
-    expect(await pathExists(path.join(project.dir, '.codex', 'skills', 'extra', 'SKILL.md'))).toBe(false)
+    expect(prunedApply.stdout).toContain('Pruning 3 plugin install(s):')
+    expect(prunedApply.stdout).toContain('core-pack')
+    expect(prunedApply.stdout).toContain('overlay-pack')
+    expect(prunedApply.stdout).toContain('extra-pack')
+    expect(
+      await pathExists(path.join(codexPluginDir(project.dir, 'prune-pack'), '.codex-plugin', 'plugin.json'))
+    ).toBe(true)
+    expect(await pathExists(path.join(codexPluginDir(project.dir, 'extra-pack')))).toBe(false)
   })
 
   it('classifies official, listed, and unlisted registries and enforces confirmation', async () => {
@@ -494,7 +518,6 @@ describe.sequential('e2e:registry-rig-security', () => {
 
     await writeJsonFile(path.join(project.dir, 'agentrig.config.json'), {
       $schema: 'https://agentrig.ai/schema/config.json',
-      skillsDir: '.codex/skills',
       registries: [
         { name: 'official', url: officialRegistryUrl(server) },
         { name: 'listed', url: listedRegistryUrl(server) },
@@ -526,20 +549,23 @@ describe.sequential('e2e:registry-rig-security', () => {
     expect(JSON.parse(unlistedView.stdout).trustTier).toBe('unlisted')
 
     await expect(
-      runBuiltCli(['add', `${unlistedRegistryUrl(server)}/unlisted-pack.json`], {
+      runBuiltCli(['plugin', 'install', 'codex', `${unlistedRegistryUrl(server)}/unlisted-pack.json`], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,
       })
-    ).rejects.toThrow('This pack is from an unlisted source. Re-run with --yes to confirm install.')
+    ).rejects.toThrow('This install includes pack(s) from unlisted sources: unlisted-pack.')
 
-    await runBuiltCli(['add', `${unlistedRegistryUrl(server)}/unlisted-pack.json`, '--yes'], {
-      cwd: project.dir,
-      homeDir: workspace.homeDir,
-      env,
-    })
+    await runBuiltCli(
+      ['plugin', 'install', 'codex', `${unlistedRegistryUrl(server)}/unlisted-pack.json`, '--yes'],
+      {
+        cwd: project.dir,
+        homeDir: workspace.homeDir,
+        env,
+      }
+    )
     expect(
-      await pathExists(path.join(project.dir, '.codex', 'skills', 'unlisted', 'SKILL.md'))
+      await pathExists(path.join(codexPluginDir(project.dir, 'unlisted-pack'), 'skills', 'unlisted', 'SKILL.md'))
     ).toBe(true)
   })
 
@@ -572,7 +598,6 @@ describe.sequential('e2e:registry-rig-security', () => {
 
     await writeJsonFile(path.join(project.dir, 'agentrig.config.json'), {
       $schema: 'https://agentrig.ai/schema/config.json',
-      skillsDir: '.codex/skills',
       registries: [{ name: 'listed', url: listedRegistryUrl(server) }],
     })
 
@@ -595,7 +620,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     ).rejects.toThrow('Invalid pack meta: missing title')
 
     await expect(
-      runBuiltCli(['add', 'listed/unsafe-target-pack'], {
+      runBuiltCli(['plugin', 'install', 'codex', 'listed/unsafe-target-pack'], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,
@@ -603,7 +628,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     ).rejects.toThrow('contains disallowed target paths')
 
     await expect(
-      runBuiltCli(['add', 'listed/bad-hash-pack'], {
+      runBuiltCli(['plugin', 'install', 'codex', 'listed/bad-hash-pack'], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,
@@ -611,7 +636,7 @@ describe.sequential('e2e:registry-rig-security', () => {
     ).rejects.toThrow('Integrity check failed')
 
     await expect(
-      runBuiltCli(['add', 'listed/cross-origin-pack'], {
+      runBuiltCli(['plugin', 'install', 'codex', 'listed/cross-origin-pack'], {
         cwd: project.dir,
         homeDir: workspace.homeDir,
         env,
