@@ -23,7 +23,6 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
 - CI coverage after this change is split intentionally:
   - Ubuntu on Node 24 runs the full coverage and Vite playground E2E jobs.
   - Ubuntu, macOS, and Windows run the packaged CLI smoke check on Node 24.
-  - Node 25 smoke runs as a non-blocking early-warning lane for upcoming runtime regressions.
 
 ## Quick Release
 - Patch/minor/major bump and release:

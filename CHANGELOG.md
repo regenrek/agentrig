@@ -5,7 +5,7 @@
 ### Added
 - Added a committed Vite playground fixture plus subprocess E2E coverage for `agentrig init`, pack scaffolding, multi-provider export, and Codex/Cursor install-uninstall flows.
 - Added a local pre-publish smoke command, `pnpm test:release:local`, that runs coverage, Vite E2E, fixture freshness checks, and a packed CLI install smoke test.
-- Added packaged CLI smoke coverage across Ubuntu, macOS, and Windows in CI, including a non-blocking Node 25 canary lane.
+- Added packaged CLI smoke coverage across Ubuntu, macOS, and Windows in CI on Node 24.
 
 ### Changed
 - Release documentation now requires the local pre-publish validation command to pass before shipping a release.
