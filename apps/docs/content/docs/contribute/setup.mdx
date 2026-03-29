@@ -36,9 +36,9 @@ The docs app serves a local registry at `http://localhost:5173/registry`.
 ## Run the CLI in dev mode
 
 ```bash
-pnpm dev:cli -- init
-pnpm dev:cli -- list --available --registry http://localhost:5173/registry
-pnpm dev:cli -- add core-committer --registry http://localhost:5173/registry
+pnpm dev:cli -- init --registry http://localhost:5173/registry
+pnpm dev:cli -- list --available
+pnpm dev:cli -- plugin install codex core-committer
 ```
 
 <Callout title="Tip">
