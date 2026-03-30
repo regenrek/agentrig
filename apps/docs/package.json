@@ -36,7 +36,7 @@
     "@cloudflare/vite-plugin": "^1.30.2",
     "@iconify-json/material-icon-theme": "^1.2.57",
     "@iconify-json/streamline-logos": "^1.2.0",
-    "@iconify/json": "^2.2.455",
+    "@iconify/json": "^2.2.456",
     "@svgr/core": "^8.1.0",
     "@svgr/plugin-jsx": "^8.1.0",
     "@tailwindcss/vite": "latest",
@@ -52,7 +52,7 @@
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
     "vite-plus": "^0.1.14",
     "vite-tsconfig-paths": "latest",
-    "workerd": "^1.20260317.1",
+    "workerd": "^1.20260329.1",
     "wrangler": "^4.78.0"
   }
 }
