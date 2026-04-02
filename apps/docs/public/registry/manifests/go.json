@@ -1,0 +1,18 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin-history.v1.json",
+  "id": "go",
+  "name": "Go skill",
+  "latest": "0.1.0",
+  "versions": [
+    "0.1.0"
+  ],
+  "description": "Go quality checks: fmt, vet, tests.",
+  "keywords": [
+    "go"
+  ],
+  "trustTier": "official",
+  "paths": {
+    "plugin": "plugins/go/0.1.0",
+    "manifest": "manifests/go.json"
+  }
+}

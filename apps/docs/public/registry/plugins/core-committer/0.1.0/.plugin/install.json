@@ -1,0 +1,193 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin-install.v1.json",
+  "files": [
+    {
+      "path": ".plugin/plugin.json",
+      "sha256": "09691ca3bc9bfe4703d451760cb3d62cbabe6f746cb29620d1fca00abc330e9c"
+    },
+    {
+      "path": "README.md",
+      "sha256": "fb333431fcea70d2f9c30bddf11e396a50f8606fadbd49864fd6a62a9a78c3e6"
+    },
+    {
+      "path": "skills/codex-analysis/SKILL.md",
+      "sha256": "90f2c554476b0a6b499789ace626dd040c2abe894cafb0a5722b9240688c3ffd"
+    },
+    {
+      "path": "skills/codex-sandbox/SKILL.md",
+      "sha256": "9cc3f3e262ba47431d94b7e22f684ce1058b70c8c057d031979ecf1ceff859eb"
+    },
+    {
+      "path": "skills/codex-sandbox/references/naming.md",
+      "sha256": "8c1ab6711682a5d13a33fbebfe976302268c98af2d9e237f777743bad4d38dd9"
+    },
+    {
+      "path": "skills/codex-sandbox/scripts/codex-task",
+      "mode": "755",
+      "sha256": "35a8341b4e624c74d82169b7d3e1407f915bbb164b635c8d55b35ad4706a2d16"
+    },
+    {
+      "path": "skills/codex-sandbox/scripts/codex_sandbox.py",
+      "mode": "755",
+      "sha256": "19f1ff9b4af2668aae000e539fbd40bb1777cc360fb1fb76530131b80ebd75a8"
+    },
+    {
+      "path": "skills/create-new-static-website/SKILL.md",
+      "sha256": "de2ada12461ea3db42ad5471c8f344c4aa3f5c08b8cc0d00ebcc89249de5c31d"
+    },
+    {
+      "path": "skills/debug-lldb/SKILL.md",
+      "sha256": "b70a42acc143f5eeab7027a289fd885f4ce065c94cdc8a3de84932042b1c9e26"
+    },
+    {
+      "path": "skills/debug-lldb/references/triage.md",
+      "sha256": "28b21610e93236b43c58291a8dce6c7e195ff7fb42e81af6bda98086717c1c2a"
+    },
+    {
+      "path": "skills/debug-lldb/scripts/collect_stacks.sh",
+      "mode": "755",
+      "sha256": "8e1cdac9afd478f7f299b573ed3464cbe7a752cb0808f5929778df46c557edff"
+    },
+    {
+      "path": "skills/gh-repo-bootstrap/SKILL.md",
+      "sha256": "6ecd550b7ebd9e2473f659684cdea259b71f96c90b59a214c55de7a576fea3e6"
+    },
+    {
+      "path": "skills/gh-repo-bootstrap/scripts/gh_repo_bootstrap.py",
+      "mode": "755",
+      "sha256": "27bdc73f9d8a33511fb07af4f622f734f7b75d8181cdea71f5d5799bfbcf4fbd"
+    },
+    {
+      "path": "skills/git-safe-workflow/SKILL.md",
+      "sha256": "a82cc1310b3576c02913c84ce76cb964c7cdaae20b7fea2337b4a859277f9a85"
+    },
+    {
+      "path": "skills/gitwhat/SKILL.md",
+      "sha256": "074658e6907ec8c92a8bc0d6f6520e9135c2d43921ebe822f0708f9523421aea"
+    },
+    {
+      "path": "skills/gitwhat/scripts/gitwhat.sh",
+      "mode": "755",
+      "sha256": "c9d3f08ccfd154fe75b32845ee98ce09299a7a50eaae35e9556c8743e8e6157a"
+    },
+    {
+      "path": "skills/go-local-health/SKILL.md",
+      "sha256": "635f3967d778b4ba1d5e7308cfdf901d3fdbc0e104c4b25e8e0fe1a2aad763f9"
+    },
+    {
+      "path": "skills/go-local-health/scripts/go-local-health",
+      "mode": "755",
+      "sha256": "cac1abf1d3fea65921626b248165e90a03d4040be5f9f4f7fb90326fe72d0a9c"
+    },
+    {
+      "path": "skills/homebrew-publish/SKILL.md",
+      "sha256": "db6d9481f9c7c0c9ae47cafb1edd767f5924ceded9f2c1ec9846692d53cb1fb7"
+    },
+    {
+      "path": "skills/homebrew-publish/references/formula-go.md",
+      "sha256": "855053cc32e09ae7502bd1202c3d64291f03024376c0690d887ac7afcea1d964"
+    },
+    {
+      "path": "skills/homebrew-publish/references/formula-node.md",
+      "sha256": "25c256050d9a2f6f5ef3fb1cced62bacdf15cd43f063e194333d9e376f9e760d"
+    },
+    {
+      "path": "skills/homebrew-publish/references/formula-prebuilt.md",
+      "sha256": "8e79cb07b4b98e200156cf70546c4e3f927138eb003420524049aa649cf84e8a"
+    },
+    {
+      "path": "skills/homebrew-publish/references/formula-python.md",
+      "sha256": "d7d9b8a793a9c650bcb1a5e77eddf2e968296285d318dfd09e03183828f1e1e4"
+    },
+    {
+      "path": "skills/homebrew-publish/references/formula-rust.md",
+      "sha256": "8cb50438df52bf8b0e5cc6c58a6609d780eae7d59abbbbb5460078bb270c4290"
+    },
+    {
+      "path": "skills/pr-commiter/SKILL.md",
+      "sha256": "79295bed40b20da9c55d6e55855a9234e303b89fd171c0b87a30141ccef829fb"
+    },
+    {
+      "path": "skills/pr-commiter/scripts/pr-commiter.sh",
+      "mode": "755",
+      "sha256": "101fd5e1897e4765e6759a8b7c839a7eaa84d7457784f60d2bb537fb5332d25f"
+    },
+    {
+      "path": "skills/publish-npm-homebrew/SKILL.md",
+      "sha256": "45e421c881acef9210ed912640b6f70c2a58773112328df527acacb53de41115"
+    },
+    {
+      "path": "skills/publish-npm-homebrew/scripts/homebrew-update.mjs",
+      "sha256": "c62a7d233b72b48276dd9d645ac6fc13705b1b3919b3dd563e5002e41b29780f"
+    },
+    {
+      "path": "skills/publish-npm-homebrew/scripts/release.ts",
+      "sha256": "9307979cb85f5cf214e70a122068f887041e84fe082781f1f26f75cec5e0b240"
+    },
+    {
+      "path": "skills/publish-npm-homebrew/workflows/homebrew-release.yml",
+      "sha256": "24bd6292f6204e020eadc0ab93cd0eb9554702f8c6f369749111787fdb50dbc6"
+    },
+    {
+      "path": "skills/publish-npm-homebrew/workflows/npm-release.yml",
+      "sha256": "5537aa6c4da0cfdb0bcf58096cbd37a8e4fada5a3a231d7b5eb72dd5ee638582"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/.DS_Store",
+      "sha256": "1372312f5bb0bd41730a9f71be2196b4b425b092668bf0bd53b708a6e20b0835"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/SKILL.md",
+      "sha256": "1205f7278108c34ec3612caba1b604b19f3c7138861a510ab4c8145f0b5499dd"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/assets/.DS_Store",
+      "sha256": "09916f0eee0b24b670815e696f8f62f81b4b8fe74eb97e26fe7ffad48e149c38"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/assets/vite-shadcn-iconify-landing/.DS_Store",
+      "sha256": "eecff5a1c7e3d00289dbe4017192aea9b36d7b7823f6e9b951683a9ed9782fec"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/assets/vite-shadcn-iconify-landing/src/.DS_Store",
+      "sha256": "bdd83948cb0fa7fa1a9c2392c6ecfee7b2804a4502dd28295dfa2618bc6a41f7"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/assets/vite-shadcn-iconify-landing/src/pages/LandingPage.tsx",
+      "sha256": "9801d4a764a0a05d742c4636373f5ff4d1bb59bc250eae1d59f06dbe904823b8"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/references/aesthetic-directions.md",
+      "sha256": "db957b03d919585ba335aae09cf77cf61486599afb06f1b3d761975bf6b4f248"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/references/copy-templates.md",
+      "sha256": "47d72bb89bb65de6bef34a528d1e4091cf2fbdcbad20ae5dfdea11640ddd1cc3"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/references/iconify.md",
+      "sha256": "6f1c45aa2a131d6e0c2f3459666d4d71a8b02a71e362ecac3e822ec8a9e626a7"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/references/landing-page-anatomy.md",
+      "sha256": "ba45f82c3b1d10fbe3e4a274a028696df1b6d15a44be8a736e3796b712efbd24"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/references/section-templates.md",
+      "sha256": "d5437ee9938fd63a9739dcb677d97af5e6c505206cf0e0fdebb12925f62ad0df"
+    },
+    {
+      "path": "skills/redesign-my-landingpage/references/shadcn-vite-setup.md",
+      "sha256": "7cf749d0a8e38f90096623ee573244da21544268f59bb12a2cdec9d8a3ea6114"
+    },
+    {
+      "path": "skills/shellck/SKILL.md",
+      "sha256": "1133257cecb38a4a114b17785df3c029d8eb01dcdf35e0edca7d658c3b1a9113"
+    },
+    {
+      "path": "skills/shellck/scripts/run_shellck.sh",
+      "mode": "755",
+      "sha256": "de928ece6f610c31c515416ab00955c57c1c8230975686971f4cbad5b11f5c4e"
+    }
+  ]
+}

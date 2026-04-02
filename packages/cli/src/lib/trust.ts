@@ -1,20 +1,7 @@
-/**
- * Trust tier management for registry sources.
- *
- * Trust tiers:
- * - official: The official agentrig.ai registry (implicit trust)
- * - listed: A registry the user explicitly configured in AgentRig
- * - unlisted: Direct URLs or unknown sources (requires confirmation)
- */
-
 import path from 'node:path'
 import type { TrustTier, RegistryRef } from './types'
 import { OFFICIAL_REGISTRY_URL, normalizeRegistryUrl, isUrl } from './registry'
 
-/**
- * Allowed target path prefixes for file installation.
- * Files can only be installed to these directories for security.
- */
 export const ALLOWED_TARGET_PREFIXES = [
   '.codex/',
   '.claude/',
@@ -48,9 +35,6 @@ export async function determineTrustTier(
   return 'unlisted'
 }
 
-/**
- * Check if a target path is allowed for installation.
- */
 export function isAllowedTargetPath(targetPath: string): boolean {
   const normalized = targetPath.startsWith('/') ? targetPath.slice(1) : targetPath
 
@@ -75,24 +59,15 @@ function normalizeRelativeTargetPath(targetPath: string): string | null {
   return normalized
 }
 
-/**
- * Validate all target paths in a pack are allowed.
- * Returns list of disallowed paths if any.
- */
-export function validateTargetPaths(
-  files: Array<{ target: string }>
+export function validatePluginPaths(
+  files: Array<{ path: string }>
 ): { valid: boolean; disallowed: string[] } {
   const disallowed: string[] = []
 
   for (const file of files) {
-    // Resolve placeholders for validation
-    const resolved = file.target
-      .replace(/\{\{skillsDir\}\}/g, '.codex/skills')
-      .replace(/\{\{[^}]+\}\}/g, '') // Remove other placeholders for validation
-
-    const normalized = normalizeRelativeTargetPath(resolved)
-    if (!normalized || !isAllowedTargetPath(normalized)) {
-      disallowed.push(file.target)
+    const normalized = normalizeRelativeTargetPath(file.path)
+    if (!normalized) {
+      disallowed.push(file.path)
     }
   }
 
@@ -102,9 +77,6 @@ export function validateTargetPaths(
   }
 }
 
-/**
- * Get a human-readable description of a trust tier.
- */
 export function describeTrustTier(tier: TrustTier): string {
   switch (tier) {
     case 'official':
@@ -116,30 +88,24 @@ export function describeTrustTier(tier: TrustTier): string {
   }
 }
 
-/**
- * Check if a trust tier requires user confirmation before install.
- */
 export function requiresConfirmation(tier: TrustTier): boolean {
   return tier === 'unlisted'
 }
 
-/**
- * Format an install plan for display to the user.
- */
 export function formatInstallPlan(
-  packName: string,
-  files: Array<{ path: string; target: string }>,
+  pluginId: string,
+  files: Array<{ path: string }>,
   trustTier: TrustTier
 ): string {
   const lines: string[] = [
-    `Pack: ${packName}`,
+    `Plugin: ${pluginId}`,
     `Trust: ${describeTrustTier(trustTier)}`,
     '',
-    'Files to install:',
+    'Files in plugin:',
   ]
 
   for (const file of files) {
-    lines.push(`  ${file.path} -> ${file.target}`)
+    lines.push(`  ${file.path}`)
   }
 
   return lines.join('\n')

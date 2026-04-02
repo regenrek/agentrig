@@ -1,6 +1,6 @@
 ---
 title: Official registry workflow
-description: Add packs or registry entries to the official registry.
+description: Add plugins or registry entries to the official registry.
 icon: PackagePlus
 ---
 
@@ -8,14 +8,24 @@ icon: PackagePlus
 
 Contributions are welcome! You can:
 
-- Add a pack under `registry/packs/<name>`
+- Add a plugin under `plugins/<name>/<version>`
 - Add a registry to the directory at `apps/docs/public/directory/index.json`
 
-## Add a pack
+## Add a plugin
 
-1. Create the pack folder and add `meta.json`.
-2. Run `pnpm registry:build` to update `apps/docs/public/registry`.
-3. Open a PR.
+1. Create `plugins/<plugin-id>/<version>/` and add `.plugin/plugin.json`.
+2. Update `manifests/<plugin-id>.json`.
+3. Update `registry.json`.
+4. Run the registry build to refresh derived delivery output.
+5. Open a PR.
+
+## Hard cut
+
+- Do not add committed root `<pluginId>.json` files to the registry source repo.
+- Do not add fallback discovery shapes or compat shims.
+- The canonical source registry path is:
+  - `registry.json -> manifests/<id>.json -> paths.plugin -> plugins/<id>/<version>/.plugin/plugin.json`
+- Any expanded `files[]` or optional `sha256` metadata belongs in the derived `.plugin/install.json` build artifact only, not in committed source metadata.
 
 ## Add a registry to the directory
 
@@ -25,5 +35,5 @@ This file is served by the docs app at `/directory/index.json`. Directory update
 
 ## Keep changes safe
 
-- Include hashes in `meta.json` (use `agentrig pack create`).
-- Keep targets inside allowed prefixes.
+- Keep `.plugin/plugin.json` valid and version-aligned with its directory.
+- Keep `manifests/<id>.json` and `registry.json` aligned with the plugin path.

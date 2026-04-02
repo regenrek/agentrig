@@ -1,0 +1,89 @@
+---
+title: Hosted uploads
+description: Publish plugins to AgentRig and the hosted community registry.
+icon: Upload
+---
+
+# Hosted uploads
+
+Use the AgentRig CLI to submit plugins for review and publication:
+
+```bash
+agentrig login
+agentrig plugin submit .
+```
+
+`agentrig plugin submit` bundles your plugin, validates it against the hosted upload policy, uploads the ZIP, and creates a review submission. The command exits once the submission has been created successfully and prints the submission id.
+
+To check review progress later:
+
+```bash
+agentrig plugin status
+```
+
+You can also pass a submission id directly:
+
+```bash
+agentrig plugin status <submission-id>
+```
+
+If you want to inspect the ZIP locally without submitting it, use:
+
+```bash
+agentrig plugin bundle .
+```
+
+The web submission UI at `/submit` uses the same backend pipeline. Approved uploads are published to the hosted community registry at `https://agentrig.ai/api/community`.
+
+## What gets published
+
+After approval:
+
+- The registry index includes your plugin: `https://agentrig.ai/api/community/registry.json`
+- Your plugin metadata is served at: `https://agentrig.ai/api/community/<plugin>.json`
+- Plugin files are downloadable via: `https://agentrig.ai/api/community/files?plugin=...&version=...&path=...`
+
+## Upload requirements
+
+- Upload a ZIP archive.
+- `.plugin/plugin.json` is required at the archive root.
+- `README.md` is recommended (missing README produces a warning).
+- `agentrig plugin submit` can keep the generated ZIP on disk with `--keep-bundle`.
+
+## Limits (current policy)
+
+- ZIP size: up to 25 MiB.
+- Max files: 500.
+- Max per-file size (uncompressed): 5 MiB.
+- Max total unpacked size: 50 MiB.
+- Blocked extensions include common binary/executable formats (e.g. `.exe`, `.dylib`, `.so`, `.dmg`, `.pkg`, `.jar`).
+
+Targets in `.plugin/plugin.json` must stay within allowed prefixes:
+
+- `.codex/`
+- `.claude/`
+- `.cursor/`
+- `.agentrig/`
+
+Only the most recent published version of a plugin is retained.
+
+## Submission statuses
+
+The upload pipeline uses these statuses:
+
+- `pending_scan` → `scanning` → `pending_review` → `publishing` → `approved`
+- Terminal outcomes: `rejected`, `blocked`
+
+Scan status is tracked separately as `pass`, `warn`, or `fail`.
+
+## Security notes
+
+- Never upload secrets. Approved uploads are redistributed.
+- Scanning/review reduce risk, but do not guarantee safety. Review plugins before installing.
+
+## Install from the hosted community registry
+
+```bash
+agentrig registry add community https://agentrig.ai/api/community
+agentrig plugin install codex community/<plugin-name>
+```

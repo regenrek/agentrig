@@ -1,15 +1,15 @@
 ---
-title: Pack schema
-description: JSON schema for pack meta.json.
+title: Plugin schema
+description: JSON schema for plugin .plugin/plugin.json.
 icon: FileBraces
 ---
 
-# Pack schema
+# Plugin schema
 
-The pack schema is served at:
+The plugin schema is served at:
 
 ```
-https://agentrig.ai/schema/pack.json
+https://agentrig.ai/schema/plugin.json
 ```
 
 It validates:
@@ -18,8 +18,8 @@ It validates:
 - `files[]` entries with `path`, `target`, optional `mode` + `sha256`
 - optional `author`, `license`, `tags`, `rigDependencies`
 
-Use `$schema` in your `meta.json` for editor hints:
+Use `$schema` in your `.plugin/plugin.json` for editor hints:
 
 ```json
-{ "$schema": "https://agentrig.ai/schema/pack.json" }
+{ "$schema": "https://agentrig.ai/schema/plugin.json" }
 ```

@@ -7,29 +7,29 @@
 ### Added
 - Added top-level `agentrig plugin install` and `agentrig plugin uninstall` commands as the canonical consumer workflow for Claude, Codex, and Cursor plugins.
 - Added canonical install `specIdentity` tracking plus shared normalization for registry, URL, and file specs so uninstall, rig prune, and repair behavior stay deterministic.
-- Added plugin pack graph resolution and materialization coverage for registry-backed plugin installs, including dedicated regression coverage for published registry path rewriting.
+- Added plugin plugin graph resolution and materialization coverage for registry-backed plugin installs, including dedicated regression coverage for published registry path rewriting.
 
 ### Changed
-- Hard-cut the consumer contract to a plugin-first model: removed the old `agentrig add` / `remove` flow and the consumer-facing `pack plugin install` / `pack plugin uninstall` commands.
+- Hard-cut the consumer contract to a plugin-first model: removed the old `agentrig add` / `remove` flow and the consumer-facing `plugin plugin install` / `plugin plugin uninstall` commands.
 - Simplified configuration and docs around minimal `agentrig init`, flat registries, advanced rigs, and the canonical `agentrig.ai` schema/domain surface.
-- Reworked rig application to install provider plugins from resolved pack specs and prune by canonical install identity instead of legacy pack-name matching.
+- Reworked rig application to install provider plugins from resolved plugin specs and prune by canonical install identity instead of legacy plugin-name matching.
 
 ### Fixed
 - Existing provider plugin directories without a matching ledger entry now require `--force` instead of silently skipping repair.
 - Existing provider plugin directories from a conflicting canonical spec identity now fail safely and require `--force` before replacement.
-- Registry-backed plugin installs now correctly materialize published pack file paths from generated registry metadata.
+- Registry-backed plugin installs now correctly materialize published plugin file paths from generated registry metadata.
 
 ## [0.3.0] - 2026-03-27
 
 ### Added
-- Added a committed Vite+ application fixture plus subprocess E2E coverage for `agentrig init`, pack scaffolding, multi-provider export, and Codex/Cursor install-uninstall flows.
+- Added a committed Vite+ application fixture plus subprocess E2E coverage for `agentrig init`, plugin scaffolding, multi-provider export, and Codex/Cursor install-uninstall flows.
 - Added a local Vite+ toolchain entrypoint at the repo root via `vite.config.ts` and `vp run`-backed root scripts for validation and fixture maintenance.
 - Added a local pre-publish smoke command, `pnpm test:release:local`, that runs coverage, Vite+ E2E, fixture freshness checks, and a packed CLI install smoke test against the installed `agentrig` bin.
 - Added packaged CLI smoke coverage across Ubuntu, macOS, and Windows in CI on Node 24.
 - Added a non-blocking Node 25 packaged-smoke canary in CI.
 
 ### Changed
-- Migrated the CLI build from `tsup` to a Vite+/tsdown-backed `vp pack` configuration.
+- Migrated the CLI build from `tsup` to a Vite+/tsdown-backed `vp plugin` configuration.
 - Replaced the old plain-Vite playground story with a Vite+ application baseline generated from `vp create vite:application`.
 - Release documentation now requires the local pre-publish validation command to pass before shipping a release, and the validation now depends on the local Vite+ toolchain.
 - The default CI coverage and Vite+ playground E2E jobs now run on Node 24 LTS instead of Node 20.
@@ -55,9 +55,9 @@
 
 ### Added
 - CLI browser auth commands: `agentrig login`, `agentrig logout`, and `agentrig whoami`.
-- Hosted pack submission flows: `agentrig pack bundle`, `agentrig pack publish`, and `agentrig pack status`.
-- Pack bundle validation, upload policy checks, and submission status handling for the hosted community registry.
-- Multi-provider plugin commands for `claude`, `codex`, and `cursor`, including `agentrig pack plugin export`, `install`, and `uninstall`.
+- Hosted plugin submission flows: `agentrig plugin bundle`, `agentrig plugin submit`, and `agentrig plugin status`.
+- Plugin bundle validation, upload policy checks, and submission status handling for the hosted community registry.
+- Multi-provider plugin commands for `claude`, `codex`, and `cursor`, including `agentrig plugin export`, `install`, and `uninstall`.
 - AgentRig-managed plugin install ledgers for personal and workspace scopes.
 
 ### Changed
@@ -69,7 +69,7 @@
 ### Fixed
 - Claude uninstall no longer removes pre-existing marketplaces that AgentRig did not add.
 - Codex marketplace updates now preserve unrelated metadata and foreign entries while matching managed entries more robustly during uninstall.
-- Plugin pack metadata is now validated at the boundary before provider export/install flows use it.
+- Plugin plugin metadata is now validated at the boundary before provider export/install flows use it.
 - Codex uninstall now fails safely before deleting managed files when the marketplace top-level structure is invalid.
 
 ## [0.1.1] - 2026-01-29

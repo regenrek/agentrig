@@ -1,0 +1,38 @@
+---
+title: Plugin structure
+description: Recommended directories and optional components.
+icon: FolderTree
+---
+
+# Plugin structure
+
+Plugins are flexible; the required files are `.plugin/plugin.json` and `README.md`.
+The rest of the tree can include any files you want installed.
+
+## Common layout
+
+```
+plugin-name/
+  .plugin/plugin.json
+  skills/
+    <skill-name>/
+      SKILL.md
+      scripts/
+  scripts/
+  agents/
+  commands/
+  hooks/
+    hooks.json
+  .mcp.json
+  .lsp.json
+```
+
+## Notes
+
+- **skills/** maps to `{{skillsDir}}` by default during install.
+- **scripts/** and other folders install exactly where `.plugin/plugin.json` targets specify.
+- **hooks/**, **agents/**, **commands/** are bundled into plugin exports when the target integration supports them.
+- **.mcp.json** is bundled into plugin exports that support MCP servers.
+- **.lsp.json** is bundled into plugin exports that support LSP configuration.
+
+Use `agentrig plugin create` to scan a directory and generate a matching `.plugin/plugin.json`.

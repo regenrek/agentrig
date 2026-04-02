@@ -6,7 +6,7 @@ icon: Shield
 
 # Trust tiers
 
-Agentrig assigns each pack source a trust tier before plugin installation.
+Agentrig assigns each plugin source a trust tier before plugin installation.
 
 | Tier | Source | Behavior |
 | --- | --- | --- |
@@ -16,20 +16,20 @@ Agentrig assigns each pack source a trust tier before plugin installation.
 
 ## How trust is determined
 
-- **Official**: the pack resolves from the official registry seeded by `agentrig init`.
-- **Listed**: the pack resolves from a registry you explicitly added with `agentrig registry add`.
-- **Unlisted**: the pack resolves from a direct URL, local file, or some other source outside your configured registries.
+- **Official**: the plugin resolves from the official registry seeded by `agentrig init`.
+- **Listed**: the plugin resolves from a registry you explicitly added with `agentrig registry add`.
+- **Unlisted**: the plugin resolves from a direct URL, local file, or some other source outside your configured registries.
 
 ## Confirmation for unlisted sources
 
-If a pack comes from an unlisted source, AgentRig refuses to continue until you confirm it:
+If a plugin comes from an unlisted source, AgentRig refuses to continue until you confirm it:
 
 ```bash
-agentrig plugin install codex https://example.com/some-pack.json
+agentrig plugin install codex https://example.com/some-plugin.json
 # Re-run with:
-agentrig plugin install codex https://example.com/some-pack.json --yes
+agentrig plugin install codex https://example.com/some-plugin.json --yes
 ```
 
 ## Path validation
 
-Regardless of trust tier, pack metadata is still validated against AgentRig's allowed target prefixes to block unsafe or non-standardized install targets.
+Regardless of trust tier, plugin metadata is still validated against AgentRig's allowed target prefixes to block unsafe or non-standardized install targets.

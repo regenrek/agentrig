@@ -12,12 +12,12 @@ const args = {
   },
   installed: {
     type: 'boolean',
-    description: 'List installed packs (default)',
+    description: 'List installed plugins (default)',
     default: true,
   },
   available: {
     type: 'boolean',
-    description: 'List packs available in registries',
+    description: 'List plugins available in registries',
     default: false,
   },
   registry: {
@@ -35,7 +35,7 @@ const args = {
 const command = defineCommand({
   meta: {
     name: 'list',
-    description: 'List installed plugin packs and/or available packs in registries.',
+    description: 'List installed plugins and/or available plugins in registries.',
   },
   args,
   async run({ args }) {
@@ -47,14 +47,14 @@ const command = defineCommand({
     if (args.installed) {
       const ledgers = await loadPluginInstallLedgers(cwd)
       const records = listPluginInstallRecords(ledgers).sort((left, right) =>
-        `${left.provider}:${left.scope}:${left.packName}`.localeCompare(
-          `${right.provider}:${right.scope}:${right.packName}`
+        `${left.provider}:${left.scope}:${left.pluginId}`.localeCompare(
+          `${right.provider}:${right.scope}:${right.pluginId}`
         )
       )
-      console.log('Installed plugin packs:')
+      console.log('Installed plugins:')
       if (!records.length) console.log('  (none)')
       for (const record of records) {
-        console.log(`  - ${record.packName}@${record.packVersion} (${record.provider}, ${record.scope})`)
+        console.log(`  - ${record.pluginId}@${record.pluginVersion} (${record.provider}, ${record.scope})`)
       }
       console.log('')
     }
@@ -84,7 +84,7 @@ const command = defineCommand({
     }
 
     for (const base of registryUrls) {
-      console.log(`Available packs in: ${base}`)
+      console.log(`Available plugins in: ${base}`)
       try {
         const index = await readRegistryIndex(base)
         if (!index.items?.length) {
@@ -93,7 +93,7 @@ const command = defineCommand({
         }
         for (const item of index.items) {
           const v = item.version ? `@${item.version}` : ''
-          console.log(`  - ${item.name}${v}  ${item.title}`)
+          console.log(`  - ${item.id}${v}  ${item.name}`)
         }
       } catch (e) {
         console.log(`  Error: ${String(e)}`)

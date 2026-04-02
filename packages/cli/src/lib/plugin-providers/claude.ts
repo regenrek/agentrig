@@ -3,8 +3,8 @@ import { ensureDir, writeJsonFile } from '../fs'
 import { getPluginInstallRecordId } from '../plugin-install-ledger'
 import type { ClaudePluginInstallRecord } from '../types'
 import type {
-  PackEntry,
-  PackFeatures,
+  PluginEntry,
+  PluginFeatures,
   PluginOwner,
   PluginProviderAdapter,
   ProviderExportContext,
@@ -17,7 +17,7 @@ import {
 } from './schemas'
 import {
   copyEntries,
-  detectPackFeatures,
+  detectPluginFeatures,
   normalizeManifestDescription,
   pluginAuthor,
 } from './shared'
@@ -26,8 +26,8 @@ function scopeToClaudeArg(scope: 'personal' | 'workspace') {
   return scope === 'workspace' ? 'project' : 'user'
 }
 
-async function copyClaudePlugin(packDir: string, pluginDir: string) {
-  await copyEntries(packDir, pluginDir, [
+async function copyClaudePlugin(pluginSourceDir: string, pluginDir: string) {
+  await copyEntries(pluginSourceDir, pluginDir, [
     'skills',
     'commands',
     'agents',
@@ -43,15 +43,15 @@ async function copyClaudePlugin(packDir: string, pluginDir: string) {
 }
 
 function buildClaudePluginManifest(
-  pack: PackEntry,
+  plugin: PluginEntry,
   owner: PluginOwner,
-  features: PackFeatures
+  features: PluginFeatures
 ): ClaudePluginManifest {
   return claudePluginManifestSchema.parse({
-    name: pack.pluginName,
-    description: normalizeManifestDescription(pack.meta),
-    version: pack.meta.version,
-    ...(pluginAuthor(pack.meta, owner) ? { author: pluginAuthor(pack.meta, owner) } : {}),
+    name: plugin.pluginName,
+    description: normalizeManifestDescription(plugin.manifest),
+    version: plugin.manifest.version,
+    ...(pluginAuthor(plugin.manifest, owner) ? { author: pluginAuthor(plugin.manifest, owner) } : {}),
     ...(features.hasCommands ? { commands: ['./commands'] } : {}),
     ...(features.hasAgents ? { agents: ['./agents'] } : {}),
   })
@@ -59,7 +59,7 @@ function buildClaudePluginManifest(
 
 function buildClaudeMarketplaceManifest(
   cfg: ProviderExportContext['cfg'],
-  packs: ProviderExportContext['packs']
+  plugins: ProviderExportContext['plugins']
 ): ClaudeMarketplaceManifest {
   return claudeMarketplaceManifestSchema.parse({
     name: cfg.providers.claude.marketplaceName,
@@ -68,46 +68,46 @@ function buildClaudeMarketplaceManifest(
       ...(cfg.owner.email ? { email: cfg.owner.email } : {}),
     },
     metadata: cfg.providers.claude.metadata,
-    plugins: packs.map((pack) => ({
-      name: pack.pluginName,
-      source: pack.pluginName,
-      description: pack.meta.description,
-      version: pack.meta.version,
-      tags: pack.meta.tags,
+    plugins: plugins.map((plugin) => ({
+      name: plugin.pluginName,
+      source: plugin.pluginName,
+      description: plugin.manifest.description,
+      version: plugin.manifest.version,
+      tags: plugin.manifest.keywords,
     })),
   })
 }
 
 export const claudeProvider: PluginProviderAdapter = {
   id: 'claude',
-  async exportMarketplace({ outRoot, cfg, packs }) {
+  async exportMarketplace({ outRoot, cfg, plugins }) {
     const pluginRoot = path.join(outRoot, 'plugins')
     await ensureDir(pluginRoot)
     await ensureDir(path.join(outRoot, '.claude-plugin'))
 
-    for (const pack of packs) {
-      const pluginDir = path.join(pluginRoot, pack.pluginName)
-      await copyClaudePlugin(pack.packDir, pluginDir)
-      const features = await detectPackFeatures(pluginDir)
+    for (const plugin of plugins) {
+      const pluginDir = path.join(pluginRoot, plugin.pluginName)
+      await copyClaudePlugin(plugin.pluginSourceDir, pluginDir)
+      const features = await detectPluginFeatures(pluginDir)
       await writeJsonFile(
         path.join(pluginDir, '.claude-plugin', 'plugin.json'),
-        buildClaudePluginManifest(pack, cfg.owner, features)
+        buildClaudePluginManifest(plugin, cfg.owner, features)
       )
     }
 
     await writeJsonFile(
       path.join(outRoot, '.claude-plugin', 'marketplace.json'),
-      buildClaudeMarketplaceManifest(cfg, packs)
+      buildClaudeMarketplaceManifest(cfg, plugins)
     )
 
     return {
       provider: 'claude',
       outRoot,
       marketplaceName: cfg.providers.claude.marketplaceName,
-      plugins: packs,
+      plugins,
     }
   },
-  previewInstall({ outRoot, packs, scope, cfg }) {
+  previewInstall({ outRoot, plugins, scope, cfg }) {
     const scopeArg = scopeToClaudeArg(scope)
     return {
       provider: 'claude',
@@ -115,14 +115,14 @@ export const claudeProvider: PluginProviderAdapter = {
       locations: [outRoot],
       actions: [
         `claude plugin marketplace add ${outRoot}`,
-        ...packs.map(
-          (pack) =>
-            `claude plugin install ${pack.pluginName}@${cfg.providers.claude.marketplaceName} --scope ${scopeArg}`
+        ...plugins.map(
+          (plugin) =>
+            `claude plugin install ${plugin.pluginName}@${cfg.providers.claude.marketplaceName} --scope ${scopeArg}`
         ),
       ],
     }
   },
-  async install({ result, dryRun, runner, scope, requestedScope, specIdentitiesByPackName }) {
+  async install({ result, dryRun, runner, scope, requestedScope, specIdentitiesByPluginId }) {
     const installed: string[] = []
     const skipped: string[] = []
     const locations = [result.outRoot]
@@ -152,9 +152,9 @@ export const claudeProvider: PluginProviderAdapter = {
     }
 
     for (const plugin of result.plugins) {
-      const specIdentity = specIdentitiesByPackName[plugin.meta.name]
+      const specIdentity = specIdentitiesByPluginId[plugin.manifest.id]
       if (!specIdentity) {
-        throw new Error(`Missing install spec identity for pack: ${plugin.meta.name}`)
+        throw new Error(`Missing install spec identity for plugin: ${plugin.manifest.id}`)
       }
       const pluginRef = `${plugin.pluginName}@${result.marketplaceName}`
       await runner('claude', ['plugin', 'install', pluginRef, '--scope', scopeArg])
@@ -165,8 +165,8 @@ export const claudeProvider: PluginProviderAdapter = {
         requestedScope,
         specIdentity,
         scope,
-        packName: plugin.meta.name,
-        packVersion: plugin.meta.version,
+        pluginId: plugin.manifest.id,
+        pluginVersion: plugin.manifest.version,
         pluginName: plugin.pluginName,
         sourceLocation: result.outRoot,
         targetPaths: [result.outRoot],

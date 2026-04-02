@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin-install.v1.json",
+  "files": [
+    {
+      "path": ".plugin/plugin.json",
+      "sha256": "d194e6433fc589706149a7a1f1f8398b092994aebcf14724cd02d6b4d2dba452"
+    },
+    {
+      "path": "README.md",
+      "sha256": "6767f9a7949d46c8707a410176b7627b4e39cbfe6407ecdb7aebd35001f1377a"
+    },
+    {
+      "path": "skills/go/SKILL.md",
+      "sha256": "e103fb4cf7294d0dfbcb9b10ab7c7557d8bb074c46fa5499384cc5cc7544c018"
+    },
+    {
+      "path": "skills/go/go-check.sh",
+      "mode": "755",
+      "sha256": "c514829f40877baf8a74a91bd09726026ca5cc91a48b0116e01519c721036070"
+    }
+  ]
+}

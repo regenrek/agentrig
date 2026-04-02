@@ -1,0 +1,51 @@
+---
+title: .plugin/plugin.json
+description: Plugin metadata and install plan.
+icon: FileBraces
+---
+
+# .plugin/plugin.json
+
+`.plugin/plugin.json` defines a plugin's identity and the files it installs.
+It also powers registry indexing and trust validation.
+
+```json
+{
+  "$schema": "https://agentrig.ai/schema/plugin.json",
+  "kind": "agentrig:plugin",
+  "name": "core-committer",
+  "title": "Committer skill",
+  "description": "Adds a committer skill with a safe commit helper script.",
+  "version": "0.1.0",
+  "author": "agentrig",
+  "tags": ["git", "workflow"],
+  "rigDependencies": ["security-check"],
+  "files": [
+    {
+      "path": "skills/committer/SKILL.md",
+      "target": "{{skillsDir}}/committer/SKILL.md"
+    }
+  ]
+}
+```
+
+## Field reference
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `name` | Yes | Plugin identifier (`kebab-case`). |
+| `title` | Yes | Human-readable name. |
+| `description` | Yes | Short summary for registry listings. |
+| `version` | Yes | Semver version (`1.2.3`). |
+| `files` | Yes | Install plan (`path` + `target`). |
+| `$schema` | No | JSON schema URL for editor hints. |
+| `kind` | No | Defaults to `agentrig:plugin`. |
+| `author` | No | Author or organization. |
+| `license` | No | SPDX identifier. |
+| `tags` | No | Keywords for filtering. |
+| `rigDependencies` | No | Plugins installed before this one. |
+| `components` | No | Claude plugin metadata. |
+
+<Callout title="Schemas">
+The CLI generates `$schema` using `https://agentrig.ai/schema/plugin.json`.
+</Callout>

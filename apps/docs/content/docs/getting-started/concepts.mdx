@@ -1,6 +1,6 @@
 ---
 title: Core concepts
-description: Packs, registries, rigs, and trust tiers.
+description: Plugins, registries, rigs, and trust tiers.
 icon: Compass
 ---
 
@@ -8,24 +8,24 @@ icon: Compass
 
 Agentrig is built around a few simple primitives.
 
-## Packs
+## Plugins
 
-A pack is a versioned bundle of files plus a `meta.json` install plan.
+A plugin is a versioned bundle of files plus a `.plugin/plugin.json` install plan.
 It can include skills, scripts, hooks, agents, MCP servers, or any file tree you want to distribute.
 
 ## Registries
 
-Registries host pack metadata and files.
+Registries host plugin metadata and files.
 
 - **Official registry**: `https://agentrig.ai/registry`
-- **Community Packs (hosted)**: packs uploaded via `/submit`, published at `https://agentrig.ai/api/community`
+- **Community Plugins (hosted)**: plugins uploaded via `/submit`, published at `https://agentrig.ai/api/community`
 - **Self-hosted registries**: registries you host yourself (static hosting works)
 
 The **directory** (`https://agentrig.ai/directory/index.json`) is a curated list of registries for discovery and trust signals.
 
 ## Rigs
 
-A rig is a named set of packs. Rigs can extend other rigs, allowing team-wide baselines plus project-specific add-ons.
+A rig is a named set of plugins. Rigs can extend other rigs, allowing team-wide baselines plus project-specific add-ons.
 
 ## Trust tiers
 
@@ -37,4 +37,4 @@ Agentrig classifies registries as:
 
 ## Manifests
 
-The CLI stores installed packs in `.agentrig/manifest.json` so it can remove or update them safely later.
+The CLI stores installed plugins in `.agentrig/manifest.json` so it can remove or update them safely later.

@@ -9,7 +9,7 @@ icon: Database
 Manage the registries in your config file.
 
 The official registry is seeded by `agentrig init`.
-Third-party registries are explicit: add the registry first, then install packs from it with `registryAlias/pack-name`.
+Third-party registries are explicit: add the registry first, then install plugins from it with `registryAlias/plugin-name`.
 
 ## List registries
 
@@ -27,7 +27,7 @@ After adding a registry:
 
 ```bash
 agentrig list --available --registry georg
-agentrig plugin install codex georg/ts-master-pack
+agentrig plugin install codex georg/ts-master-plugin
 ```
 
 Direct URLs and local files stay outside this listed path. Those installs are treated as unlisted and require `--yes`.

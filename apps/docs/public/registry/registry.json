@@ -1,73 +1,73 @@
 {
-  "$schema": "https://agentrig.ai/schema/registry.json",
+  "$schema": "https://agentrig.ai/schema/registry.v1.json",
   "name": "agentrig",
   "homepage": "https://agentrig.ai",
-  "generatedAt": "2026-03-28T20:30:02.197Z",
+  "generatedAt": "2026-04-01T11:12:57.430Z",
   "items": [
     {
-      "name": "core-committer",
-      "title": "Committer skill",
+      "id": "core-committer",
+      "name": "Committer skill",
       "description": "Adds a committer skill with a safe commit helper script.",
       "version": "0.1.0",
-      "tags": [
+      "keywords": [
         "git",
         "workflow",
         "core"
       ],
-      "meta": "core-committer.json"
+      "manifest": "manifests/core-committer.json"
     },
     {
-      "name": "go",
-      "title": "Go skill",
+      "id": "go",
+      "name": "Go skill",
       "description": "Go quality checks: fmt, vet, tests.",
       "version": "0.1.0",
-      "tags": [
+      "keywords": [
         "go"
       ],
-      "meta": "go.json"
+      "manifest": "manifests/go.json"
     },
     {
-      "name": "rust",
-      "title": "Rust skill",
+      "id": "rust",
+      "name": "Rust skill",
       "description": "Rust quality checks: fmt, clippy, tests.",
       "version": "0.1.0",
-      "tags": [
+      "keywords": [
         "rust"
       ],
-      "meta": "rust.json"
+      "manifest": "manifests/rust.json"
     },
     {
-      "name": "security-check",
-      "title": "Security check skill",
+      "id": "security-check",
+      "name": "Security check skill",
       "description": "Adds a security check skill that runs lightweight checks before shipping.",
       "version": "0.1.0",
-      "tags": [
+      "keywords": [
         "security",
         "workflow",
         "core"
       ],
-      "meta": "security-check.json"
+      "manifest": "manifests/security-check.json"
     },
     {
-      "name": "solidjs",
-      "title": "SolidJS skill",
+      "id": "solidjs",
+      "name": "SolidJS skill",
       "description": "SolidJS patterns and guardrails for agentic coding.",
       "version": "0.1.0",
-      "tags": [
+      "keywords": [
         "solidjs",
         "frontend"
       ],
-      "meta": "solidjs.json"
+      "manifest": "manifests/solidjs.json"
     },
     {
-      "name": "typescript",
-      "title": "TypeScript skill",
+      "id": "typescript",
+      "name": "TypeScript skill",
       "description": "TypeScript patterns and guardrails for agentic coding.",
       "version": "0.1.0",
-      "tags": [
+      "keywords": [
         "typescript"
       ],
-      "meta": "typescript.json"
+      "manifest": "manifests/typescript.json"
     }
   ]
 }

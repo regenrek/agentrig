@@ -8,8 +8,8 @@ import {
   isSamePluginInstallSpecIdentity,
   normalizePluginInstallSpecIdentity,
 } from '../../lib/plugin-install-spec'
-import { resolvePackSpec } from '../../lib/pack-resolver'
-import { parseRegistryPackSpec } from '../../lib/registry-spec'
+import { resolvePluginSpec } from '../../lib/plugin-resolver'
+import { parseRegistryPluginSpec } from '../../lib/registry-spec'
 import {
   parsePluginInstallScopeSelector,
   parsePluginProviderSelector,
@@ -26,9 +26,9 @@ function resolveUninstallSpecIdentity(
   try {
     return normalizePluginInstallSpecIdentity(spec, cwd, registries)
   } catch (error) {
-    const parsed = parseRegistryPackSpec(spec)
+    const parsed = parseRegistryPluginSpec(spec)
     const matches = records.filter(
-      (record) => record.specIdentity.kind === 'registry' && record.specIdentity.packName === parsed.pack
+      (record) => record.specIdentity.kind === 'registry' && record.specIdentity.pluginId === parsed.plugin
     )
     const identities = [
       ...new Map(
@@ -44,12 +44,12 @@ function resolveUninstallSpecIdentity(
 
 function printUninstallPlan(
   provider: string,
-  packName: string,
+  pluginId: string,
   records: Array<{ scope: string; pluginName: string; targetPaths: string[] }>
 ) {
   console.log('Uninstall plan:')
   console.log(`  provider: ${provider}`)
-  console.log(`  pack: ${packName}`)
+  console.log(`  plugin: ${pluginId}`)
   console.log(`  scopes: ${[...new Set(records.map((record) => record.scope))].join(', ')}`)
 
   for (const record of records) {
@@ -63,7 +63,7 @@ function printUninstallPlan(
 const command = defineCommand({
   meta: {
     name: 'uninstall',
-    description: 'Remove an AgentRig-managed provider plugin for a resolved pack spec.',
+    description: 'Remove an AgentRig-managed provider plugin for a resolved plugin spec.',
   },
   args: {
     provider: {
@@ -73,7 +73,7 @@ const command = defineCommand({
     },
     spec: {
       type: 'positional',
-      description: 'Pack name, registryAlias/pack, or a meta.json URL/path',
+      description: 'Plugin id, registryAlias/plugin, or a .plugin/plugin.json URL/path',
       required: true,
     },
     cwd: {
@@ -120,16 +120,16 @@ const command = defineCommand({
     )
     const cfg = await loadConfig(cwd)
     const specIdentity = resolveUninstallSpecIdentity(spec, cwd, cfg.registries, providerRecords)
-    let packName = specIdentity.kind === 'registry' ? specIdentity.packName : spec
+    let pluginId = specIdentity.kind === 'registry' ? specIdentity.pluginId : spec
     try {
-      const resolved = await resolvePackSpec(spec, cwd, cfg.registries)
-      packName = resolved.meta.name
+      const resolved = await resolvePluginSpec(spec, cwd, cfg.registries)
+      pluginId = resolved.manifest.id
     } catch {
       const matchedRecord = providerRecords.find((record) =>
         isSamePluginInstallSpecIdentity(record.specIdentity, specIdentity)
       )
       if (matchedRecord) {
-        packName = matchedRecord.packName
+        pluginId = matchedRecord.pluginId
       }
     }
     const matchingRecords = allRecords.filter(
@@ -141,11 +141,11 @@ const command = defineCommand({
 
     if (matchingRecords.length === 0) {
       throw new Error(
-        `No AgentRig-managed ${provider} plugin installs were found for pack "${packName}".`
+        `No AgentRig-managed ${provider} plugin installs were found for plugin "${pluginId}".`
       )
     }
 
-    printUninstallPlan(provider, packName, matchingRecords)
+    printUninstallPlan(provider, pluginId, matchingRecords)
 
     const results = await uninstallPluginProviders(matchingRecords, {
       cwd,

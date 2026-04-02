@@ -1,0 +1,58 @@
+---
+title: Publishing plugins
+description: Add plugins to registries and publish them.
+icon: Upload
+---
+
+# Publishing plugins
+
+AgentRig supports three first-class publishing paths: hosted community uploads, self-hosted registries, and directory listing.
+
+## Community Plugins (hosted)
+
+Upload plugins to AgentRig via the web UI at `/submit`. Submissions are scanned and reviewed before publishing.
+
+Once approved, plugins are published to the hosted community registry at:
+
+- `https://agentrig.ai/api/community/registry.json`
+- `https://agentrig.ai/api/community/<plugin>.json`
+
+<Callout title="Security">
+Scanning and review reduce risk, but they are not a guarantee of safety. Never include secrets in uploads. Always review plugins before installing.
+</Callout>
+
+See: [Hosted uploads](/plugins/uploads)
+
+<Callout title="Tip">
+To install from the hosted community registry:
+
+```bash
+agentrig registry add community https://agentrig.ai/api/community
+agentrig plugin install codex community/<plugin-name>
+```
+</Callout>
+
+## Self-hosted registry
+
+Host your own registry index (`registry.json`), per-plugin JSON (`{name}.json`), and plugin files at a base URL.
+Static hosting works: the CLI only needs a base URL to fetch JSON and files.
+
+Recommended next steps:
+
+- [Hosting a registry](/registry/hosting)
+- [Team registry guide](/guides/team-registry)
+
+## Directory listing
+
+The directory is a curated list of registries published at `https://agentrig.ai/directory/index.json`.
+
+Directory listing is for:
+
+- Discovery on the AgentRig homepage
+- Trust signals in the CLI (listed vs unlisted)
+
+It is **not** an upload mechanism. To get listed, open the GitHub issue linked on the homepage and a maintainer will add your entry to the directory index.
+
+## Contribute to the official registry
+
+If you want to contribute plugins to the official registry in this repo, follow the [official registry workflow](/contribute/official-registry).

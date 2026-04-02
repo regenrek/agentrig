@@ -6,11 +6,11 @@ icon: Users
 
 # Run a team registry
 
-Teams can host their own registry and publish private packs without changing the core consumer flow.
+Teams can host their own registry and publish private plugins without changing the core consumer flow.
 
 ## 1. Host the registry
 
-Publish the `registry.json`, `<pack>.json`, and `packs/<pack>/**` files on a static host.
+Publish the `registry.json`, `<plugin>.json`, and `plugins/<plugin>/**` files on a static host.
 
 ## 2. Add the registry explicitly
 
@@ -18,7 +18,7 @@ Publish the `registry.json`, `<pack>.json`, and `packs/<pack>/**` files on a sta
 agentrig registry add acme https://acme.example/registry
 ```
 
-## 3. Browse and install packs
+## 3. Browse and install plugins
 
 ```bash
 agentrig list --available --registry acme

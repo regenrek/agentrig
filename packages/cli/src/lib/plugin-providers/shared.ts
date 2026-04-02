@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
-import { isValidPackName, isValidPackVersion } from '../pack-validation'
+import { isValidPluginId, isValidPluginVersion } from '../plugin-validation'
 import type {
   PluginInstallRecord,
   PluginInstallSpecIdentity,
@@ -76,15 +76,15 @@ export type ResolvedPluginConfig = {
   }
 }
 
-export type PluginPackMeta = z.infer<typeof pluginPackMetaSchema>
+export type PluginSourceManifest = z.infer<typeof pluginManifestSchema>
 
-export type PackEntry = {
-  meta: PluginPackMeta
-  packDir: string
+export type PluginEntry = {
+  manifest: PluginSourceManifest
+  pluginSourceDir: string
   pluginName: string
 }
 
-export type PackFeatures = {
+export type PluginFeatures = {
   hasReadme: boolean
   hasSkills: boolean
   hasCommands: boolean
@@ -103,7 +103,7 @@ export type ProviderExportResult = {
   provider: PluginProviderId
   outRoot: string
   marketplaceName: string
-  plugins: PackEntry[]
+  plugins: PluginEntry[]
 }
 
 export type ProviderInstallPreview = {
@@ -134,7 +134,7 @@ export type ProviderUninstallResult = {
 export type PluginExportOptions = {
   cwd: string
   agent: PluginProviderSelector
-  packsDir: string
+  pluginsDir: string
   out?: string
   configPath?: string
   marketplaceName?: string
@@ -142,14 +142,14 @@ export type PluginExportOptions = {
   ownerEmail?: string
   pluginPrefix?: string
   clean?: boolean
-  pack?: string
+  plugin?: string
 }
 
 export type ExternalCommandRunner = (command: string, args: string[]) => Promise<void>
 
 export type PluginInstallOptions = PluginExportOptions & {
   scope?: PluginInstallScopeSelector
-  specIdentitiesByPackName: Record<string, PluginInstallSpecIdentity>
+  specIdentitiesByPluginId: Record<string, PluginInstallSpecIdentity>
   force?: boolean
   dryRun?: boolean
   commandRunner?: ExternalCommandRunner
@@ -164,14 +164,14 @@ export type PreparedProviderInstall = {
 export type PreparedPluginInstall = {
   cwd: string
   cfg: ResolvedPluginConfig
-  packsRoot: string
-  packs: PackEntry[]
+  pluginsRoot: string
+  plugins: PluginEntry[]
   baseOut: string
   out?: string
   clean: boolean
   force: boolean
   dryRun: boolean
-  specIdentitiesByPackName: Record<string, PluginInstallSpecIdentity>
+  specIdentitiesByPluginId: Record<string, PluginInstallSpecIdentity>
   requestedScope: PluginInstallScopeSelector
   providers: PreparedProviderInstall[]
   commandRunner: ExternalCommandRunner
@@ -188,7 +188,7 @@ export type ProviderInstallPreviewContext = {
   cwd: string
   outRoot: string
   cfg: ResolvedPluginConfig
-  packs: PackEntry[]
+  plugins: PluginEntry[]
   scope: PluginInstallScope
 }
 
@@ -203,7 +203,7 @@ export type PluginProviderAdapter = {
 export type ProviderExportContext = {
   outRoot: string
   cfg: ResolvedPluginConfig
-  packs: PackEntry[]
+  plugins: PluginEntry[]
 }
 
 export type ProviderInstallContext = {
@@ -212,7 +212,7 @@ export type ProviderInstallContext = {
   cfg: ResolvedPluginConfig
   scope: PluginInstallScope
   requestedScope: PluginInstallScopeSelector
-  specIdentitiesByPackName: Record<string, PluginInstallSpecIdentity>
+  specIdentitiesByPluginId: Record<string, PluginInstallSpecIdentity>
   force: boolean
   dryRun: boolean
   runner: ExternalCommandRunner
@@ -282,14 +282,20 @@ const pluginConfigFileSchema = z.object({
     .strict()
     .optional(),
 }).strict()
-const pluginPackMetaSchema = z.looseObject({
-  name: nonEmptyStringSchema.refine(isValidPackName, 'Pack name must be lowercase letters, numbers, or hyphens'),
-  title: nonEmptyStringSchema,
+const pluginManifestSchema = z.object({
+  $schema: z.string().optional(),
+  kind: z.literal('agentrig:plugin'),
+  id: nonEmptyStringSchema.refine(isValidPluginId, 'Plugin id must be lowercase letters, numbers, or hyphens'),
+  name: nonEmptyStringSchema,
   description: nonEmptyStringSchema,
-  version: nonEmptyStringSchema.refine(isValidPackVersion, 'Pack version must be valid semver (x.y.z)'),
+  version: nonEmptyStringSchema.refine(isValidPluginVersion, 'Plugin version must be valid semver (x.y.z)'),
   author: optionalStringSchema,
-  tags: z.array(nonEmptyStringSchema).optional(),
-})
+  license: optionalStringSchema,
+  keywords: z.array(nonEmptyStringSchema).optional(),
+  pluginDependencies: z.array(nonEmptyStringSchema).optional(),
+  configSchema: z.object({}).passthrough(),
+  'x-agentrig': z.object({}).passthrough().optional(),
+}).strict()
 
 const DEFAULT_CONFIG: ResolvedPluginConfig = {
   pluginPrefix: 'agentrig-',
@@ -300,7 +306,7 @@ const DEFAULT_CONFIG: ResolvedPluginConfig = {
     claude: {
       marketplaceName: 'agentrig-community',
       metadata: {
-        description: 'Agentrig workflow packs exported as provider-native plugins.',
+        description: 'AgentRig workflow plugins exported as provider-native plugins.',
         version: '1.0.0',
         pluginRoot: './plugins',
       },
@@ -316,7 +322,7 @@ const DEFAULT_CONFIG: ResolvedPluginConfig = {
     cursor: {
       marketplaceName: 'agentrig-marketplace',
       metadata: {
-        description: 'Agentrig packs exported as Cursor plugins.',
+        description: 'AgentRig plugins exported as Cursor plugins.',
         version: '1.0.0',
         pluginRoot: 'plugins',
       },
@@ -345,8 +351,8 @@ export function toPosixPath(value: string) {
   return value.split(path.sep).join('/')
 }
 
-export function normalizeManifestDescription(meta: PluginPackMeta) {
-  return meta.description || meta.title
+export function normalizeManifestDescription(meta: PluginSourceManifest) {
+  return meta.description || meta.name
 }
 
 export function normalizeAuthorObject(name?: string, email?: string) {
@@ -355,41 +361,41 @@ export function normalizeAuthorObject(name?: string, email?: string) {
   return email?.trim() ? { name: authorName, email: email.trim() } : { name: authorName }
 }
 
-export function pluginAuthor(meta: PluginPackMeta, owner: PluginOwner) {
+export function pluginAuthor(meta: PluginSourceManifest, owner: PluginOwner) {
   return normalizeAuthorObject(meta.author ?? owner.name, owner.email)
 }
 
-export async function readPackMeta(packDir: string) {
-  const metaPath = path.join(packDir, 'meta.json')
-  const raw = await readJsonFile<unknown>(metaPath)
+export async function readPluginManifest(pluginSourceDir: string) {
+  const manifestPath = path.join(pluginSourceDir, '.plugin', 'plugin.json')
+  const raw = await readJsonFile<unknown>(manifestPath)
   if (!raw) {
-    throw new Error(`Missing meta.json in ${packDir}`)
+    throw new Error(`Missing .plugin/plugin.json in ${pluginSourceDir}`)
   }
-  const meta = pluginPackMetaSchema.safeParse(raw)
+  const meta = pluginManifestSchema.safeParse(raw)
   if (!meta.success) {
     const issue = meta.error.issues[0]
-    throw new Error(`Invalid meta.json in ${packDir}: ${issue?.message ?? 'invalid data'}`)
+    throw new Error(`Invalid .plugin/plugin.json in ${pluginSourceDir}: ${issue?.message ?? 'invalid data'}`)
   }
   return meta.data
 }
 
-export async function listPackDirs(packsRoot: string, onlyPack?: string) {
-  const explicitPackDir = onlyPack ? path.join(packsRoot, onlyPack) : null
-  if (explicitPackDir) {
-    if (!(await pathExists(explicitPackDir))) {
-      throw new Error(`Pack not found: ${explicitPackDir}`)
+export async function listPluginDirs(pluginsRoot: string, onlyPlugin?: string) {
+  const explicitPluginDir = onlyPlugin ? path.join(pluginsRoot, onlyPlugin) : null
+  if (explicitPluginDir) {
+    if (!(await pathExists(explicitPluginDir))) {
+      throw new Error(`Plugin not found: ${explicitPluginDir}`)
     }
-    return [explicitPackDir]
+    return [explicitPluginDir]
   }
 
-  const entries = await fs.readdir(packsRoot, { withFileTypes: true })
+  const entries = await fs.readdir(pluginsRoot, { withFileTypes: true })
   return entries
     .filter((entry) => entry.isDirectory())
-    .map((entry) => path.join(packsRoot, entry.name))
+    .map((entry) => path.join(pluginsRoot, entry.name))
 }
 
-export async function detectPackFeatures(packDir: string): Promise<PackFeatures> {
-  const hasFile = (relativePath: string) => pathExists(path.join(packDir, relativePath))
+export async function detectPluginFeatures(pluginSourceDir: string): Promise<PluginFeatures> {
+  const hasFile = (relativePath: string) => pathExists(path.join(pluginSourceDir, relativePath))
 
   return {
     hasReadme: await hasFile('README.md'),
@@ -408,12 +414,12 @@ export async function detectPackFeatures(packDir: string): Promise<PackFeatures>
 }
 
 export async function copyEntry(
-  packDir: string,
+  pluginSourceDir: string,
   pluginDir: string,
   sourceRel: string,
   destinationRel = sourceRel
 ) {
-  const sourcePath = path.join(packDir, sourceRel)
+  const sourcePath = path.join(pluginSourceDir, sourceRel)
   if (!(await pathExists(sourcePath))) return false
 
   const destinationPath = path.join(pluginDir, destinationRel)
@@ -425,12 +431,12 @@ export async function copyEntry(
   return true
 }
 
-export async function copyEntries(packDir: string, pluginDir: string, entries: CopyEntrySpec[]) {
+export async function copyEntries(pluginSourceDir: string, pluginDir: string, entries: CopyEntrySpec[]) {
   await Promise.all(
     entries.map((entry) =>
       typeof entry === 'string'
-        ? copyEntry(packDir, pluginDir, entry)
-        : copyEntry(packDir, pluginDir, entry.source, entry.destination)
+        ? copyEntry(pluginSourceDir, pluginDir, entry)
+        : copyEntry(pluginSourceDir, pluginDir, entry.source, entry.destination)
     )
   )
 }
@@ -539,23 +545,23 @@ export async function loadPluginConfig(
   } satisfies ResolvedPluginConfig
 }
 
-export async function buildPackEntries(
-  packsRoot: string,
+export async function buildPluginEntries(
+  pluginsRoot: string,
   pluginPrefix: string,
-  onlyPack?: string
-): Promise<PackEntry[]> {
-  const packDirs = await listPackDirs(packsRoot, onlyPack)
-  const packs = await Promise.all(
-    packDirs.map(async (packDir) => {
-      const meta = await readPackMeta(packDir)
+  onlyPlugin?: string
+): Promise<PluginEntry[]> {
+  const pluginDirs = await listPluginDirs(pluginsRoot, onlyPlugin)
+  const plugins = await Promise.all(
+    pluginDirs.map(async (pluginSourceDir) => {
+      const manifest = await readPluginManifest(pluginSourceDir)
       return {
-        meta,
-        packDir,
-        pluginName: `${pluginPrefix}${meta.name}`,
-      } satisfies PackEntry
+        manifest,
+        pluginSourceDir,
+        pluginName: `${pluginPrefix}${manifest.id}`,
+      } satisfies PluginEntry
     })
   )
-  return packs.sort((left, right) => left.pluginName.localeCompare(right.pluginName))
+  return plugins.sort((left, right) => left.pluginName.localeCompare(right.pluginName))
 }
 
 async function walkFiles(rootDir: string, currentDir = rootDir): Promise<string[]> {

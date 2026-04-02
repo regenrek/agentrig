@@ -17,15 +17,15 @@ const pluginInstallSpecIdentitySchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('registry'),
     registryUrl: z.string().min(1),
-    packName: z.string().min(1),
+    pluginId: z.string().min(1),
   }),
   z.strictObject({
     kind: z.literal('url'),
-    metaUrl: z.string().min(1),
+    manifestUrl: z.string().min(1),
   }),
   z.strictObject({
     kind: z.literal('file'),
-    metaPath: z.string().min(1),
+    manifestPath: z.string().min(1),
   }),
 ])
 const pluginInstalledFileSchema = z.strictObject({
@@ -38,8 +38,8 @@ const pluginInstallRecordBaseSchema = z.strictObject({
   requestedScope: pluginInstallScopeSelectorSchema,
   specIdentity: pluginInstallSpecIdentitySchema,
   scope: pluginInstallScopeSchema,
-  packName: z.string().min(1),
-  packVersion: z.string().min(1),
+  pluginId: z.string().min(1),
+  pluginVersion: z.string().min(1),
   pluginName: z.string().min(1),
   sourceLocation: z.string().min(1),
   targetPaths: z.array(z.string().min(1)),

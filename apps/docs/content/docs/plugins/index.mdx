@@ -1,0 +1,33 @@
+---
+title: Plugins overview
+description: What plugins contain and how they install.
+icon: Package
+---
+
+# Plugins overview
+
+A plugin is a portable unit of workflow logic. Each plugin ships files plus a `.plugin/plugin.json` file that describes how to install them.
+
+<Files>
+  <Folder name="plugin-name" defaultOpen>
+    <File name=".plugin/plugin.json" />
+    <Folder name="skills" defaultOpen>
+      <Folder name="committer" defaultOpen>
+        <File name="SKILL.md" />
+        <File name="commit.sh" />
+      </Folder>
+    </Folder>
+    <Folder name="scripts">
+      <File name="lint.sh" />
+    </Folder>
+  </Folder>
+</Files>
+
+## What the CLI does
+
+- Reads the plugin `.plugin/plugin.json`.
+- Validates target paths and hashes.
+- Writes files to the target directory (`{{skillsDir}}` by default).
+- Records the install in `.agentrig/manifest.json`.
+
+Next, explore the full plugin structure and metadata options.

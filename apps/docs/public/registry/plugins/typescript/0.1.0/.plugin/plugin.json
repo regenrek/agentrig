@@ -1,0 +1,18 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin.v1.json",
+  "kind": "agentrig:plugin",
+  "id": "typescript",
+  "name": "TypeScript skill",
+  "description": "TypeScript patterns and guardrails for agentic coding.",
+  "version": "0.1.0",
+  "author": "agentrig",
+  "keywords": [
+    "typescript"
+  ],
+  "pluginDependencies": [],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

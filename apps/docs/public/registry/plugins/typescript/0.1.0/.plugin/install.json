@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin-install.v1.json",
+  "files": [
+    {
+      "path": ".DS_Store",
+      "sha256": "75106c268d9e2f74b27f69e6709a78b798b16a276cbe917f349338adc6da4800"
+    },
+    {
+      "path": ".plugin/plugin.json",
+      "sha256": "e223b421cbe5cd134aacda71e941e473a9c4725c78bd7ffe7b6e88ee5eac93fc"
+    },
+    {
+      "path": "README.md",
+      "sha256": "134510733948ee4452882dae8ad8df4ed735c6743789f5b032c992a7a6afd681"
+    },
+    {
+      "path": "skills/.DS_Store",
+      "sha256": "c3ada1a5a8f5b2dadf296fd2344d21d6e313242de55ca5623005ac3623f2dfac"
+    },
+    {
+      "path": "skills/typescript/SKILL.md",
+      "sha256": "cd21572f835cfeba021d7980953c1dc5f62ada5ebaadef78937864fc76e9399d"
+    }
+  ]
+}

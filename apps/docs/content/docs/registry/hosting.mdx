@@ -1,6 +1,6 @@
 ---
 title: Hosting a registry
-description: Serve registry.json and pack files from any static host.
+description: Serve registry.json and plugin files from any static host.
 icon: Server
 ---
 
@@ -10,15 +10,15 @@ A registry is a static folder that contains:
 
 ```
 registry.json
-<pack>.json
-packs/<pack>/**
+<plugin>.json
+plugins/<plugin>/**
 ```
 
 ## Minimum requirements
 
 - `registry.json` at the registry root.
-- One JSON file per pack (`<pack>.json`).
-- All files referenced by `meta.json` at the paths specified by each `files[].path` entry.
+- One JSON file per plugin (`<plugin>.json`).
+- All files referenced by `.plugin/plugin.json` at the paths specified by each `files[].path` entry.
 
 ## Example
 
@@ -26,7 +26,7 @@ packs/<pack>/**
 https://example.com/registry/
   registry.json
   core-committer.json
-  packs/
+  plugins/
     core-committer/
       skills/committer/SKILL.md
 ```

@@ -9,8 +9,8 @@ icon: Rocket
 AgentRig starts with a simple consumer flow:
 
 1. initialize config
-2. browse available packs
-3. inspect a pack if needed
+2. browse available plugins
+3. inspect a plugin if needed
 4. install it as a native provider plugin
 
 ## Official registry flow
@@ -18,7 +18,7 @@ AgentRig starts with a simple consumer flow:
 <Steps>
   <Step>
     <h3>Install agentrig</h3>
-    <p>Install the CLI once so you can use the same pack workflow in any repo.</p>
+    <p>Install the CLI once so you can use the same plugin workflow in any repo.</p>
 
     ```bash
     npm install -g agentrig
@@ -34,14 +34,14 @@ AgentRig starts with a simple consumer flow:
   </Step>
   <Step>
     <h3>Browse the official registry</h3>
-    <p>See what packs are available before you install anything.</p>
+    <p>See what plugins are available before you install anything.</p>
 
     ```bash
     agentrig list --available
     ```
   </Step>
   <Step>
-    <h3>Inspect the pack</h3>
+    <h3>Inspect the plugin</h3>
     <p>Optional, but useful if you want to review dependencies, files, and trust before installing.</p>
 
     ```bash
@@ -61,21 +61,21 @@ AgentRig starts with a simple consumer flow:
 ## Third-party registry flow
 
 Third-party registries are explicit.
-Add the registry first, then install packs from it with `registryAlias/pack-name`.
+Add the registry first, then install plugins from it with `registryAlias/plugin-name`.
 
 ```bash
 agentrig registry add georg https://georg.dev/agentrig
 agentrig list --available --registry georg
-agentrig plugin install cursor georg/ts-master-pack
+agentrig plugin install cursor georg/ts-master-plugin
 ```
 
 ## Direct URL or local file flow
 
-Direct `meta.json` URLs and local `meta.json` files are treated as unlisted sources.
+Direct `.plugin/plugin.json` URLs and local `.plugin/plugin.json` files are treated as unlisted sources.
 Install them only when you trust the source:
 
 ```bash
-agentrig plugin install codex ./hello-skills/meta.json --yes
+agentrig plugin install codex ./hello-skills/.plugin/plugin.json --yes
 ```
 
 ## Where to go next
@@ -83,4 +83,4 @@ agentrig plugin install codex ./hello-skills/meta.json --yes
 - Want the config details? Read [`agentrig init`](/cli/init) and [Project config](/configuration/project).
 - Want to add a third-party source? Read [`agentrig registry`](/cli/registry).
 - Want provider-native installs? Read [Integrations](/integrations).
-- Want to author a pack instead of consuming one? Start with [Your first pack](/getting-started/first-pack).
+- Want to author a plugin instead of consuming one? Start with [Your first plugin](/getting-started/first-plugin).

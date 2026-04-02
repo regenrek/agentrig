@@ -4,7 +4,7 @@ import { shouldShowParentUsage } from '../lib/command'
 const command = defineCommand({
   meta: {
     name: 'rig',
-    description: 'Work with rig profiles (named sets of packs).',
+    description: 'Work with rig profiles (named sets of plugins).',
   },
   args: {
     help: {

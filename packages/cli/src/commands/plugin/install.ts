@@ -3,9 +3,9 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../../lib/config'
 import {
-  cleanupMaterializedPack,
-  materializeResolvedPackGraph,
-  resolvePackGraph,
+  cleanupMaterializedPlugin,
+  materializeResolvedPluginGraph,
+  resolvePluginGraph,
 } from '../../lib/plugin-consumer'
 import {
   installPreparedPluginProviders,
@@ -13,12 +13,12 @@ import {
   parsePluginProviderSelector,
   preparePluginInstall,
 } from '../../lib/plugin-providers'
-import { buildResolvedPackSpecIdentityMap } from '../../lib/plugin-install-spec'
+import { buildResolvedPluginSpecIdentityMap } from '../../lib/plugin-install-spec'
 import { determineTrustTier, requiresConfirmation } from '../../lib/trust'
 
 function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginInstall>>) {
   console.log('Install plan:')
-  console.log(`  packs: ${plan.packs.map((pack) => pack.meta.name).join(', ')}`)
+  console.log(`  plugins: ${plan.plugins.map((plugin) => plugin.manifest.id).join(', ')}`)
   console.log(`  requested scope: ${plan.requestedScope}`)
 
   for (const provider of plan.providers) {
@@ -35,7 +35,7 @@ function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginIn
 const command = defineCommand({
   meta: {
     name: 'install',
-    description: 'Install a resolved pack as a Claude, Codex, or Cursor plugin.',
+    description: 'Install a resolved plugin as a Claude, Codex, or Cursor plugin.',
   },
   args: {
     provider: {
@@ -45,7 +45,7 @@ const command = defineCommand({
     },
     spec: {
       type: 'positional',
-      description: 'Pack name, registryAlias/pack, or a meta.json URL/path',
+      description: 'Plugin id, registryAlias/plugin, or a .plugin/plugin.json URL/path',
       required: true,
     },
     cwd: {
@@ -93,33 +93,33 @@ const command = defineCommand({
       : 'auto'
 
     const cfg = await loadConfig(cwd)
-    const graph = await resolvePackGraph(String(args.spec), cwd, cfg.registries)
-    const unlistedPacks = []
-    for (const resolved of graph.resolvedPacks) {
+    const graph = await resolvePluginGraph(String(args.spec), cwd, cfg.registries)
+    const unlistedPlugins = []
+    for (const resolved of graph.resolvedPlugins) {
       const trustTier = resolved.trustTier ?? await determineTrustTier(
         resolved.source.type === 'url' ? resolved.source.baseUrl : resolved.sourceLabel,
         cfg.registries
       )
       if (requiresConfirmation(trustTier)) {
-        unlistedPacks.push(resolved.meta.name)
+        unlistedPlugins.push(resolved.manifest.id)
       }
     }
-    if (unlistedPacks.length > 0 && !args.yes) {
+    if (unlistedPlugins.length > 0 && !args.yes) {
       throw new Error(
-        `This install includes pack(s) from unlisted sources: ${unlistedPacks.join(', ')}.\n` +
+        `This install includes plugin(s) from unlisted sources: ${unlistedPlugins.join(', ')}.\n` +
           'Re-run with --yes to confirm install.'
       )
     }
 
-    const materialized = await materializeResolvedPackGraph(graph)
-    const specIdentitiesByPackName = buildResolvedPackSpecIdentityMap(graph.resolvedPacks)
+    const materialized = await materializeResolvedPluginGraph(graph)
+    const specIdentitiesByPluginId = buildResolvedPluginSpecIdentityMap(graph.resolvedPlugins)
 
     try {
       const plan = await preparePluginInstall({
         cwd,
         agent: provider,
-        packsDir: materialized.packsRoot,
-        specIdentitiesByPackName,
+        pluginsDir: materialized.pluginsRoot,
+        specIdentitiesByPluginId,
         scope,
         force: args.force,
         dryRun: args.dryRun,
@@ -137,7 +137,7 @@ const command = defineCommand({
         }
       }
     } finally {
-      await cleanupMaterializedPack(materialized.packsRoot)
+      await cleanupMaterializedPlugin(materialized.pluginsRoot)
     }
   },
 })

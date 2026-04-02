@@ -2,11 +2,11 @@ import type {
   CliLoginExchange,
   CliLoginStart,
   CliWhoAmI,
-  PackSubmissionListResponse,
-  PackSubmissionCreateResponse,
-  PackSubmissionStatus,
-  PackUploadUrlResponse,
-  PackUploadPolicySnapshot,
+  PluginSubmissionListResponse,
+  PluginSubmissionCreateResponse,
+  PluginSubmissionStatus,
+  PluginUploadUrlResponse,
+  PluginUploadPolicySnapshot,
 } from './types'
 
 const DEFAULT_COMMUNITY_BASE_URL = 'https://agentrig.ai'
@@ -171,15 +171,15 @@ export async function logout(baseUrl: string, accessToken: string) {
   })
 }
 
-export async function getPackUploadPolicy(baseUrl: string, accessToken: string) {
-  return await request<PackUploadPolicySnapshot>(baseUrl, '/api/cli/packs/policy', {
+export async function getPluginUploadPolicy(baseUrl: string, accessToken: string) {
+  return await request<PluginUploadPolicySnapshot>(baseUrl, '/api/cli/plugins/policy', {
     accessToken,
     maxRetries: 0,
   })
 }
 
-export async function getPackUploadUrl(baseUrl: string, accessToken: string) {
-  const result = await request<PackUploadUrlResponse>(baseUrl, '/api/cli/packs/upload-url', {
+export async function getPluginUploadUrl(baseUrl: string, accessToken: string) {
+  const result = await request<PluginUploadUrlResponse>(baseUrl, '/api/cli/plugins/upload-url', {
     method: 'POST',
     accessToken,
     maxRetries: 0,
@@ -187,7 +187,7 @@ export async function getPackUploadUrl(baseUrl: string, accessToken: string) {
   return result.uploadUrl
 }
 
-export async function uploadPackBundle(uploadUrl: string, zipBytes: Uint8Array) {
+export async function uploadPluginBundle(uploadUrl: string, zipBytes: Uint8Array) {
   const response = await fetchWithTimeout(
     uploadUrl,
     {
@@ -212,7 +212,7 @@ export async function uploadPackBundle(uploadUrl: string, zipBytes: Uint8Array) 
   return storageId
 }
 
-export async function createPackSubmission(
+export async function createPluginSubmission(
   baseUrl: string,
   accessToken: string,
   payload: {
@@ -222,7 +222,7 @@ export async function createPackSubmission(
     contentType: string
   }
 ) {
-  const result = await request<PackSubmissionCreateResponse>(baseUrl, '/api/cli/packs/submissions', {
+  const result = await request<PluginSubmissionCreateResponse>(baseUrl, '/api/cli/plugins/submissions', {
     method: 'POST',
     accessToken,
     body: payload,
@@ -231,14 +231,14 @@ export async function createPackSubmission(
   return result.submissionId
 }
 
-export async function getPackSubmissionStatus(
+export async function getPluginSubmissionStatus(
   baseUrl: string,
   accessToken: string,
   submissionId: string
 ) {
-  return await request<PackSubmissionStatus>(
+  return await request<PluginSubmissionStatus>(
     baseUrl,
-    `/api/cli/packs/submissions/${encodeURIComponent(submissionId)}`,
+    `/api/cli/plugins/submissions/${encodeURIComponent(submissionId)}`,
     {
       accessToken,
       maxRetries: 0,
@@ -246,14 +246,14 @@ export async function getPackSubmissionStatus(
   )
 }
 
-export async function listPackSubmissions(
+export async function listPluginSubmissions(
   baseUrl: string,
   accessToken: string,
   limit = 20
 ) {
-  const response = await request<PackSubmissionListResponse>(
+  const response = await request<PluginSubmissionListResponse>(
     baseUrl,
-    `/api/cli/packs/submissions?limit=${encodeURIComponent(String(limit))}`,
+    `/api/cli/plugins/submissions?limit=${encodeURIComponent(String(limit))}`,
     {
       accessToken,
       maxRetries: 0,

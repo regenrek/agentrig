@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin-history.v1.json",
+  "id": "core-committer",
+  "name": "Committer skill",
+  "latest": "0.1.0",
+  "versions": [
+    "0.1.0"
+  ],
+  "description": "Adds a committer skill with a safe commit helper script.",
+  "keywords": [
+    "git",
+    "workflow",
+    "core"
+  ],
+  "trustTier": "official",
+  "paths": {
+    "plugin": "plugins/core-committer/0.1.0",
+    "manifest": "manifests/core-committer.json"
+  }
+}

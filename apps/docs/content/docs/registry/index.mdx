@@ -6,19 +6,19 @@ icon: Globe
 
 # Registry overview
 
-Agentrig uses a flat registry model: one base URL, one `registry.json`, and one `<pack>.json` per pack.
+Agentrig uses a flat registry model: one base URL, one `registry.json`, and one `<plugin>.json` per plugin.
 
 ## Core pieces
 
 - **Official registry** - hosted at `https://agentrig.ai/registry`.
 - **Third-party registries** - any registry base URL you explicitly add with `agentrig registry add`.
-- **Community Packs (hosted)** - packs uploaded via `/submit`, published at `https://agentrig.ai/api/community`.
+- **Community Plugins (hosted)** - plugins uploaded via `/submit`, published at `https://agentrig.ai/api/community`.
 - **Directory** - a curated list of public registries at `https://agentrig.ai/directory/index.json`.
 
-The CLI resolves consumer pack specs from:
+The CLI resolves consumer plugin specs from:
 
 - The official registry
-- Any configured third-party registry via `registryAlias/pack-name`
+- Any configured third-party registry via `registryAlias/plugin-name`
 - The hosted community registry after you add it as a registry
 - Direct URLs or local file paths (unlisted sources)
 

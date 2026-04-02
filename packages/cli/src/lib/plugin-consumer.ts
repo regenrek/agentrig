@@ -3,177 +3,170 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ensureDir, writeJsonFile } from './fs'
 import { sha256Hex } from './hash'
-import { resolvePackSpec } from './pack-resolver'
-import { isFileish, isUrl, readSourceFile, resolvePackFromRegistryRef } from './registry'
-import { parseRegistryPackSpec } from './registry-spec'
-import { validateTargetPaths } from './trust'
-import type { ResolvedPack } from './registry'
+import { resolvePluginSpec } from './plugin-resolver'
+import { isFileish, isUrl, readSourceFile, resolvePluginFromRegistryRef } from './registry'
+import { parseRegistryPluginSpec } from './registry-spec'
+import { validatePluginPaths } from './trust'
+import type { ResolvedPlugin } from './registry'
 import type { RegistryRef } from './types'
 
-function assertPackMeta(meta: any): asserts meta is {
-  name: string
-  title: string
-  description: string
-  version: string
-  files: Array<{ path: string; target: string; sha256?: string }>
-  rigDependencies?: string[]
-} {
-  if (!meta || typeof meta !== 'object') throw new Error('Invalid pack meta: not an object')
-  for (const key of ['name', 'title', 'description', 'version']) {
-    if (typeof meta[key] !== 'string' || !meta[key]) throw new Error(`Invalid pack meta: missing ${key}`)
-  }
-  if (!Array.isArray(meta.files)) throw new Error('Invalid pack meta: files must be an array')
-}
-
-function resolvePackSourcePath(packDir: string, relativePath: string) {
+function resolvePluginSourcePath(pluginDir: string, relativePath: string) {
   const normalized = path.normalize(relativePath)
   if (path.isAbsolute(normalized)) {
-    throw new Error(`Absolute pack source paths are not allowed: ${relativePath}`)
+    throw new Error(`Absolute plugin source paths are not allowed: ${relativePath}`)
   }
 
-  const destinationPath = path.resolve(packDir, normalized)
-  const relativeToPackDir = path.relative(packDir, destinationPath)
-  if (relativeToPackDir.startsWith('..') || path.isAbsolute(relativeToPackDir)) {
-    throw new Error(`Pack source path escapes the pack root: ${relativePath}`)
+  const destinationPath = path.resolve(pluginDir, normalized)
+  const relativeToPluginDir = path.relative(pluginDir, destinationPath)
+  if (relativeToPluginDir.startsWith('..') || path.isAbsolute(relativeToPluginDir)) {
+    throw new Error(`Plugin source path escapes the plugin root: ${relativePath}`)
   }
 
   return destinationPath
 }
 
-function normalizeMaterializedPackFilePath(packName: string, relativePath: string) {
-  const slashNormalized = relativePath.replace(/\\/g, '/')
-  const publishedPrefix = `packs/${packName}/`
-  if (slashNormalized.startsWith(publishedPrefix)) {
-    return slashNormalized.slice(publishedPrefix.length)
-  }
-  return relativePath
-}
-
-function isExplicitPackSpec(spec: string) {
+function isExplicitPluginSpec(spec: string) {
   return isUrl(spec) || isFileish(spec) || spec.includes('/')
 }
 
-async function resolveDependencyPackSpec(
+async function resolveDependencyPluginSpec(
   spec: string,
-  parent: ResolvedPack,
+  parent: ResolvedPlugin,
   cwd: string,
   registries: RegistryRef[]
 ) {
-  if (isExplicitPackSpec(spec)) {
-    return resolvePackSpec(spec, cwd, registries)
+  if (isExplicitPluginSpec(spec)) {
+    return resolvePluginSpec(spec, cwd, registries)
   }
 
-  const parsed = parseRegistryPackSpec(spec)
+  const parsed = parseRegistryPluginSpec(spec)
   if (parent.registry) {
-    return resolvePackFromRegistryRef(parent.registry, parsed.pack)
+    return resolvePluginFromRegistryRef(parent.registry, parsed.plugin)
   }
 
   throw new Error(
-    `Pack "${parent.meta.name}" dependency "${spec}" must be an explicit spec when the parent pack does not come from a configured registry.`
+    `Plugin "${parent.manifest.id}" dependency "${spec}" must be an explicit spec when the parent plugin does not come from a configured registry.`
   )
 }
 
-export type ResolvedPackGraph = {
-  requestedPack: ResolvedPack
-  resolvedPacks: ResolvedPack[]
+export type ResolvedPluginGraph = {
+  requestedPlugin: ResolvedPlugin
+  resolvedPlugins: ResolvedPlugin[]
 }
 
-export async function resolvePackGraph(
+export async function resolvePluginGraph(
   spec: string,
   cwd: string,
   registries: RegistryRef[]
-): Promise<ResolvedPackGraph> {
-  const resolvedPacks: ResolvedPack[] = []
+): Promise<ResolvedPluginGraph> {
+  const resolvedPlugins: ResolvedPlugin[] = []
   const visited = new Set<string>()
-  const sourceByPackName = new Map<string, string>()
+  const sourcesByPluginId = new Map<string, string>()
 
-  async function visit(nextSpec: string, parent?: ResolvedPack): Promise<ResolvedPack> {
+  async function visit(nextSpec: string, parent?: ResolvedPlugin): Promise<ResolvedPlugin> {
     const resolved = parent
-      ? await resolveDependencyPackSpec(nextSpec, parent, cwd, registries)
-      : await resolvePackSpec(nextSpec, cwd, registries)
+      ? await resolveDependencyPluginSpec(nextSpec, parent, cwd, registries)
+      : await resolvePluginSpec(nextSpec, cwd, registries)
 
-    assertPackMeta(resolved.meta)
-
-    const existingSource = sourceByPackName.get(resolved.meta.name)
+    const existingSource = sourcesByPluginId.get(resolved.manifest.id)
     if (existingSource && existingSource !== resolved.sourceLabel) {
       throw new Error(
-        `Pack "${resolved.meta.name}" resolves from multiple sources (${existingSource}, ${resolved.sourceLabel}). Use one canonical source per dependency graph.`
+        `Plugin "${resolved.manifest.id}" resolves from multiple sources (${existingSource}, ${resolved.sourceLabel}). Use one canonical source per dependency graph.`
       )
     }
-    sourceByPackName.set(resolved.meta.name, resolved.sourceLabel)
+    sourcesByPluginId.set(resolved.manifest.id, resolved.sourceLabel)
 
-    const visitKey = `${resolved.sourceLabel}:${resolved.meta.name}`
+    const visitKey = `${resolved.sourceLabel}:${resolved.manifest.id}`
     if (visited.has(visitKey)) {
       return resolved
     }
     visited.add(visitKey)
 
-    for (const dependencySpec of resolved.meta.rigDependencies ?? []) {
+    for (const dependencySpec of resolved.manifest.pluginDependencies ?? []) {
       await visit(dependencySpec, resolved)
     }
 
-    resolvedPacks.push(resolved)
+    resolvedPlugins.push(resolved)
     return resolved
   }
 
-  const requestedPack = await visit(spec)
+  const requestedPlugin = await visit(spec)
   return {
-    requestedPack,
-    resolvedPacks,
+    requestedPlugin,
+    resolvedPlugins,
   }
 }
 
-export async function materializeResolvedPackGraph(graph: ResolvedPackGraph) {
-  const packsRoot = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-plugin-pack-'))
+export async function materializeResolvedPluginGraph(graph: ResolvedPluginGraph) {
+  const pluginsRoot = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-plugin-source-'))
 
-  for (const resolved of graph.resolvedPacks) {
-    const pathValidation = validateTargetPaths(resolved.meta.files)
+  for (const resolved of graph.resolvedPlugins) {
+    const installFiles = resolved.installMetadata?.files ?? []
+    const requiresDeliveryMetadata =
+      resolved.source.type === 'url' || Boolean(resolved.registry)
+    if (requiresDeliveryMetadata && installFiles.length === 0) {
+      throw new Error(
+        `Plugin "${resolved.manifest.id}" is missing required delivery install metadata.`
+      )
+    }
+    const pathValidation = validatePluginPaths(installFiles)
     if (!pathValidation.valid) {
       throw new Error(
-        `Pack "${resolved.meta.name}" contains disallowed target paths:\n` +
+        `Plugin "${resolved.manifest.id}" contains invalid file paths:\n` +
           pathValidation.disallowed.map((target) => `  - ${target}`).join('\n')
       )
     }
 
-    const packDir = path.join(packsRoot, resolved.meta.name)
-    await ensureDir(packDir)
-    await writeJsonFile(path.join(packDir, 'meta.json'), resolved.meta)
+    const pluginDir = path.join(pluginsRoot, resolved.manifest.id)
+    await ensureDir(path.join(pluginDir, '.plugin'))
+    await writeJsonFile(path.join(pluginDir, '.plugin', 'plugin.json'), {
+      ...resolved.manifest,
+      files: undefined,
+    })
 
-    for (const file of resolved.meta.files) {
+    for (const file of installFiles) {
+      if (requiresDeliveryMetadata && !file.sha256) {
+        throw new Error(
+          `Plugin "${resolved.manifest.id}" is missing required sha256 for remote file "${file.path}".`
+        )
+      }
       const bytes = await readSourceFile(resolved.source, file.path)
       const actualSha = sha256Hex(bytes)
       if (file.sha256 && file.sha256 !== actualSha) {
         throw new Error(
-          `Integrity check failed for ${resolved.meta.name}:${file.path}\nExpected: ${file.sha256}\nActual:   ${actualSha}`
+          `Integrity check failed for ${resolved.manifest.id}:${file.path}\nExpected: ${file.sha256}\nActual:   ${actualSha}`
         )
       }
 
-      const destinationPath = resolvePackSourcePath(
-        packDir,
-        normalizeMaterializedPackFilePath(resolved.meta.name, file.path)
+      const destinationPath = resolvePluginSourcePath(
+        pluginDir,
+        file.path
       )
       await ensureDir(path.dirname(destinationPath))
       await fs.writeFile(destinationPath, bytes)
+      if (file.mode) {
+        await fs.chmod(destinationPath, Number.parseInt(file.mode, 8))
+      }
     }
   }
 
   return {
-    resolved: graph.requestedPack,
-    resolvedPacks: graph.resolvedPacks,
-    packsRoot,
-    packDir: path.join(packsRoot, graph.requestedPack.meta.name),
+    resolved: graph.requestedPlugin,
+    resolvedPlugins: graph.resolvedPlugins,
+    pluginsRoot,
+    pluginDir: path.join(pluginsRoot, graph.requestedPlugin.manifest.id),
   }
 }
 
-export async function materializeResolvedPack(
+export async function materializeResolvedPlugin(
   spec: string,
   cwd: string,
   registries: RegistryRef[]
 ) {
-  const graph = await resolvePackGraph(spec, cwd, registries)
-  return materializeResolvedPackGraph(graph)
+  const graph = await resolvePluginGraph(spec, cwd, registries)
+  return materializeResolvedPluginGraph(graph)
 }
 
-export async function cleanupMaterializedPack(packsRoot: string) {
-  await fs.rm(packsRoot, { recursive: true, force: true })
+export async function cleanupMaterializedPlugin(pluginsRoot: string) {
+  await fs.rm(pluginsRoot, { recursive: true, force: true })
 }

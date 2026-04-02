@@ -12,7 +12,7 @@ import { codexProvider } from './plugin-providers/codex'
 import { cursorProvider } from './plugin-providers/cursor'
 import {
   PLUGIN_PROVIDER_IDS,
-  buildPackEntries,
+  buildPluginEntries,
   defaultCommandRunner,
   formatProviderSummary,
   loadPluginConfig,
@@ -75,18 +75,18 @@ export type {
 export async function exportPluginProviders(options: PluginExportOptions): Promise<ProviderExportResult[]> {
   const providers = resolvePluginProviders(options.agent)
   const baseOut = resolveExportBaseOut(options.cwd, options.agent, options.out)
-  const packsRoot = path.resolve(options.cwd, options.packsDir)
+  const pluginsRoot = path.resolve(options.cwd, options.pluginsDir)
   const cfg = await loadPluginConfig(options.cwd, options.configPath, options)
 
-  if (!(await pathExists(packsRoot))) {
-    throw new Error(`Missing packs directory: ${packsRoot}`)
+  if (!(await pathExists(pluginsRoot))) {
+    throw new Error(`Missing plugins directory: ${pluginsRoot}`)
   }
 
   if (options.clean) {
     await removeIfExists(baseOut)
   }
 
-  const packs = await buildPackEntries(packsRoot, cfg.pluginPrefix, options.pack)
+  const plugins = await buildPluginEntries(pluginsRoot, cfg.pluginPrefix, options.plugin)
   const results: ProviderExportResult[] = []
 
   for (const provider of providers) {
@@ -95,7 +95,7 @@ export async function exportPluginProviders(options: PluginExportOptions): Promi
       await PROVIDER_ADAPTERS[provider].exportMarketplace({
         outRoot: providerOut,
         cfg,
-        packs,
+        plugins,
       })
     )
   }
@@ -105,16 +105,16 @@ export async function exportPluginProviders(options: PluginExportOptions): Promi
 
 export async function preparePluginInstall(options: PluginInstallOptions): Promise<PreparedPluginInstall> {
   const cfg = await loadPluginConfig(options.cwd, options.configPath, options)
-  const packsRoot = path.resolve(options.cwd, options.packsDir)
-  if (!(await pathExists(packsRoot))) {
-    throw new Error(`Missing packs directory: ${packsRoot}`)
+  const pluginsRoot = path.resolve(options.cwd, options.pluginsDir)
+  if (!(await pathExists(pluginsRoot))) {
+    throw new Error(`Missing plugins directory: ${pluginsRoot}`)
   }
 
-  const packs = await buildPackEntries(packsRoot, cfg.pluginPrefix, options.pack)
-  const specIdentitiesByPackName = options.specIdentitiesByPackName
-  for (const pack of packs) {
-    if (!specIdentitiesByPackName[pack.meta.name]) {
-      throw new Error(`Missing canonical install spec identity for pack: ${pack.meta.name}`)
+  const plugins = await buildPluginEntries(pluginsRoot, cfg.pluginPrefix, options.plugin)
+  const specIdentitiesByPluginId = options.specIdentitiesByPluginId
+  for (const plugin of plugins) {
+    if (!specIdentitiesByPluginId[plugin.manifest.id]) {
+      throw new Error(`Missing canonical install spec identity for plugin: ${plugin.manifest.id}`)
     }
   }
   const requestedScope = options.scope ?? 'auto'
@@ -131,7 +131,7 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
         cwd: options.cwd,
         outRoot,
         cfg,
-        packs,
+        plugins,
         scope,
       }),
     }
@@ -140,21 +140,21 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
   return {
     cwd: options.cwd,
     cfg,
-    packsRoot,
-    packs,
+    pluginsRoot,
+    plugins,
     baseOut,
     out: options.out ? path.resolve(options.cwd, options.out) : undefined,
     clean: options.clean ?? true,
     force: Boolean(options.force),
     dryRun: Boolean(options.dryRun),
-    specIdentitiesByPackName,
+    specIdentitiesByPluginId,
     requestedScope,
     providers,
     commandRunner: options.commandRunner ?? defaultCommandRunner,
     exportOptions: {
       cwd: options.cwd,
       agent: options.agent,
-      packsDir: options.packsDir,
+      pluginsDir: options.pluginsDir,
       out: options.out ? path.resolve(options.cwd, options.out) : undefined,
       configPath: options.configPath,
       marketplaceName: options.marketplaceName,
@@ -162,7 +162,7 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
       ownerEmail: options.ownerEmail,
       pluginPrefix: options.pluginPrefix,
       clean: options.clean,
-      pack: options.pack,
+      plugin: options.plugin,
     },
   }
 }
@@ -191,7 +191,7 @@ export async function installPreparedPluginProviders(plan: PreparedPluginInstall
           cfg: plan.cfg,
           scope: providerPlan.scope,
           requestedScope: plan.requestedScope,
-          specIdentitiesByPackName: plan.specIdentitiesByPackName,
+          specIdentitiesByPluginId: plan.specIdentitiesByPluginId,
           force: plan.force,
           dryRun: plan.dryRun,
           runner: plan.commandRunner,

@@ -1,12 +1,12 @@
 ---
 title: Integrations
-description: Install resolved packs as native plugins for supported providers.
+description: Install resolved plugins as native plugins for supported providers.
 icon: Plug
 ---
 
 # Integrations
 
-AgentRig can take a resolved pack and install it as a native plugin for:
+AgentRig can take a resolved plugin and install it as a native plugin for:
 
 - `Claude Code`
 - `Codex`
@@ -15,21 +15,21 @@ AgentRig can take a resolved pack and install it as a native plugin for:
 ## Consumer flow
 
 ```bash
-agentrig plugin install <provider> <pack-spec>
-agentrig plugin uninstall <provider> <pack-spec>
+agentrig plugin install <provider> <plugin-spec>
+agentrig plugin uninstall <provider> <plugin-spec>
 ```
 
-`<pack-spec>` can be:
+`<plugin-spec>` can be:
 
-- an official pack name such as `core-committer`
-- a third-party pack from an added registry such as `georg/ts-master-pack`
-- a direct `meta.json` URL
-- a local `meta.json` path
+- an official plugin name such as `core-committer`
+- a third-party plugin from an added registry such as `georg/ts-master-plugin`
+- a direct `.plugin/plugin.json` URL
+- a local `.plugin/plugin.json` path
 
 ## Author flow
 
-If you are publishing or testing local packs, export provider-native marketplaces from pack directories:
+If you are publishing or testing local plugins, export provider-native marketplaces from plugin directories:
 
 ```bash
-agentrig pack plugin export --agent <provider|all> --packsDir registry/packs
+agentrig plugin export --agent <provider|all> --pluginsDir registry/plugins
 ```

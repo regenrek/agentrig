@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin.v1.json",
+  "kind": "agentrig:plugin",
+  "id": "__PLUGIN_ID__",
+  "name": "__PLUGIN_NAME__",
+  "description": "__PLUGIN_DESCRIPTION__",
+  "version": "0.1.0",
+  "author": "__PLUGIN_AUTHOR__",
+  "license": "MIT",
+  "keywords": [],
+  "pluginDependencies": [],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin-history.v1.json",
+  "id": "security-check",
+  "name": "Security check skill",
+  "latest": "0.1.0",
+  "versions": [
+    "0.1.0"
+  ],
+  "description": "Adds a security check skill that runs lightweight checks before shipping.",
+  "keywords": [
+    "security",
+    "workflow",
+    "core"
+  ],
+  "trustTier": "official",
+  "paths": {
+    "plugin": "plugins/security-check/0.1.0",
+    "manifest": "manifests/security-check.json"
+  }
+}

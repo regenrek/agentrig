@@ -1,6 +1,6 @@
 {
   "title": "Registry",
-  "description": "Official packs, hosted community packs, and trust",
+  "description": "Official plugins, hosted community plugins, and trust",
   "icon": "Globe",
   "pages": ["index", "official", "hosting", "namespaces", "trust"]
 }

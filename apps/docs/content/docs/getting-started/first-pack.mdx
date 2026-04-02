@@ -1,46 +1,46 @@
 ---
-title: Your first pack
-description: Author and test a local pack.
+title: Your first plugin
+description: Author and test a local plugin.
 icon: Box
 ---
 
-# Your first pack
+# Your first plugin
 
-This page is for pack authors.
-If you want to consume packs from registries, start with [Getting started](/getting-started).
+This page is for plugin authors.
+If you want to consume plugins from registries, start with [Getting started](/getting-started).
 
-A pack is a folder with `meta.json` and the files you want to distribute.
+A plugin is a folder with `.plugin/plugin.json` and the files you want to distribute.
 
-## Scaffold the pack
+## Scaffold the plugin
 
 ```bash
-agentrig pack init hello-skills
+agentrig plugin init hello-skills
 ```
 
 This creates a folder like:
 
 ```
 hello-skills/
-  meta.json
+  .plugin/plugin.json
   skills/hello-skills/SKILL.md
   README.md
 ```
 
 ## Add files
 
-Add skills, scripts, hooks, agents, or MCP config under the pack directory.
-Then regenerate `meta.json`:
+Add skills, scripts, hooks, agents, or MCP config under the plugin directory.
+Then regenerate `.plugin/plugin.json`:
 
 ```bash
-agentrig pack create . --out meta.json
+agentrig plugin create . --out .plugin/plugin.json
 ```
 
 ## Test locally
 
-Install your local pack from its `meta.json` as a provider plugin:
+Install your local plugin from its `.plugin/plugin.json` as a provider plugin:
 
 ```bash
-agentrig plugin install codex ./hello-skills/meta.json --yes
+agentrig plugin install codex ./hello-skills/.plugin/plugin.json --yes
 ```
 
-Next, learn about [`meta.json`](/packs/meta-json) and [`agentrig pack`](/cli/pack).
+Next, learn about [`.plugin/plugin.json`](/plugins/meta-json) and [`agentrig plugin`](/cli/plugin).

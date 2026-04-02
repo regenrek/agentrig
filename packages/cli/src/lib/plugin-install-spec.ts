@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { OFFICIAL_REGISTRY_URL, isFileish, isUrl, normalizeRegistryUrl } from './registry'
-import { parseRegistryPackSpec } from './registry-spec'
-import type { ResolvedPack } from './registry'
+import { parseRegistryPluginSpec } from './registry-spec'
+import type { ResolvedPlugin } from './registry'
 import type { PluginInstallSpecIdentity, RegistryRef } from './types'
 
 function normalizeFileSpecPath(spec: string, cwd: string) {
@@ -23,23 +23,28 @@ export function normalizePluginInstallSpecIdentity(
   if (isUrl(trimmed)) {
     return {
       kind: 'url',
-      metaUrl: new URL(trimmed).toString(),
+      manifestUrl: new URL(trimmed).toString(),
     }
   }
 
   if (isFileish(trimmed)) {
+    const resolved = normalizeFileSpecPath(trimmed, cwd)
+    const isDirectorySpec = !resolved.endsWith('.json')
+    const manifestPath = isDirectorySpec
+      ? path.join(resolved, '.plugin', 'plugin.json')
+      : resolved
     return {
       kind: 'file',
-      metaPath: normalizeFileSpecPath(trimmed, cwd),
+      manifestPath,
     }
   }
 
-  const parsed = parseRegistryPackSpec(trimmed)
+  const parsed = parseRegistryPluginSpec(trimmed)
   if (!parsed.registry || parsed.registry === 'official') {
     return {
       kind: 'registry',
       registryUrl: normalizeRegistryUrl(getConfiguredOfficialRegistryUrl(registries)),
-      packName: parsed.pack,
+      pluginId: parsed.plugin,
     }
   }
 
@@ -54,50 +59,50 @@ export function normalizePluginInstallSpecIdentity(
   return {
     kind: 'registry',
     registryUrl: normalizeRegistryUrl(registry.url),
-    packName: parsed.pack,
+    pluginId: parsed.plugin,
   }
 }
 
-export function getResolvedPackSpecIdentity(resolved: ResolvedPack): PluginInstallSpecIdentity {
+export function getResolvedPluginSpecIdentity(resolved: ResolvedPlugin): PluginInstallSpecIdentity {
   if (resolved.registry) {
     return {
       kind: 'registry',
       registryUrl: normalizeRegistryUrl(resolved.registry.url),
-      packName: resolved.meta.name,
+      pluginId: resolved.manifest.id,
     }
   }
 
   if (resolved.sourceLabel.startsWith('url:')) {
     return {
       kind: 'url',
-      metaUrl: new URL(resolved.sourceLabel.slice('url:'.length)).toString(),
+      manifestUrl: new URL(resolved.sourceLabel.slice('url:'.length)).toString(),
     }
   }
 
   if (resolved.sourceLabel.startsWith('file:')) {
     return {
       kind: 'file',
-      metaPath: path.normalize(resolved.sourceLabel.slice('file:'.length)),
+      manifestPath: path.normalize(resolved.sourceLabel.slice('file:'.length)),
     }
   }
 
-  throw new Error(`Unable to determine install spec identity for ${resolved.meta.name}.`)
+  throw new Error(`Unable to determine install spec identity for ${resolved.manifest.id}.`)
 }
 
-export function buildResolvedPackSpecIdentityMap(resolvedPacks: ResolvedPack[]) {
+export function buildResolvedPluginSpecIdentityMap(resolvedPlugins: ResolvedPlugin[]) {
   return Object.fromEntries(
-    resolvedPacks.map((resolved) => [resolved.meta.name, getResolvedPackSpecIdentity(resolved)])
+    resolvedPlugins.map((resolved) => [resolved.manifest.id, getResolvedPluginSpecIdentity(resolved)])
   ) satisfies Record<string, PluginInstallSpecIdentity>
 }
 
 export function getPluginInstallSpecIdentityKey(identity: PluginInstallSpecIdentity) {
   switch (identity.kind) {
     case 'registry':
-      return `registry:${identity.registryUrl}:${identity.packName}`
+      return `registry:${identity.registryUrl}:${identity.pluginId}`
     case 'url':
-      return `url:${identity.metaUrl}`
+      return `url:${identity.manifestUrl}`
     case 'file':
-      return `file:${identity.metaPath}`
+      return `file:${identity.manifestPath}`
   }
 }
 

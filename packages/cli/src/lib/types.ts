@@ -5,8 +5,8 @@ export type RegistryRef = {
 
 export type RigDefinition = {
   extends?: string[]
-  /** Pack specs: official pack, registryAlias/pack, or explicit spec */
-  packs?: string[]
+  /** Plugin specs: official plugin, registryAlias/plugin, or explicit manifest spec */
+  plugins?: string[]
 }
 
 /**
@@ -35,12 +35,12 @@ export type AgentRigConfig = {
 }
 
 export type RegistryIndexItem = {
+  id: string
   name: string
-  title: string
   description: string
   version?: string
-  tags?: string[]
-  meta: string
+  keywords?: string[]
+  manifest: string
 }
 
 export type RegistryIndex = {
@@ -51,31 +51,18 @@ export type RegistryIndex = {
   items: RegistryIndexItem[]
 }
 
-export type PackFile = {
-  /** File path in the pack source (registry, repo, local folder) */
+export type PluginFile = {
+  /** File path in the plugin source (registry, repo, local folder) */
   path: string
-  /** Standardized install target metadata */
-  target: string
   /** Optional file mode as a string, ex: "755" */
   mode?: string
   /** Optional sha256 integrity hash (hex) */
   sha256?: string
 }
 
-/**
- * Claude plugin component declarations for pack exports.
- */
-export type PackComponents = {
-  /** Skills included in this pack */
-  skills?: string[]
-  /** Subagents included in this pack */
-  agents?: string[]
-  /** Whether this pack includes hooks (hooks/hooks.json) */
-  hooks?: boolean
-  /** Whether this pack includes MCP servers (.mcp.json) */
-  mcp?: boolean
-  /** Whether this pack includes LSP servers (.lsp.json) */
-  lsp?: boolean
+export type PluginInstallMetadata = {
+  $schema?: string
+  files: PluginFile[]
 }
 
 /**
@@ -133,21 +120,19 @@ export type AgentDefinition = {
   hooks?: HookDefinition[]
 }
 
-export type PackMeta = {
+export type PluginManifest = {
   $schema?: string
-  kind?: 'agentrig:pack'
+  kind: 'agentrig:plugin'
+  id: string
   name: string
-  title: string
   description: string
   version: string
   author?: string
   license?: string
-  tags?: string[]
-  topics?: Record<string, string[]>
-  rigDependencies?: string[]
-  files: PackFile[]
-  /** Claude plugin components included in this pack */
-  components?: PackComponents
+  keywords?: string[]
+  pluginDependencies?: string[]
+  configSchema: Record<string, unknown>
+  'x-agentrig'?: Record<string, unknown>
 }
 
 export type PluginProviderName = 'claude' | 'codex' | 'cursor'
@@ -180,15 +165,15 @@ export type PluginInstallSpecIdentity =
   | {
       kind: 'registry'
       registryUrl: string
-      packName: string
+      pluginId: string
     }
   | {
       kind: 'url'
-      metaUrl: string
+      manifestUrl: string
     }
   | {
       kind: 'file'
-      metaPath: string
+      manifestPath: string
     }
 
 type PluginInstallRecordBase = {
@@ -197,8 +182,8 @@ type PluginInstallRecordBase = {
   requestedScope: PluginInstallScopeSelectorName
   specIdentity: PluginInstallSpecIdentity
   scope: PluginInstallScopeName
-  packName: string
-  packVersion: string
+  pluginId: string
+  pluginVersion: string
   pluginName: string
   sourceLocation: string
   targetPaths: string[]
@@ -287,7 +272,7 @@ export type CliWhoAmI = {
   name?: string | null
 }
 
-export type PackUploadPolicySnapshot = {
+export type PluginUploadPolicySnapshot = {
   maxZipBytes: number
   maxFileBytes: number
   maxTotalBytes: number
@@ -300,32 +285,32 @@ export type PackUploadPolicySnapshot = {
   publishedVersionRetention: number
 }
 
-export type PackBundle = {
+export type PluginBundle = {
   directory: string
   bundlePath: string
   fileName: string
-  meta: PackMeta
+  manifest: PluginManifest
   zipBytes: Uint8Array
   temporary: boolean
 }
 
-export type PackPublishValidationResult = {
-  meta: PackMeta
+export type PluginSubmissionValidationResult = {
+  manifest: PluginManifest
   fileCount: number
   totalBytes: number
   zipBytes: number
   warnings: string[]
 }
 
-export type PackUploadUrlResponse = {
+export type PluginUploadUrlResponse = {
   uploadUrl: string
 }
 
-export type PackSubmissionCreateResponse = {
+export type PluginSubmissionCreateResponse = {
   submissionId: string
 }
 
-export type PackSubmissionStatus = {
+export type PluginSubmissionStatus = {
   _id: string
   fileName: string
   status: string
@@ -334,13 +319,13 @@ export type PackSubmissionStatus = {
   scanWarnings?: string[]
   reviewStatus?: string
   reviewNote?: string
-  packMeta?: unknown
-  packName?: string
-  packVersion?: string
+  pluginManifest?: unknown
+  pluginId?: string
+  pluginVersion?: string
   createdAt: number
   updatedAt: number
 }
 
-export type PackSubmissionListResponse = {
-  submissions: PackSubmissionStatus[]
+export type PluginSubmissionListResponse = {
+  submissions: PluginSubmissionStatus[]
 }

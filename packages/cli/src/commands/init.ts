@@ -45,7 +45,7 @@ function printNextSteps() {
   console.log('Next steps:')
   console.log('  agentrig list --available')
   console.log('  agentrig registry add <alias> <baseUrl>')
-  console.log('  agentrig plugin install <provider> <pack-name>')
+  console.log('  agentrig plugin install <provider> <plugin-id>')
 }
 
 const command = defineCommand({

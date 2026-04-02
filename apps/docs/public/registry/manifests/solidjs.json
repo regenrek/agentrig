@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agentrig.ai/schema/plugin-history.v1.json",
+  "id": "solidjs",
+  "name": "SolidJS skill",
+  "latest": "0.1.0",
+  "versions": [
+    "0.1.0"
+  ],
+  "description": "SolidJS patterns and guardrails for agentic coding.",
+  "keywords": [
+    "solidjs",
+    "frontend"
+  ],
+  "trustTier": "official",
+  "paths": {
+    "plugin": "plugins/solidjs/0.1.0",
+    "manifest": "manifests/solidjs.json"
+  }
+}
