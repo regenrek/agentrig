@@ -42,6 +42,9 @@ apps/docs/src/routeTree.gen.ts
 # Cloudflare Wrangler cache
 .wrangler/
 
+# Generated registry build output (canonical source: agentrig-registry)
+apps/docs/public/registry/
+
 # agentrig runtime
 .agentrig/
 .codex/

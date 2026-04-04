@@ -17,10 +17,14 @@ It is treated as **trust tier: official** in the CLI.
 ## What it contains
 
 - `registry.json` - the plugin index
-- `<plugin>.json` - individual plugin metadata
-- `plugins/<plugin>/**` - the file contents referenced in each plugin
+- `manifests/<plugin>.json` - plugin version history and pointers
+- `plugins/<plugin>/<version>/` - the published plugin payloads
 
-When running locally in this repo, the registry is served from `apps/docs/public/registry`.
+## Canonical source
+
+The canonical source of truth for the official registry is the [`agentrig-registry`](https://github.com/agentrig/agentrig-registry) GitHub repository.
+
+For local development, run `pnpm build:registry` to generate a local snapshot from the canonical source. The output is gitignored and never committed.
 
 ## CLI behavior
 
