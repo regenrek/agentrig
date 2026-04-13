@@ -35,10 +35,10 @@
     }
   },
   "devDependencies": {
-    "lefthook": "^2.1.4",
+    "lefthook": "^2.1.5",
     "tsx": "^4.7.0",
     "typescript": "^5.9.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-    "vite-plus": "^0.1.14"
+    "vite-plus": "^0.1.16"
   }
 }
