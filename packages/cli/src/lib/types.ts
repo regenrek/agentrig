@@ -23,8 +23,12 @@ export type DirectoryEntry = {
   url: string
   description?: string
   logo?: string
+  /** Identity-only verification signal. Never treat this as install trust. */
   verified?: boolean
+  /** Directory payloads are discovery-only. */
+  installability: 'discovery_only'
   tags?: string[]
+  keywords?: string[]
 }
 
 export type TrustTier = CanonicalTrustTier

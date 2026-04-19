@@ -7,7 +7,7 @@
 Features:
 
 - create your own plugins and registries
-- install community plugins from a registry
+- install registry-backed plugins from signed registries
 - share plugins with your team or the community
 
 # Why AgentRig exists
@@ -65,7 +65,8 @@ Direct URLs, local `.plugin/plugin.json` paths, ZIPs, and author repos are not p
 ## Quick Vocabulary
 
 - A `plugin` is a bundle of skills, agents, MCP servers, commands, and related files.
-- A `registry` is where you find plugins.
+- A `registry` is an install source only when it is a configured static signed registry.
+- A `directory` is a discovery surface. Being listed there does not make a plugin installable.
 - A `provider` is where the plugin gets installed: Claude Code, Codex, or Cursor.
 - A `rig` is an advanced team setup that applies multiple plugins together.
 
