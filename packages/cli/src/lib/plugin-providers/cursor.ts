@@ -129,7 +129,7 @@ export const cursorProvider: PluginProviderAdapter = {
       actions: plugins.map((plugin) => `copy ${plugin.pluginName} -> ${path.join(pluginRoot, plugin.pluginName)}`),
     }
   },
-  async install({ cwd, result, scope, requestedScope, specIdentitiesByPluginId, force, dryRun }) {
+  async install({ cwd, result, scope, requestedScope, installMetadataByPluginId, force, dryRun }) {
     const installed: string[] = []
     const skipped: string[] = []
     const ledgerEntries: CursorPluginInstallRecord[] = []
@@ -138,9 +138,9 @@ export const cursorProvider: PluginProviderAdapter = {
     const installLedger = dryRun ? null : await loadPluginInstallLedger(cwd, scope)
 
     for (const plugin of result.plugins) {
-      const specIdentity = specIdentitiesByPluginId[plugin.manifest.id]
-      if (!specIdentity) {
-        throw new Error(`Missing install spec identity for plugin: ${plugin.manifest.id}`)
+      const installMetadata = installMetadataByPluginId[plugin.manifest.id]
+      if (!installMetadata) {
+        throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
       }
 
       const destinationDir = path.join(pluginRoot, plugin.pluginName)
@@ -154,7 +154,7 @@ export const cursorProvider: PluginProviderAdapter = {
           `Cursor plugin ${plugin.pluginName} already exists at ${destinationDir} without a matching AgentRig ledger entry. Re-run with --force to repair.`
         )
       }
-      if (!isSamePluginInstallSpecIdentity(existingRecord.specIdentity, specIdentity)) {
+      if (!isSamePluginInstallSpecIdentity(existingRecord.specIdentity, installMetadata.specIdentity)) {
         throw new Error(
           `Cursor plugin ${plugin.pluginName} already exists at ${destinationDir} for a different AgentRig source. Re-run with --force to replace it.`
         )
@@ -175,17 +175,21 @@ export const cursorProvider: PluginProviderAdapter = {
       }
 
       if (changed) {
-        const specIdentity = specIdentitiesByPluginId[plugin.manifest.id]
+        const installMetadata = installMetadataByPluginId[plugin.manifest.id]
+        if (!installMetadata) {
+          throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
+        }
         ledgerEntries.push({
           id: getPluginInstallRecordId('cursor', scope, plugin.pluginName),
           provider: 'cursor',
           requestedScope,
-          specIdentity,
+          specIdentity: installMetadata.specIdentity,
+          registry: installMetadata.registry,
           scope,
           pluginId: plugin.manifest.id,
           pluginVersion: plugin.manifest.version,
+          snapshotDigest: installMetadata.snapshotDigest,
           pluginName: plugin.pluginName,
-          sourceLocation: sourceDir,
           targetPaths: [destinationDir],
           installedAt: new Date().toISOString(),
           files: copyResult.files,

@@ -15,16 +15,16 @@ AgentRig can take a resolved plugin and install it as a native plugin for:
 ## Consumer flow
 
 ```bash
-agentrig plugin install <provider> <plugin-spec>
-agentrig plugin uninstall <provider> <plugin-spec>
+agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>
+agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>@<version>
 ```
 
-`<plugin-spec>` can be:
+Public install refs are exact and registry-only:
 
-- an official plugin name such as `core-committer`
-- a third-party plugin from an added registry such as `georg/ts-master-plugin`
-- a direct `.plugin/plugin.json` URL
-- a local `.plugin/plugin.json` path
+- `agentrig/agentrig.core-committer@0.1.0`
+- `georg/georg.ts-master-plugin@1.2.0`
+
+Direct `.plugin/plugin.json` paths, arbitrary URLs, ZIPs, and author repos are outside the public install contract.
 
 ## Author flow
 

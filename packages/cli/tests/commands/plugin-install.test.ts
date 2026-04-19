@@ -10,9 +10,8 @@ const mocks = vi.hoisted(() => ({
   installPreparedPluginProviders: vi.fn(),
   parsePluginProviderSelector: vi.fn(),
   parsePluginInstallScopeSelector: vi.fn(),
-  buildResolvedPluginSpecIdentityMap: vi.fn(),
-  determineTrustTier: vi.fn(),
-  requiresConfirmation: vi.fn(),
+  buildResolvedPluginInstallMetadataMap: vi.fn(),
+  assertInstallableTrust: vi.fn(),
 }))
 
 vi.mock('../../src/lib/config', () => ({
@@ -33,12 +32,11 @@ vi.mock('../../src/lib/plugin-providers', () => ({
 }))
 
 vi.mock('../../src/lib/plugin-install-spec', () => ({
-  buildResolvedPluginSpecIdentityMap: mocks.buildResolvedPluginSpecIdentityMap,
+  buildResolvedPluginInstallMetadataMap: mocks.buildResolvedPluginInstallMetadataMap,
 }))
 
 vi.mock('../../src/lib/trust', () => ({
-  determineTrustTier: mocks.determineTrustTier,
-  requiresConfirmation: mocks.requiresConfirmation,
+  assertInstallableTrust: mocks.assertInstallableTrust,
 }))
 
 import command from '../../src/commands/plugin/install'
@@ -52,35 +50,57 @@ describe('command:plugin install', () => {
     mocks.parsePluginProviderSelector.mockReturnValue('codex')
     mocks.parsePluginInstallScopeSelector.mockReturnValue('auto')
     mocks.loadConfig.mockResolvedValue({
-      registries: [{ name: 'official', url: 'https://agentrig.ai/registry' }] satisfies RegistryRef[],
+      registries: [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }] satisfies RegistryRef[],
     })
-    mocks.determineTrustTier.mockResolvedValue('official')
-    mocks.requiresConfirmation.mockReturnValue(false)
-    mocks.buildResolvedPluginSpecIdentityMap.mockReturnValue(
-      new Map([['demo-plugin', { kind: 'registry', registryUrl: 'https://agentrig.ai/registry', pluginId: 'demo-plugin' }]])
-    )
+    mocks.buildResolvedPluginInstallMetadataMap.mockReturnValue({
+      'demo-plugin': {
+        specIdentity: {
+          kind: 'registry',
+          registryAlias: 'agentrig',
+          registryUrl: 'https://agentrig.ai/registry',
+          pluginId: 'demo-plugin',
+          version: '1.2.3',
+        },
+        registry: {
+          registryAlias: 'agentrig',
+          registryUrl: 'https://agentrig.ai/registry',
+          sourceRepository: 'https://github.com/agentrig/agentrig-registry',
+          contractVersion: '1',
+          generatedAt: '2026-04-16T11:00:00Z',
+          signature: {
+            algorithm: 'sha256-json-envelope',
+            keyId: 'agentrig-registry',
+            signedDigest: 'sha256:registry',
+          },
+        },
+        snapshotDigest: 'sha256:snapshot',
+      },
+    })
     mocks.resolvePluginGraph.mockResolvedValue({
       requestedPlugin: {
-        manifest: { id: 'demo-plugin', name: 'Demo Plugin' },
+        manifest: { id: 'demo-plugin', name: 'Demo Plugin', version: '1.2.3' },
         source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
-        sourceLabel: 'registry:official',
-        trustTier: 'official',
-        registry: { name: 'official', url: 'https://agentrig.ai/registry' },
+        sourceLabel: 'agentrig/demo-plugin@1.2.3',
+        trustTier: 'reviewed',
+        installability: 'installable',
+        registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
       },
       resolvedPlugins: [
         {
-          manifest: { id: 'dep-plugin', name: 'Dependency Plugin' },
+          manifest: { id: 'dep-plugin', name: 'Dependency Plugin', version: '0.1.0' },
           source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
-          sourceLabel: 'registry:official',
+          sourceLabel: 'agentrig/dep-plugin@0.1.0',
           trustTier: 'official',
-          registry: { name: 'official', url: 'https://agentrig.ai/registry' },
+          installability: 'installable',
+          registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
         },
         {
-          manifest: { id: 'demo-plugin', name: 'Demo Plugin' },
+          manifest: { id: 'demo-plugin', name: 'Demo Plugin', version: '1.2.3' },
           source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
-          sourceLabel: 'registry:official',
-          trustTier: 'official',
-          registry: { name: 'official', url: 'https://agentrig.ai/registry' },
+          sourceLabel: 'agentrig/demo-plugin@1.2.3',
+          trustTier: 'reviewed',
+          installability: 'installable',
+          registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
         },
       ],
     })
@@ -116,24 +136,29 @@ describe('command:plugin install', () => {
     ])
   })
 
-  it('prepares installs from canonical plugin ids and cleans up materialized plugins', async () => {
+  it('prepares installs from canonical registry install refs and cleans up materialized plugins', async () => {
     await run({
       args: {
         provider: 'codex',
-        spec: 'demo-plugin',
+        spec: 'agentrig/demo-plugin@1.2.3',
         cwd: '/repo',
         scope: undefined,
         force: false,
         dryRun: false,
-        yes: false,
         help: false,
       },
     })
 
     expect(mocks.resolvePluginGraph).toHaveBeenCalledWith(
-      'demo-plugin',
+      'agentrig/demo-plugin@1.2.3',
       '/repo',
-      [{ name: 'official', url: 'https://agentrig.ai/registry' }],
+      [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
+    )
+    expect(mocks.assertInstallableTrust).toHaveBeenCalledWith(
+      'dep-plugin',
+      '0.1.0',
+      'official',
+      'installable',
     )
     expect(mocks.preparePluginInstall).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -146,24 +171,24 @@ describe('command:plugin install', () => {
     expect(mocks.cleanupMaterializedPlugin).toHaveBeenCalledWith('/tmp/materialized-plugins')
   })
 
-  it('requires explicit confirmation for unlisted sources', async () => {
-    mocks.determineTrustTier.mockResolvedValue('unlisted')
-    mocks.requiresConfirmation.mockReturnValue(true)
+  it('fails fast when trust enforcement rejects a resolved snapshot', async () => {
+    mocks.assertInstallableTrust.mockImplementation(() => {
+      throw new Error('Trust-tier rejection for demo-plugin@1.2.3')
+    })
 
     await expect(
       run({
         args: {
           provider: 'codex',
-          spec: 'demo-plugin',
+          spec: 'agentrig/demo-plugin@1.2.3',
           cwd: '/repo',
           scope: undefined,
           force: false,
           dryRun: false,
-          yes: false,
           help: false,
         },
       }),
-    ).rejects.toThrow(/unlisted sources/i)
+    ).rejects.toThrow(/trust-tier rejection/i)
     expect(mocks.cleanupMaterializedPlugin).not.toHaveBeenCalled()
   })
 })

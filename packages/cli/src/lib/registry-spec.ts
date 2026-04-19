@@ -1,9 +1,15 @@
 const NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
-const ALIASED_PLUGIN_PATTERN = /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)$/
+const PLUGIN_ID_PATTERN =
+  /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
+const SEMVER_PATTERN =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
+const INSTALL_REF_PATTERN =
+  /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)@((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$/
 
 export type ParsedRegistryPluginSpec = {
-  registry: string | null
+  registry: string
   plugin: string
+  version: string
 }
 
 export function isValidRegistryAlias(name: string): boolean {
@@ -11,31 +17,26 @@ export function isValidRegistryAlias(name: string): boolean {
 }
 
 export function isValidPluginId(name: string): boolean {
-  return NAME_PATTERN.test(name)
+  return PLUGIN_ID_PATTERN.test(name)
 }
 
-export function isAliasedPluginSpec(spec: string): boolean {
-  return ALIASED_PLUGIN_PATTERN.test(spec)
+export function isValidExactPluginVersion(version: string): boolean {
+  return SEMVER_PATTERN.test(version)
 }
 
 export function parseRegistryPluginSpec(spec: string): ParsedRegistryPluginSpec {
-  const match = spec.match(ALIASED_PLUGIN_PATTERN)
-  if (match) {
-    return {
-      registry: match[1],
-      plugin: match[2],
-    }
-  }
-
-  if (spec.includes('/')) {
+  const trimmed = spec.trim()
+  const match = trimmed.match(INSTALL_REF_PATTERN)
+  if (!match) {
     throw new Error(
-      `Invalid plugin spec: ${spec}\n` +
-        'Use <plugin-id> for official plugins or <registry-alias>/<plugin-id> for configured registries.'
+      `Invalid install ref: ${spec}\n` +
+        'Use the canonical public install form: <registryAlias>/<namespace.plugin>@<version>.'
     )
   }
 
   return {
-    registry: null,
-    plugin: spec,
+    registry: match[1],
+    plugin: match[2],
+    version: match[3],
   }
 }

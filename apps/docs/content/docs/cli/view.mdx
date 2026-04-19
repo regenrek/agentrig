@@ -9,14 +9,13 @@ icon: Eye
 Inspect a plugin's metadata and install plan without writing files.
 
 ```bash
-agentrig view core-committer
-agentrig view @acme/tauri-rust --json
+agentrig view agentrig/agentrig.core-committer@0.1.0
+agentrig view acme/acme.tauri-rust@1.4.2 --json
 ```
 
 ## Options
 
 - `--cwd <path>` - working directory.
-- `--registry <name|url>` - registry override.
 - `--json` - print structured JSON output.
 
 The command also validates target paths and prints trust tier information.

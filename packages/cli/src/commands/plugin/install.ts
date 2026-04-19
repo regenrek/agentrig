@@ -13,8 +13,8 @@ import {
   parsePluginProviderSelector,
   preparePluginInstall,
 } from '../../lib/plugin-providers'
-import { buildResolvedPluginSpecIdentityMap } from '../../lib/plugin-install-spec'
-import { determineTrustTier, requiresConfirmation } from '../../lib/trust'
+import { buildResolvedPluginInstallMetadataMap } from '../../lib/plugin-install-spec'
+import { assertInstallableTrust } from '../../lib/trust'
 
 function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginInstall>>) {
   console.log('Install plan:')
@@ -45,7 +45,7 @@ const command = defineCommand({
     },
     spec: {
       type: 'positional',
-      description: 'Plugin id, registryAlias/plugin, or a .plugin/plugin.json URL/path',
+      description: 'Canonical install ref: <registryAlias>/<namespace.plugin>@<version>',
       required: true,
     },
     cwd: {
@@ -64,12 +64,6 @@ const command = defineCommand({
     dryRun: {
       type: 'boolean',
       description: 'Show what would be installed without writing files or invoking provider CLIs.',
-      default: false,
-    },
-    yes: {
-      type: 'boolean',
-      alias: 'y',
-      description: 'Skip confirmation prompts for unlisted sources.',
       default: false,
     },
     help: {
@@ -94,32 +88,24 @@ const command = defineCommand({
 
     const cfg = await loadConfig(cwd)
     const graph = await resolvePluginGraph(String(args.spec), cwd, cfg.registries)
-    const unlistedPlugins = []
     for (const resolved of graph.resolvedPlugins) {
-      const trustTier = resolved.trustTier ?? await determineTrustTier(
-        resolved.source.type === 'url' ? resolved.source.baseUrl : resolved.sourceLabel,
-        cfg.registries
-      )
-      if (requiresConfirmation(trustTier)) {
-        unlistedPlugins.push(resolved.manifest.id)
-      }
-    }
-    if (unlistedPlugins.length > 0 && !args.yes) {
-      throw new Error(
-        `This install includes plugin(s) from unlisted sources: ${unlistedPlugins.join(', ')}.\n` +
-          'Re-run with --yes to confirm install.'
+      assertInstallableTrust(
+        resolved.manifest.id,
+        resolved.manifest.version,
+        resolved.trustTier,
+        resolved.installability
       )
     }
 
     const materialized = await materializeResolvedPluginGraph(graph)
-    const specIdentitiesByPluginId = buildResolvedPluginSpecIdentityMap(graph.resolvedPlugins)
+    const installMetadataByPluginId = buildResolvedPluginInstallMetadataMap(graph.resolvedPlugins)
 
     try {
       const plan = await preparePluginInstall({
         cwd,
         agent: provider,
         pluginsDir: materialized.pluginsRoot,
-        specIdentitiesByPluginId,
+        installMetadataByPluginId,
         scope,
         force: args.force,
         dryRun: args.dryRun,

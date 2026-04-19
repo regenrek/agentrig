@@ -1,12 +1,161 @@
+import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { resolvePluginFromRegistryRef } from '../../src/lib/registry'
 import type { RegistryRef } from '../../src/lib/types'
-import {
-  readSourceFile,
-  resolvePluginFromManifestSpec,
-  resolvePluginFromRegistryRef,
-} from '../../src/lib/registry'
 
 const originalFetch = globalThis.fetch
+const registry: RegistryRef = {
+  name: 'agentrig',
+  url: 'https://agentrig.ai/registry',
+}
+const pluginId = 'community.typescript'
+const version = '0.1.0'
+
+function sha256(input: string) {
+  return `sha256:${createHash('sha256').update(Buffer.from(input)).digest('hex')}`
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortKeys(entry))
+  }
+  if (!value || typeof value !== 'object') {
+    return value
+  }
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, sortKeys(entry)])
+  )
+}
+
+function digestJson(value: unknown) {
+  return sha256(JSON.stringify(sortKeys(value)))
+}
+
+function jsonResponse(value: unknown, status = 200) {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: {
+      'content-type': 'application/json',
+    },
+  })
+}
+
+function buildCanonicalArtifacts() {
+  const manifest = {
+    $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+    kind: 'agentrig:plugin' as const,
+    id: pluginId,
+    name: 'TypeScript skill',
+    description: 'TypeScript patterns and guardrails.',
+    version,
+    keywords: ['typescript'],
+    pluginDependencies: ['agentrig.security-check'],
+    configSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {},
+    },
+  }
+  const skillBody = '# TypeScript skill\n'
+  const lockFileDigests = [
+    { path: '.plugin/plugin.json', digest: sha256(JSON.stringify(manifest)) },
+    { path: 'skills/typescript/SKILL.md', digest: sha256(skillBody) },
+  ]
+  const snapshotDigest = digestJson(lockFileDigests)
+  const versionRoot = `plugins/community/typescript/versions/${version}/`
+  const versionRecord = {
+    version,
+    path: versionRoot,
+    manifest: `${versionRoot}.plugin/plugin.json`,
+    source: `${versionRoot}AGENTRIG_SOURCE.json`,
+    lock: `${versionRoot}AGENTRIG_LOCK.json`,
+    review: `${versionRoot}AGENTRIG_REVIEW.json`,
+    trust_tier: 'reviewed',
+    installability: 'installable',
+    snapshot_digest: snapshotDigest,
+    published_at: '2026-04-15T18:30:00Z',
+  } as const
+  const history = {
+    $schema: 'https://agentrig.ai/schema/plugin-history.json',
+    plugin: pluginId,
+    namespace: 'community',
+    name: 'TypeScript skill',
+    description: 'TypeScript patterns and guardrails.',
+    latest_version: version,
+    trust_tier: 'reviewed',
+    installability: 'installable',
+    active_version: versionRecord,
+    keywords: ['typescript'],
+    versions: [versionRecord],
+  }
+  const registryPayload = {
+    $schema: 'https://agentrig.ai/schema/registry.json',
+    contract_version: '1',
+    registry_alias: 'agentrig',
+    source_repository: 'https://github.com/agentrig/agentrig-registry',
+    generated_at: '2026-04-16T11:00:00Z',
+    items: [
+      {
+        plugin: pluginId,
+        name: 'TypeScript skill',
+        description: 'TypeScript patterns and guardrails.',
+        latest_version: version,
+        history: 'plugins/community/typescript/plugin.json',
+        active_version: versionRecord,
+        trust_tier: 'reviewed',
+        installability: 'installable',
+        keywords: ['typescript'],
+      },
+    ],
+  }
+  const registryDocument = {
+    ...registryPayload,
+    signature: {
+      algorithm: 'sha256-json-envelope',
+      key_id: 'agentrig-registry',
+      target: 'registry.json',
+      signed_digest: digestJson(registryPayload),
+    },
+  }
+  const lock = {
+    $schema: 'https://agentrig.ai/schema/agentrig-lock.json',
+    plugin: pluginId,
+    version,
+    file_digests: lockFileDigests,
+    capability_set: [],
+    declared_network_domains: [],
+    declared_secrets: [],
+    runtime_requirements: [],
+    dependencies: [{ plugin: 'agentrig.security-check', version: '0.1.0' }],
+    snapshot_digest: snapshotDigest,
+  }
+  const source = {
+    $schema: 'https://agentrig.ai/schema/agentrig-source.json',
+    upstream_repo: 'https://github.com/community-agents/typescript-skill',
+    upstream_tag: 'v0.1.0',
+    upstream_commit: '3333333333333333333333333333333333333333',
+    plugin_path: 'plugin',
+    submitted_by: 'community-review@agentrig.ai',
+    snapshot_created_at: '2026-04-15T17:45:00Z',
+    snapshot_tree_digest: snapshotDigest,
+  }
+  const review = {
+    $schema: 'https://agentrig.ai/schema/agentrig-review.json',
+    review_status: 'approved',
+    reviewer: 'AgentRig Community Review Team',
+    reviewed_at: '2026-04-15T18:30:00Z',
+    scanner_summary: { status: 'pass', findings: [] },
+    policy_decisions: ['Community plugin passed review.'],
+    trust_tier_basis: {
+      trust_tier: 'reviewed',
+      installability: 'installable',
+      rationale: 'Approved for reviewed-tier installs.',
+    },
+  }
+  return { manifest, registryDocument, history, lock, source, review, snapshotDigest }
+}
 
 describe('registry resolution', () => {
   beforeEach(() => {
@@ -18,77 +167,18 @@ describe('registry resolution', () => {
     vi.restoreAllMocks()
   })
 
-  it('resolves registry plugins via registry.json and manifests/<id>.json', async () => {
+  it('resolves exact registry versions through signed registry and version artifacts', async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const artifacts = buildCanonicalArtifacts()
     fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            name: 'agentrig',
-            homepage: 'https://agentrig.ai',
-            items: [
-              {
-                id: 'demo-plugin',
-                name: 'Demo Plugin',
-                description: 'Demo plugin',
-                version: '1.2.3',
-                kind: 'agentrig:plugin',
-                manifest: 'manifests/demo-plugin.json',
-              },
-            ],
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            latest: '1.2.3',
-            versions: ['1.2.3'],
-            description: 'Demo plugin',
-            trustTier: 'official',
-            paths: {
-              plugin: 'plugins/demo-plugin/1.2.3',
-              manifest: 'manifests/demo-plugin.json',
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            description: 'Demo plugin',
-            version: '1.2.3',
-            kind: 'agentrig:plugin',
-configSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            files: [{ path: 'skills/demo/SKILL.md', sha256: 'a'.repeat(64) }],
-          }),
-          { status: 200 },
-        ),
-      )
+      .mockResolvedValueOnce(jsonResponse(artifacts.registryDocument))
+      .mockResolvedValueOnce(jsonResponse(artifacts.history))
+      .mockResolvedValueOnce(jsonResponse(artifacts.manifest))
+      .mockResolvedValueOnce(jsonResponse(artifacts.lock))
+      .mockResolvedValueOnce(jsonResponse(artifacts.source))
+      .mockResolvedValueOnce(jsonResponse(artifacts.review))
 
-    const registry: RegistryRef = {
-      name: 'official',
-      url: 'https://agentrig.ai/registry',
-    }
-
-    const resolved = await resolvePluginFromRegistryRef(registry, 'demo-plugin')
+    const resolved = await resolvePluginFromRegistryRef(registry, pluginId, version)
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -97,484 +187,126 @@ configSchema: {
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      'https://agentrig.ai/registry/manifests/demo-plugin.json',
+      'https://agentrig.ai/registry/plugins/community/typescript/plugin.json',
       expect.any(Object),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/.plugin/plugin.json',
+      'https://agentrig.ai/registry/plugins/community/typescript/versions/0.1.0/.plugin/plugin.json',
       expect.any(Object),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/.plugin/install.json',
+      'https://agentrig.ai/registry/plugins/community/typescript/versions/0.1.0/AGENTRIG_LOCK.json',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      'https://agentrig.ai/registry/plugins/community/typescript/versions/0.1.0/AGENTRIG_SOURCE.json',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      'https://agentrig.ai/registry/plugins/community/typescript/versions/0.1.0/AGENTRIG_REVIEW.json',
       expect.any(Object),
     )
     expect(resolved.source).toEqual({
       type: 'url',
-      baseUrl: 'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/',
+      baseUrl: 'https://agentrig.ai/registry/plugins/community/typescript/versions/0.1.0/',
     })
-    expect('files' in resolved.manifest).toBe(false)
-    expect(resolved.installMetadata?.files).toEqual([
-      { path: 'skills/demo/SKILL.md', sha256: 'a'.repeat(64) },
+    expect(resolved.trustTier).toBe('reviewed')
+    expect(resolved.installability).toBe('installable')
+    expect(resolved.snapshotDigest).toBe(artifacts.snapshotDigest)
+    expect(resolved.lockArtifact.dependencies).toEqual([
+      { plugin: 'agentrig.security-check', version: '0.1.0' },
     ])
-    expect(resolved.trustTier).toBe('official')
   })
 
-  it('fails closed when registry install metadata is missing', async () => {
+  it('fails when the signed registry digest does not match the unsigned payload', async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            name: 'agentrig',
-            homepage: 'https://agentrig.ai',
-            items: [
-              {
-                id: 'demo-plugin',
-                name: 'Demo Plugin',
-                description: 'Demo plugin',
-                version: '1.2.3',
-                kind: 'agentrig:plugin',
-                manifest: 'manifests/demo-plugin.json',
-              },
-            ],
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            latest: '1.2.3',
-            versions: ['1.2.3'],
-            description: 'Demo plugin',
-            trustTier: 'official',
-            paths: {
-              plugin: 'plugins/demo-plugin/1.2.3',
-              manifest: 'manifests/demo-plugin.json',
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            description: 'Demo plugin',
-            version: '1.2.3',
-            kind: 'agentrig:plugin',
-configSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(new Response('Not found', { status: 404 }))
-
-    await expect(
-      resolvePluginFromRegistryRef(
-        { name: 'official', url: 'https://agentrig.ai/registry' },
-        'demo-plugin',
-      ),
-    ).rejects.toThrow(/install\.json/i)
-  })
-
-  it('fails closed when registry install metadata is invalid', async () => {
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            name: 'agentrig',
-            homepage: 'https://agentrig.ai',
-            items: [
-              {
-                id: 'demo-plugin',
-                name: 'Demo Plugin',
-                description: 'Demo plugin',
-                version: '1.2.3',
-                kind: 'agentrig:plugin',
-                manifest: 'manifests/demo-plugin.json',
-              },
-            ],
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            latest: '1.2.3',
-            versions: ['1.2.3'],
-            description: 'Demo plugin',
-            trustTier: 'official',
-            paths: {
-              plugin: 'plugins/demo-plugin/1.2.3',
-              manifest: 'manifests/demo-plugin.json',
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            description: 'Demo plugin',
-            version: '1.2.3',
-            kind: 'agentrig:plugin',
-configSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ files: 'nope' }), { status: 200 }),
-      )
-
-    await expect(
-      resolvePluginFromRegistryRef(
-        { name: 'official', url: 'https://agentrig.ai/registry' },
-        'demo-plugin',
-      ),
-    ).rejects.toThrow(/files must be an array/i)
-  })
-
-  it('fails closed when registry install metadata is empty', async () => {
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            name: 'agentrig',
-            homepage: 'https://agentrig.ai',
-            items: [
-              {
-                id: 'demo-plugin',
-                name: 'Demo Plugin',
-                description: 'Demo plugin',
-                version: '1.2.3',
-                kind: 'agentrig:plugin',
-                manifest: 'manifests/demo-plugin.json',
-              },
-            ],
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            latest: '1.2.3',
-            versions: ['1.2.3'],
-            description: 'Demo plugin',
-            trustTier: 'official',
-            paths: {
-              plugin: 'plugins/demo-plugin/1.2.3',
-              manifest: 'manifests/demo-plugin.json',
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            description: 'Demo plugin',
-            version: '1.2.3',
-            kind: 'agentrig:plugin',
-configSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ files: [] }), { status: 200 }),
-      )
-
-    await expect(
-      resolvePluginFromRegistryRef(
-        { name: 'official', url: 'https://agentrig.ai/registry' },
-        'demo-plugin',
-      ),
-    ).rejects.toThrow(/must not be empty/i)
-  })
-
-  it('treats direct .plugin/plugin.json URLs as plugin-root relative sources', async () => {
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const artifacts = buildCanonicalArtifacts()
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          id: 'demo-plugin',
-          name: 'Demo Plugin',
-          description: 'Demo plugin',
-          version: '1.2.3',
-          kind: 'agentrig:plugin',
-configSchema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {},
+      jsonResponse({
+        ...artifacts.registryDocument,
+        signature: {
+          ...artifacts.registryDocument.signature,
+          signed_digest: 'sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+        },
+      })
+    )
+
+    await expect(resolvePluginFromRegistryRef(registry, pluginId, version)).rejects.toThrow(
+      /signature verification failed/i
+    )
+  })
+
+  it('fails when the exact requested version is absent from plugin history', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const artifacts = buildCanonicalArtifacts()
+    const modifiedRegistryPayload = {
+      ...artifacts.registryDocument,
+      items: [
+        {
+          ...artifacts.registryDocument.items[0],
+          latest_version: '0.2.0',
+          active_version: {
+            ...artifacts.registryDocument.items[0].active_version,
+            version: '0.2.0',
+            path: 'plugins/community/typescript/versions/0.2.0/',
+            manifest: 'plugins/community/typescript/versions/0.2.0/.plugin/plugin.json',
+            source: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_SOURCE.json',
+            lock: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_LOCK.json',
+            review: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_REVIEW.json',
           },
-        }),
-        { status: 200 },
-      ),
-    )
-    fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ files: [{ path: 'README.md', sha256: 'a'.repeat(64) }] }), {
-        status: 200,
-      }),
-    )
-
-    const resolved = await resolvePluginFromManifestSpec(
-      'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/.plugin/plugin.json',
-      '/repo',
-    )
-
-    expect(resolved.source).toEqual({
-      type: 'url',
-      baseUrl: 'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/',
-    })
-    expect(resolved.installMetadata?.files).toEqual([{ path: 'README.md', sha256: 'a'.repeat(64) }])
-  })
-
-  it('preserves query parameters for direct manifest install metadata and file reads', async () => {
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+        },
+      ],
+    }
     fetchMock
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            description: 'Demo plugin',
-            version: '1.2.3',
-            kind: 'agentrig:plugin',
-            configSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ files: [{ path: 'README.md', sha256: 'a'.repeat(64) }] }), {
-          status: 200,
-        }),
-      )
-      .mockResolvedValueOnce(new Response('# Demo Plugin\n', { status: 200 }))
-
-    const resolved = await resolvePluginFromManifestSpec(
-      'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/.plugin/plugin.json?token=secret',
-      '/repo',
-    )
-
-    const bytes = await readSourceFile(resolved.source, 'README.md')
-
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/.plugin/plugin.json?token=secret',
-      expect.any(Object),
-    )
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/.plugin/install.json?token=secret',
-      expect.any(Object),
-    )
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
-      'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/README.md?token=secret',
-      expect.any(Object),
-    )
-    expect(new TextDecoder().decode(bytes)).toBe('# Demo Plugin\n')
-  })
-
-  it('fails closed when direct plugin manifest URLs are missing install metadata', async () => {
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'demo-plugin',
-            name: 'Demo Plugin',
-            description: 'Demo plugin',
-            version: '1.2.3',
-            kind: 'agentrig:plugin',
-configSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-            },
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(new Response('Not found', { status: 404 }))
-
-    await expect(
-      resolvePluginFromManifestSpec(
-        'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/.plugin/plugin.json',
-        '/repo',
-      ),
-    ).rejects.toThrow(/install\.json/i)
-  })
-
-  it('rejects remote manifest URLs that do not point to /.plugin/plugin.json', async () => {
-    await expect(
-      resolvePluginFromManifestSpec(
-        'https://agentrig.ai/registry/plugins/demo-plugin/1.2.3/manifest.json',
-        '/repo',
-      ),
-    ).rejects.toThrow(/must point to \/\.plugin\/plugin\.json/i)
-  })
-
-  it('falls back to canonical local source files when a manifest path has no install.json', async () => {
-    const fs = await import('node:fs/promises')
-    const os = await import('node:os')
-    const path = await import('node:path')
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'agentrig-local-plugin-'))
-    try {
-      const pluginRoot = path.join(tempRoot, 'demo-plugin')
-      await fs.mkdir(path.join(pluginRoot, '.plugin'), { recursive: true })
-      await fs.mkdir(path.join(pluginRoot, 'skills', 'demo'), { recursive: true })
-      await fs.mkdir(path.join(pluginRoot, 'scripts'), { recursive: true })
-      await fs.writeFile(
-        path.join(pluginRoot, '.plugin', 'plugin.json'),
-        JSON.stringify({
-          id: 'demo-plugin',
-          name: 'Demo Plugin',
-          description: 'Demo plugin',
-          version: '1.0.0',
-          kind: 'agentrig:plugin',
-          configSchema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {},
+        jsonResponse({
+          ...modifiedRegistryPayload,
+          signature: {
+            ...modifiedRegistryPayload.signature,
+            signed_digest: digestJson({
+              $schema: modifiedRegistryPayload.$schema,
+              contract_version: modifiedRegistryPayload.contract_version,
+              registry_alias: modifiedRegistryPayload.registry_alias,
+              source_repository: modifiedRegistryPayload.source_repository,
+              generated_at: modifiedRegistryPayload.generated_at,
+              items: modifiedRegistryPayload.items,
+            }),
           },
         })
       )
-      await fs.writeFile(path.join(pluginRoot, 'skills', 'demo', 'SKILL.md'), '# Demo skill\n')
-      await fs.writeFile(path.join(pluginRoot, 'scripts', 'run.sh'), '#!/usr/bin/env bash\necho demo\n')
-      await fs.writeFile(path.join(pluginRoot, 'LICENSE'), 'MIT\n')
-      await fs.writeFile(path.join(pluginRoot, 'notes.txt'), 'ignore me\n')
-      await fs.chmod(path.join(pluginRoot, 'scripts', 'run.sh'), 0o755)
-
-      const resolved = await resolvePluginFromManifestSpec(
-        path.join(pluginRoot, '.plugin', 'plugin.json'),
-        '/repo'
-      )
-
-      expect(resolved.installMetadata?.files).toEqual([
-        { path: 'LICENSE', mode: undefined },
-        { path: 'scripts/run.sh', mode: '755' },
-        { path: 'skills/demo/SKILL.md', mode: undefined },
-      ])
-    } finally {
-      await fs.rm(tempRoot, { recursive: true, force: true })
-    }
-  })
-
-  it('fails when local install metadata exists but is invalid', async () => {
-    const fs = await import('node:fs/promises')
-    const os = await import('node:os')
-    const path = await import('node:path')
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'agentrig-local-plugin-'))
-    try {
-      const pluginRoot = path.join(tempRoot, 'demo-plugin')
-      await fs.mkdir(path.join(pluginRoot, '.plugin'), { recursive: true })
-      await fs.writeFile(
-        path.join(pluginRoot, '.plugin', 'plugin.json'),
-        JSON.stringify({
-          id: 'demo-plugin',
-          name: 'Demo Plugin',
-          description: 'Demo plugin',
-          version: '1.0.0',
-          kind: 'agentrig:plugin',
-          configSchema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {},
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...artifacts.history,
+          latest_version: '0.2.0',
+          active_version: {
+            ...artifacts.history.active_version,
+            version: '0.2.0',
+            path: 'plugins/community/typescript/versions/0.2.0/',
+            manifest: 'plugins/community/typescript/versions/0.2.0/.plugin/plugin.json',
+            source: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_SOURCE.json',
+            lock: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_LOCK.json',
+            review: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_REVIEW.json',
           },
-        }),
-      )
-      await fs.writeFile(path.join(pluginRoot, '.plugin', 'install.json'), JSON.stringify({ files: 'bad' }))
-
-      await expect(
-        resolvePluginFromManifestSpec(path.join(pluginRoot, '.plugin', 'plugin.json'), '/repo'),
-      ).rejects.toThrow(/files must be an array/i)
-    } finally {
-      await fs.rm(tempRoot, { recursive: true, force: true })
-    }
-  })
-
-  it('fails when registry history manifest id does not match the requested plugin', async () => {
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            name: 'agentrig',
-            homepage: 'https://agentrig.ai',
-            items: [
-              {
-                id: 'demo-plugin',
-                name: 'Demo Plugin',
-                description: 'Demo plugin',
-                version: '1.2.3',
-                kind: 'agentrig:plugin',
-                manifest: 'manifests/demo-plugin.json',
-              },
-            ],
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'other-plugin',
-            name: 'Demo Plugin',
-            latest: '1.2.3',
-            versions: ['1.2.3'],
-            description: 'Demo plugin',
-            trustTier: 'official',
-            paths: {
-              plugin: 'plugins/demo-plugin/1.2.3',
-              manifest: 'manifests/demo-plugin.json',
+          versions: [
+            {
+              ...artifacts.history.active_version,
+              version: '0.2.0',
+              path: 'plugins/community/typescript/versions/0.2.0/',
+              manifest: 'plugins/community/typescript/versions/0.2.0/.plugin/plugin.json',
+              source: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_SOURCE.json',
+              lock: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_LOCK.json',
+              review: 'plugins/community/typescript/versions/0.2.0/AGENTRIG_REVIEW.json',
             },
-          }),
-          { status: 200 },
-        ),
+          ],
+        })
       )
 
-    await expect(
-      resolvePluginFromRegistryRef(
-        { name: 'official', url: 'https://agentrig.ai/registry' },
-        'demo-plugin',
-      ),
-    ).rejects.toThrow(/manifest id mismatch/i)
+    await expect(resolvePluginFromRegistryRef(registry, pluginId, version)).rejects.toThrow(
+      /unknown version/i
+    )
   })
 })

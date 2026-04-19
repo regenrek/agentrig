@@ -10,7 +10,7 @@ import {
 } from '../../lib/plugin-consumer'
 import { loadPluginInstallLedgers, listPluginInstallRecords } from '../../lib/plugin-install-ledger'
 import {
-  buildResolvedPluginSpecIdentityMap,
+  buildResolvedPluginInstallMetadataMap,
   getPluginInstallSpecIdentityKey,
 } from '../../lib/plugin-install-spec'
 import {
@@ -20,7 +20,7 @@ import {
   preparePluginInstall,
   uninstallPluginProviders,
 } from '../../lib/plugin-providers'
-import { determineTrustTier, requiresConfirmation } from '../../lib/trust'
+import { assertInstallableTrust } from '../../lib/trust'
 import type { ResolvedPlugin } from '../../lib/registry'
 
 function resolveRigPlugins(
@@ -84,12 +84,6 @@ const args = {
   dryRun: {
     type: 'boolean',
     description: 'Show what would happen without writing files or invoking provider CLIs.',
-    default: false,
-  },
-  yes: {
-    type: 'boolean',
-    alias: 'y',
-    description: 'Skip confirmation prompts for unlisted sources.',
     default: false,
   },
   help: {
@@ -181,20 +175,12 @@ const command = defineCommand({
       graphs.push(await resolvePluginGraph(pluginSpec, cwd, cfg.registries))
     }
     const resolvedPlugins = mergePluginGraphs(graphs)
-    const unlistedPlugins: string[] = []
     for (const resolved of resolvedPlugins) {
-      const trustTier = resolved.trustTier ?? await determineTrustTier(
-        resolved.source.type === 'url' ? resolved.source.baseUrl : resolved.sourceLabel,
-        cfg.registries
-      )
-      if (requiresConfirmation(trustTier)) {
-        unlistedPlugins.push(resolved.manifest.id)
-      }
-    }
-    if (unlistedPlugins.length > 0 && !args.yes) {
-      throw new Error(
-        `This rig includes plugin(s) from unlisted sources: ${unlistedPlugins.join(', ')}.\n` +
-          'Re-run with --yes to confirm install.'
+      assertInstallableTrust(
+        resolved.manifest.id,
+        resolved.manifest.version,
+        resolved.trustTier,
+        resolved.installability
       )
     }
 
@@ -202,14 +188,14 @@ const command = defineCommand({
       requestedPlugin: graphs[0]!.requestedPlugin,
       resolvedPlugins,
     })
-    const specIdentitiesByPluginId = buildResolvedPluginSpecIdentityMap(resolvedPlugins)
+    const installMetadataByPluginId = buildResolvedPluginInstallMetadataMap(resolvedPlugins)
 
     try {
       const plan = await preparePluginInstall({
         cwd,
         agent: provider,
         pluginsDir: materialized.pluginsRoot,
-        specIdentitiesByPluginId,
+        installMetadataByPluginId,
         scope,
         force: args.force,
         dryRun: args.dryRun,
@@ -230,8 +216,8 @@ const command = defineCommand({
       const effectiveScope = plan.providers[0]?.scope
       if (args.prune && effectiveScope) {
         const want = new Set(
-          Object.values(specIdentitiesByPluginId).map((identity) =>
-            getPluginInstallSpecIdentityKey(identity)
+          Object.values(installMetadataByPluginId).map((entry) =>
+            getPluginInstallSpecIdentityKey(entry.specIdentity)
           )
         )
         const ledgers = await loadPluginInstallLedgers(cwd)

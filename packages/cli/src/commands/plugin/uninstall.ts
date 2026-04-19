@@ -4,43 +4,14 @@ import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../../lib/config'
 import { loadPluginInstallLedgers, listPluginInstallRecords } from '../../lib/plugin-install-ledger'
 import {
-  getPluginInstallSpecIdentityKey,
   isSamePluginInstallSpecIdentity,
   normalizePluginInstallSpecIdentity,
 } from '../../lib/plugin-install-spec'
-import { resolvePluginSpec } from '../../lib/plugin-resolver'
-import { parseRegistryPluginSpec } from '../../lib/registry-spec'
 import {
   parsePluginInstallScopeSelector,
   parsePluginProviderSelector,
   uninstallPluginProviders,
 } from '../../lib/plugin-providers'
-import type { PluginInstallRecord, RegistryRef } from '../../lib/types'
-
-function resolveUninstallSpecIdentity(
-  spec: string,
-  cwd: string,
-  registries: RegistryRef[],
-  records: PluginInstallRecord[]
-) {
-  try {
-    return normalizePluginInstallSpecIdentity(spec, cwd, registries)
-  } catch (error) {
-    const parsed = parseRegistryPluginSpec(spec)
-    const matches = records.filter(
-      (record) => record.specIdentity.kind === 'registry' && record.specIdentity.pluginId === parsed.plugin
-    )
-    const identities = [
-      ...new Map(
-        matches.map((record) => [getPluginInstallSpecIdentityKey(record.specIdentity), record.specIdentity])
-      ).values(),
-    ]
-    if (identities.length === 1) {
-      return identities[0]
-    }
-    throw error
-  }
-}
 
 function printUninstallPlan(
   provider: string,
@@ -73,7 +44,7 @@ const command = defineCommand({
     },
     spec: {
       type: 'positional',
-      description: 'Plugin id, registryAlias/plugin, or a .plugin/plugin.json URL/path',
+      description: 'Canonical install ref: <registryAlias>/<namespace.plugin>@<version>',
       required: true,
     },
     cwd: {
@@ -115,23 +86,9 @@ const command = defineCommand({
 
     const ledgers = await loadPluginInstallLedgers(cwd)
     const allRecords = listPluginInstallRecords(ledgers, scope)
-    const providerRecords = allRecords.filter(
-      (record) => record.provider === provider && (!scope || record.scope === scope)
-    )
     const cfg = await loadConfig(cwd)
-    const specIdentity = resolveUninstallSpecIdentity(spec, cwd, cfg.registries, providerRecords)
-    let pluginId = specIdentity.kind === 'registry' ? specIdentity.pluginId : spec
-    try {
-      const resolved = await resolvePluginSpec(spec, cwd, cfg.registries)
-      pluginId = resolved.manifest.id
-    } catch {
-      const matchedRecord = providerRecords.find((record) =>
-        isSamePluginInstallSpecIdentity(record.specIdentity, specIdentity)
-      )
-      if (matchedRecord) {
-        pluginId = matchedRecord.pluginId
-      }
-    }
+    const specIdentity = normalizePluginInstallSpecIdentity(spec, cwd, cfg.registries)
+    const pluginId = specIdentity.pluginId
     const matchingRecords = allRecords.filter(
       (record) =>
         record.provider === provider &&

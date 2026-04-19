@@ -26,10 +26,10 @@ agentrig plugin create . --out .plugin/plugin.json
 
 ## 4. Test locally
 
-Install your plugin from the local `.plugin/plugin.json` as a provider plugin:
+Keep local author testing separate from the public install surface by exporting a provider-native marketplace from your plugin directory:
 
 ```bash
-agentrig plugin install codex ./my-skill-plugin/.plugin/plugin.json --yes
+agentrig plugin export --agent codex --pluginsDir . --plugin my-skill-plugin --out dist/codex-marketplace
 ```
 
 ## 5. Publish

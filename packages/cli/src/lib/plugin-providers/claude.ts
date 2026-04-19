@@ -122,7 +122,7 @@ export const claudeProvider: PluginProviderAdapter = {
       ],
     }
   },
-  async install({ result, dryRun, runner, scope, requestedScope, specIdentitiesByPluginId }) {
+  async install({ result, dryRun, runner, scope, requestedScope, installMetadataByPluginId }) {
     const installed: string[] = []
     const skipped: string[] = []
     const locations = [result.outRoot]
@@ -152,9 +152,9 @@ export const claudeProvider: PluginProviderAdapter = {
     }
 
     for (const plugin of result.plugins) {
-      const specIdentity = specIdentitiesByPluginId[plugin.manifest.id]
-      if (!specIdentity) {
-        throw new Error(`Missing install spec identity for plugin: ${plugin.manifest.id}`)
+      const installMetadata = installMetadataByPluginId[plugin.manifest.id]
+      if (!installMetadata) {
+        throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
       }
       const pluginRef = `${plugin.pluginName}@${result.marketplaceName}`
       await runner('claude', ['plugin', 'install', pluginRef, '--scope', scopeArg])
@@ -163,12 +163,13 @@ export const claudeProvider: PluginProviderAdapter = {
         id: getPluginInstallRecordId('claude', scope, plugin.pluginName),
         provider: 'claude',
         requestedScope,
-        specIdentity,
+        specIdentity: installMetadata.specIdentity,
+        registry: installMetadata.registry,
         scope,
         pluginId: plugin.manifest.id,
         pluginVersion: plugin.manifest.version,
+        snapshotDigest: installMetadata.snapshotDigest,
         pluginName: plugin.pluginName,
-        sourceLocation: result.outRoot,
         targetPaths: [result.outRoot],
         installedAt: new Date().toISOString(),
         files: [],

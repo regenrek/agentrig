@@ -12,11 +12,14 @@ Rigs are stored under the `rigs` key in your config file.
 {
   "rigs": {
     "core": {
-      "plugins": ["core-committer", "security-check"]
+      "plugins": [
+        "agentrig/agentrig.core-committer@0.1.0",
+        "agentrig/agentrig.security-check@0.1.0"
+      ]
     },
     "tauri-agentic": {
       "extends": ["core"],
-      "plugins": ["rust", "solidjs"]
+      "plugins": ["agentrig/community.typescript@0.1.0"]
     }
   },
   "defaultRig": "core"
@@ -25,6 +28,6 @@ Rigs are stored under the `rigs` key in your config file.
 
 ## Fields
 
-- `plugins` - list of plugins to install.
+- `plugins` - list of canonical install refs to install.
 - `extends` - list of parent rigs to merge in order.
 - `defaultRig` - used when you run `agentrig rig apply` without a name.

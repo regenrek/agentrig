@@ -34,8 +34,8 @@ If you want to install a plugin from the official registry:
 ```bash
 agentrig init
 agentrig list --available
-agentrig view core-committer
-agentrig plugin install codex core-committer
+agentrig view agentrig/agentrig.core-committer@0.1.0
+agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
 ```
 
 `agentrig init` seeds your config with the official registry. `agentrig list` shows what you already have installed, while `agentrig list --available` shows plugins you can install.
@@ -47,16 +47,20 @@ If a team or publisher gives you a registry URL, add it explicitly and install f
 ```bash
 agentrig registry add georg https://georg.dev/agentrig
 agentrig list --available --registry georg
-agentrig plugin install cursor georg/ts-master-plugin
+agentrig plugin install cursor georg/georg.ts-master-plugin@1.2.0
 ```
 
-## Install From A Local File Or URL
+## Public Install Contract
 
-If you already have a plugin `.plugin/plugin.json`, you can install it directly. Local files and direct URLs are treated as unlisted sources and require confirmation:
+Public installs are registry-only:
 
-```bash
-agentrig plugin install codex ./my-plugin/.plugin/plugin.json --yes
-```
+- exact registry alias
+- exact plugin id
+- exact version
+- exact signed registry state
+- exact digest-verified plugin snapshot
+
+Direct URLs, local `.plugin/plugin.json` paths, ZIPs, and author repos are not part of the public install surface.
 
 ## Quick Vocabulary
 
@@ -65,21 +69,19 @@ agentrig plugin install codex ./my-plugin/.plugin/plugin.json --yes
 - A `provider` is where the plugin gets installed: Claude Code, Codex, or Cursor.
 - A `rig` is an advanced team setup that applies multiple plugins together.
 
-AgentRig can resolve a plugin from:
+AgentRig publicly installs plugins only from static signed registries via:
 
-- the seeded `official` registry
-- an added third-party registry via `registryAlias/plugin-name`
-- a direct `.plugin/plugin.json` URL
-- a direct local `.plugin/plugin.json` path
+- the seeded `agentrig` registry
+- an added third-party registry via `<registryAlias>/<namespace.plugin>@<version>`
 
 ## Install Or Remove A Plugin
 
 Once a plugin resolves, you can install or uninstall it for a provider:
 
 ```bash
-agentrig plugin install claude core-committer
-agentrig plugin install codex georg/ts-master-plugin --scope workspace
-agentrig plugin uninstall codex georg/ts-master-plugin --scope workspace
+agentrig plugin install claude agentrig/agentrig.core-committer@0.1.0
+agentrig plugin install codex georg/georg.ts-master-plugin@1.2.0 --scope workspace
+agentrig plugin uninstall codex georg/georg.ts-master-plugin@1.2.0 --scope workspace
 ```
 
 `--scope` controls where the native plugin is installed:

@@ -1,4 +1,5 @@
 import { execFile as execFileCallback } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -11,6 +12,7 @@ import type {
   PluginInstallSpecIdentity,
   PluginInstalledFile,
   PluginInstallScopeSelectorName,
+  VerifiedRegistryIdentity,
 } from '../types'
 
 const execFile = promisify(execFileCallback)
@@ -147,9 +149,15 @@ export type PluginExportOptions = {
 
 export type ExternalCommandRunner = (command: string, args: string[]) => Promise<void>
 
+export type ResolvedPluginInstallMetadata = {
+  specIdentity: PluginInstallSpecIdentity
+  registry: VerifiedRegistryIdentity
+  snapshotDigest: string
+}
+
 export type PluginInstallOptions = PluginExportOptions & {
   scope?: PluginInstallScopeSelector
-  specIdentitiesByPluginId: Record<string, PluginInstallSpecIdentity>
+  installMetadataByPluginId: Record<string, ResolvedPluginInstallMetadata>
   force?: boolean
   dryRun?: boolean
   commandRunner?: ExternalCommandRunner
@@ -171,7 +179,7 @@ export type PreparedPluginInstall = {
   clean: boolean
   force: boolean
   dryRun: boolean
-  specIdentitiesByPluginId: Record<string, PluginInstallSpecIdentity>
+  installMetadataByPluginId: Record<string, ResolvedPluginInstallMetadata>
   requestedScope: PluginInstallScopeSelector
   providers: PreparedProviderInstall[]
   commandRunner: ExternalCommandRunner
@@ -212,7 +220,7 @@ export type ProviderInstallContext = {
   cfg: ResolvedPluginConfig
   scope: PluginInstallScope
   requestedScope: PluginInstallScopeSelector
-  specIdentitiesByPluginId: Record<string, PluginInstallSpecIdentity>
+  installMetadataByPluginId: Record<string, ResolvedPluginInstallMetadata>
   force: boolean
   dryRun: boolean
   runner: ExternalCommandRunner
@@ -592,24 +600,48 @@ export async function copyInstalledPlugin(
     return { changed: false, files: [] }
   }
 
-  if (exists && force) {
-    await fs.rm(destinationDir, { recursive: true, force: true })
-  }
-
   const relativeFiles = await walkFiles(sourceDir)
-  await ensureDir(destinationDir)
+  const destinationParent = path.dirname(destinationDir)
+  const destinationBase = path.basename(destinationDir)
+  await ensureDir(destinationParent)
+  const stagingDir = await fs.mkdtemp(path.join(destinationParent, `${destinationBase}.staging-`))
 
   const files: PluginInstalledFile[] = []
-  for (const relativeFile of relativeFiles) {
-    const sourcePath = path.join(sourceDir, relativeFile)
-    const destinationPath = path.join(destinationDir, relativeFile)
-    const bytes = await fs.readFile(sourcePath)
-    await ensureDir(path.dirname(destinationPath))
-    await fs.writeFile(destinationPath, bytes)
-    files.push({
-      path: destinationPath,
-      sha256: sha256Hex(bytes),
-    })
+  try {
+    for (const relativeFile of relativeFiles) {
+      const sourcePath = path.join(sourceDir, relativeFile)
+      const destinationPath = path.join(stagingDir, relativeFile)
+      const bytes = await fs.readFile(sourcePath)
+      await ensureDir(path.dirname(destinationPath))
+      await fs.writeFile(destinationPath, bytes)
+      files.push({
+        path: path.join(destinationDir, relativeFile),
+        sha256: sha256Hex(bytes),
+      })
+    }
+
+    const backupDir = exists
+      ? path.join(destinationParent, `${destinationBase}.backup-${randomUUID()}`)
+      : null
+    if (backupDir) {
+      await fs.rename(destinationDir, backupDir)
+    }
+
+    try {
+      await fs.rename(stagingDir, destinationDir)
+    } catch (error) {
+      if (backupDir && !(await pathExists(destinationDir))) {
+        await fs.rename(backupDir, destinationDir).catch(() => {})
+      }
+      throw error
+    }
+
+    if (backupDir) {
+      await fs.rm(backupDir, { recursive: true, force: true })
+    }
+  } catch (error) {
+    await fs.rm(stagingDir, { recursive: true, force: true }).catch(() => {})
+    throw error
   }
 
   return {

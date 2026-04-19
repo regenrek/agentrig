@@ -3,7 +3,13 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../lib/config'
 import { loadPluginInstallLedgers, listPluginInstallRecords } from '../lib/plugin-install-ledger'
-import { isUrl, readRegistryIndex } from '../lib/registry'
+import {
+  OFFICIAL_REGISTRY_ALIAS,
+  OFFICIAL_REGISTRY_URL,
+  readRegistryIndex,
+  resolveConfiguredRegistry,
+} from '../lib/registry'
+import type { RegistryRef } from '../lib/types'
 
 const args = {
   cwd: {
@@ -22,7 +28,7 @@ const args = {
   },
   registry: {
     type: 'string',
-    description: 'Registry alias (from config) or a registry base URL',
+    description: 'Registry alias (from config)',
   },
   help: {
     type: 'boolean',
@@ -61,39 +67,35 @@ const command = defineCommand({
 
     if (!args.available) return
 
-    const registryUrls: string[] = []
+    const registries: RegistryRef[] = []
     if (args.registry) {
-      if (isUrl(args.registry)) registryUrls.push(args.registry)
-      else {
-        const match = cfg.registries.find((r) => r.name === args.registry)
-        if (!match) {
-          throw new Error(
-            `Registry "${args.registry}" is not configured. Add it first with:\n` +
-              `agentrig registry add ${args.registry} <baseUrl>`
-          )
-        }
-        registryUrls.push(match.url)
-      }
+      registries.push(resolveConfiguredRegistry(String(args.registry), cfg.registries))
+    } else if (cfg.registries.length > 0) {
+      registries.push(...cfg.registries.map((registry) => resolveConfiguredRegistry(registry.name, cfg.registries)))
     } else {
-      for (const r of cfg.registries) registryUrls.push(r.url)
+      registries.push({
+        name: OFFICIAL_REGISTRY_ALIAS,
+        url: OFFICIAL_REGISTRY_URL,
+      })
     }
 
-    if (!registryUrls.length) {
+    if (!registries.length) {
       console.log('No registries configured. Add one in agentrig.config.json or global config.')
       return
     }
 
-    for (const base of registryUrls) {
-      console.log(`Available plugins in: ${base}`)
+    for (const registry of registries) {
+      console.log(`Available plugins in: ${registry.name} (${registry.url})`)
       try {
-        const index = await readRegistryIndex(base)
+        const index = await readRegistryIndex(registry)
         if (!index.items?.length) {
           console.log('  (no items)')
           continue
         }
         for (const item of index.items) {
-          const v = item.version ? `@${item.version}` : ''
-          console.log(`  - ${item.id}${v}  ${item.name}`)
+          console.log(
+            `  - ${registry.name}/${item.plugin}@${item.latest_version}  ${item.name} [${item.trust_tier}]`
+          )
         }
       } catch (e) {
         console.log(`  Error: ${String(e)}`)

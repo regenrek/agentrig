@@ -37,10 +37,10 @@ agentrig plugin create . --out .plugin/plugin.json
 
 ## Test locally
 
-Install your local plugin from its `.plugin/plugin.json` as a provider plugin:
+Keep author testing on the local export surface instead of the public install command:
 
 ```bash
-agentrig plugin install codex ./hello-skills/.plugin/plugin.json --yes
+agentrig plugin export --agent codex --pluginsDir . --plugin hello-skills --out dist/codex-marketplace
 ```
 
 Next, learn about [`.plugin/plugin.json`](/plugins/meta-json) and [`agentrig plugin`](/cli/plugin).

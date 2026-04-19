@@ -6,8 +6,6 @@ const mocks = vi.hoisted(() => ({
   listPluginInstallRecords: vi.fn(),
   normalizePluginInstallSpecIdentity: vi.fn(),
   isSamePluginInstallSpecIdentity: vi.fn(),
-  getPluginInstallSpecIdentityKey: vi.fn(),
-  resolvePluginSpec: vi.fn(),
   parsePluginProviderSelector: vi.fn(),
   parsePluginInstallScopeSelector: vi.fn(),
   uninstallPluginProviders: vi.fn(),
@@ -25,11 +23,6 @@ vi.mock('../../src/lib/plugin-install-ledger', () => ({
 vi.mock('../../src/lib/plugin-install-spec', () => ({
   normalizePluginInstallSpecIdentity: mocks.normalizePluginInstallSpecIdentity,
   isSamePluginInstallSpecIdentity: mocks.isSamePluginInstallSpecIdentity,
-  getPluginInstallSpecIdentityKey: mocks.getPluginInstallSpecIdentityKey,
-}))
-
-vi.mock('../../src/lib/plugin-resolver', () => ({
-  resolvePluginSpec: mocks.resolvePluginSpec,
 }))
 
 vi.mock('../../src/lib/plugin-providers', () => ({
@@ -48,17 +41,17 @@ describe('command:plugin uninstall', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     mocks.parsePluginProviderSelector.mockReturnValue('cursor')
     mocks.loadPluginInstallLedgers.mockResolvedValue({})
-    mocks.loadConfig.mockResolvedValue({ registries: [{ name: 'official', url: 'https://agentrig.ai/registry' }] })
+    mocks.loadConfig.mockResolvedValue({ registries: [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }] })
     mocks.normalizePluginInstallSpecIdentity.mockReturnValue({
       kind: 'registry',
+      registryAlias: 'agentrig',
       registryUrl: 'https://agentrig.ai/registry',
       pluginId: 'demo-plugin',
+      version: '1.2.3',
     })
     mocks.isSamePluginInstallSpecIdentity.mockImplementation(
-      (left: { pluginId?: string }, right: { pluginId?: string }) => left.pluginId === right.pluginId,
-    )
-    mocks.getPluginInstallSpecIdentityKey.mockImplementation(
-      (identity: { pluginId?: string }) => identity.pluginId ?? 'unknown',
+      (left: { pluginId?: string; version?: string }, right: { pluginId?: string; version?: string }) =>
+        left.pluginId === right.pluginId && left.version === right.version,
     )
     mocks.listPluginInstallRecords.mockReturnValue([
       {
@@ -69,17 +62,13 @@ describe('command:plugin uninstall', () => {
         targetPaths: ['/repo/.cursor/plugins/local/demo-plugin'],
         specIdentity: {
           kind: 'registry',
+          registryAlias: 'agentrig',
           registryUrl: 'https://agentrig.ai/registry',
           pluginId: 'demo-plugin',
+          version: '1.2.3',
         },
       },
     ])
-    mocks.resolvePluginSpec.mockResolvedValue({
-      manifest: {
-        id: 'demo-plugin',
-        name: 'Demo Plugin',
-      },
-    })
     mocks.uninstallPluginProviders.mockResolvedValue([
       {
         provider: 'cursor',
@@ -91,11 +80,11 @@ describe('command:plugin uninstall', () => {
     ])
   })
 
-  it('matches uninstall records by canonical plugin id', async () => {
+  it('matches uninstall records by canonical registry install ref', async () => {
     await run({
       args: {
         provider: 'cursor',
-        spec: 'demo-plugin',
+        spec: 'agentrig/demo-plugin@1.2.3',
         cwd: '/repo',
         scope: undefined,
         dryRun: false,
@@ -103,10 +92,10 @@ describe('command:plugin uninstall', () => {
       },
     })
 
-    expect(mocks.resolvePluginSpec).toHaveBeenCalledWith(
-      'demo-plugin',
+    expect(mocks.normalizePluginInstallSpecIdentity).toHaveBeenCalledWith(
+      'agentrig/demo-plugin@1.2.3',
       '/repo',
-      [{ name: 'official', url: 'https://agentrig.ai/registry' }],
+      [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
     )
     expect(mocks.uninstallPluginProviders).toHaveBeenCalledWith(
       [

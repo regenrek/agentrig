@@ -1,3 +1,8 @@
+import type {
+  CanonicalTrustTier,
+  InstallabilityState,
+} from './registry-contract'
+
 export type RegistryRef = {
   name: string
   url: string
@@ -5,12 +10,12 @@ export type RegistryRef = {
 
 export type RigDefinition = {
   extends?: string[]
-  /** Plugin specs: official plugin, registryAlias/plugin, or explicit manifest spec */
+  /** Canonical public install refs: <registryAlias>/<namespace.plugin>@<version> */
   plugins?: string[]
 }
 
 /**
- * Directory index entry for a community registry.
+ * Directory entry for a listed registry or discovery catalog.
  */
 export type DirectoryEntry = {
   name: string
@@ -22,10 +27,8 @@ export type DirectoryEntry = {
   tags?: string[]
 }
 
-/**
- * Trust tier for registry sources.
- */
-export type TrustTier = 'official' | 'listed' | 'unlisted'
+export type TrustTier = CanonicalTrustTier
+export type RegistryInstallability = InstallabilityState
 
 export type AgentRigConfig = {
   $schema?: string
@@ -34,35 +37,115 @@ export type AgentRigConfig = {
   defaultRig?: string
 }
 
-export type RegistryIndexItem = {
-  id: string
+export type PluginFile = {
+  /** File path in the plugin source */
+  path: string
+  /** sha256 integrity hash with algorithm prefix */
+  digest: string
+}
+
+export type RegistryVersionDependency = {
+  plugin: string
+  version: string
+}
+
+export type RegistrySignatureEnvelope = {
+  algorithm: string
+  key_id: string
+  target: string
+  signed_digest: string
+}
+
+export type RegistryVersionRecord = {
+  version: string
+  path: string
+  manifest: string
+  source: string
+  lock: string
+  review: string
+  trust_tier: TrustTier
+  installability: RegistryInstallability
+  snapshot_digest: string
+  published_at: string
+}
+
+export type RegistryHistory = {
+  $schema?: string
+  plugin: string
+  namespace: string
   name: string
   description: string
-  version?: string
+  latest_version: string
+  trust_tier: TrustTier
+  installability: RegistryInstallability
+  active_version: RegistryVersionRecord
   keywords?: string[]
-  manifest: string
+  advisories?: string[]
+  versions: RegistryVersionRecord[]
+}
+
+export type RegistryIndexItem = {
+  plugin: string
+  name: string
+  description: string
+  latest_version: string
+  history: string
+  active_version: RegistryVersionRecord
+  trust_tier: TrustTier
+  installability: RegistryInstallability
+  keywords?: string[]
+  advisories?: string[]
 }
 
 export type RegistryIndex = {
   $schema?: string
-  name: string
-  homepage?: string
-  generatedAt?: string
+  contract_version: string
+  registry_alias: string
+  source_repository: string
+  generated_at: string
+  signature: RegistrySignatureEnvelope
   items: RegistryIndexItem[]
 }
 
-export type PluginFile = {
-  /** File path in the plugin source (registry, repo, local folder) */
-  path: string
-  /** Optional file mode as a string, ex: "755" */
-  mode?: string
-  /** Optional sha256 integrity hash (hex) */
-  sha256?: string
+export type RegistryLock = {
+  $schema?: string
+  plugin: string
+  version: string
+  file_digests: PluginFile[]
+  capability_set: string[]
+  declared_network_domains: string[]
+  declared_secrets: string[]
+  runtime_requirements: string[]
+  dependencies: RegistryVersionDependency[]
+  snapshot_digest: string
 }
 
-export type PluginInstallMetadata = {
+export type RegistrySource = {
   $schema?: string
-  files: PluginFile[]
+  upstream_repo: string
+  upstream_tag: string
+  upstream_commit: string
+  plugin_path: string
+  submitted_by: string
+  snapshot_created_at: string
+  snapshot_tree_digest: string
+}
+
+export type RegistryReview = {
+  $schema?: string
+  review_status: string
+  reviewer: string
+  reviewed_at: string
+  scanner_summary: {
+    status: string
+    findings?: string[]
+  }
+  policy_decisions: string[]
+  trust_tier_basis: {
+    trust_tier: TrustTier
+    installability: RegistryInstallability
+    rationale: string
+  }
 }
 
 /**
@@ -162,30 +245,38 @@ export type CodexMarketplacePluginRecord = {
 }
 
 export type PluginInstallSpecIdentity =
-  | {
-      kind: 'registry'
-      registryUrl: string
-      pluginId: string
-    }
-  | {
-      kind: 'url'
-      manifestUrl: string
-    }
-  | {
-      kind: 'file'
-      manifestPath: string
-    }
+  {
+    kind: 'registry'
+    registryAlias: string
+    registryUrl: string
+    pluginId: string
+    version: string
+  }
+
+export type VerifiedRegistryIdentity = {
+  registryAlias: string
+  registryUrl: string
+  sourceRepository: string
+  contractVersion: string
+  generatedAt: string
+  signature: {
+    algorithm: string
+    keyId: string
+    signedDigest: string
+  }
+}
 
 type PluginInstallRecordBase = {
   id: string
   provider: PluginProviderName
   requestedScope: PluginInstallScopeSelectorName
   specIdentity: PluginInstallSpecIdentity
+  registry: VerifiedRegistryIdentity
   scope: PluginInstallScopeName
   pluginId: string
   pluginVersion: string
+  snapshotDigest: string
   pluginName: string
-  sourceLocation: string
   targetPaths: string[]
   installedAt: string
 }
@@ -226,7 +317,7 @@ export type PluginInstallRecord =
   | CursorPluginInstallRecord
 
 export type PluginInstallLedger = {
-  schemaVersion: 1
+  schemaVersion: 2
   installs: Record<string, PluginInstallRecord>
 }
 

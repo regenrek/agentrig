@@ -111,10 +111,10 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
   }
 
   const plugins = await buildPluginEntries(pluginsRoot, cfg.pluginPrefix, options.plugin)
-  const specIdentitiesByPluginId = options.specIdentitiesByPluginId
+  const installMetadataByPluginId = options.installMetadataByPluginId
   for (const plugin of plugins) {
-    if (!specIdentitiesByPluginId[plugin.manifest.id]) {
-      throw new Error(`Missing canonical install spec identity for plugin: ${plugin.manifest.id}`)
+    if (!installMetadataByPluginId[plugin.manifest.id]) {
+      throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
     }
   }
   const requestedScope = options.scope ?? 'auto'
@@ -147,7 +147,7 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
     clean: options.clean ?? true,
     force: Boolean(options.force),
     dryRun: Boolean(options.dryRun),
-    specIdentitiesByPluginId,
+    installMetadataByPluginId,
     requestedScope,
     providers,
     commandRunner: options.commandRunner ?? defaultCommandRunner,
@@ -191,7 +191,7 @@ export async function installPreparedPluginProviders(plan: PreparedPluginInstall
           cfg: plan.cfg,
           scope: providerPlan.scope,
           requestedScope: plan.requestedScope,
-          specIdentitiesByPluginId: plan.specIdentitiesByPluginId,
+          installMetadataByPluginId: plan.installMetadataByPluginId,
           force: plan.force,
           dryRun: plan.dryRun,
           runner: plan.commandRunner,

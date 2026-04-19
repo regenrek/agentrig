@@ -3,12 +3,12 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../lib/config'
 import { resolvePluginSpec } from '../lib/plugin-resolver'
-import { determineTrustTier, describeTrustTier, validatePluginPaths } from '../lib/trust'
+import { describeTrustTier, validatePluginPaths } from '../lib/trust'
 
 const args = {
   spec: {
     type: 'positional',
-    description: 'Plugin id, registryAlias/plugin, or a .plugin/plugin.json URL/path',
+    description: 'Canonical install ref: <registryAlias>/<namespace.plugin>@<version>',
     required: true,
   },
   cwd: {
@@ -28,16 +28,6 @@ const args = {
   },
 } as const
 
-function resolveTrustSource(
-  spec: string,
-  resolved: { source: { type: 'url'; baseUrl: string } | { type: 'fs'; baseDir: string } }
-) {
-  if (resolved.source.type === 'url') {
-    return resolved.source.baseUrl
-  }
-  return spec
-}
-
 const command = defineCommand({
   meta: {
     name: 'view',
@@ -54,11 +44,8 @@ const command = defineCommand({
 
     const resolved = await resolvePluginSpec(spec, cwd, cfg.registries)
     const manifest = resolved.manifest
-    const installFiles = resolved.installMetadata?.files ?? []
-    const trustTier = resolved.trustTier ?? await determineTrustTier(
-      resolveTrustSource(spec, resolved),
-      cfg.registries
-    )
+    const installFiles = resolved.lockArtifact.file_digests
+    const trustTier = resolved.trustTier
 
     const pathValidation = validatePluginPaths(installFiles)
 
@@ -71,10 +58,18 @@ const command = defineCommand({
         author: manifest.author,
         license: manifest.license,
         keywords: manifest.keywords,
+        registry: {
+          alias: resolved.registry.name,
+          url: resolved.registry.url,
+          generatedAt: resolved.registryDocument.generated_at,
+          signedDigest: resolved.registryDocument.signature.signed_digest,
+        },
         source: resolved.sourceLabel,
         trustTier,
+        installability: resolved.installability,
+        snapshotDigest: resolved.snapshotDigest,
         files: installFiles,
-        pluginDependencies: manifest.pluginDependencies,
+        pluginDependencies: resolved.lockArtifact.dependencies,
         pathValidation,
       }, null, 2))
       return
@@ -88,14 +83,18 @@ const command = defineCommand({
     if (manifest.author) console.log(`Author: ${manifest.author}`)
     if (manifest.license) console.log(`License: ${manifest.license}`)
     if (manifest.keywords?.length) console.log(`Keywords: ${manifest.keywords.join(', ')}`)
+    console.log(`Registry: ${resolved.registry.name} (${resolved.registry.url})`)
     console.log(`Source: ${resolved.sourceLabel}`)
     console.log(`Trust: ${describeTrustTier(trustTier)}`)
+    console.log(`Installability: ${resolved.installability}`)
+    console.log(`Registry snapshot: ${resolved.registryDocument.signature.signed_digest}`)
+    console.log(`Plugin snapshot: ${resolved.snapshotDigest}`)
 
-    if (manifest.pluginDependencies?.length) {
+    if (resolved.lockArtifact.dependencies.length) {
       console.log('')
       console.log('Dependencies:')
-      for (const dep of manifest.pluginDependencies) {
-        console.log(`  - ${dep}`)
+      for (const dep of resolved.lockArtifact.dependencies) {
+        console.log(`  - ${dep.plugin}@${dep.version}`)
       }
     }
 
@@ -104,9 +103,7 @@ const command = defineCommand({
       console.log('Files:')
     }
     for (const f of installFiles) {
-      const mode = f.mode ? ` (mode: ${f.mode})` : ''
-      const hash = f.sha256 ? ` [${f.sha256.slice(0, 8)}...]` : ''
-      console.log(`  ${f.path}${mode}${hash}`)
+      console.log(`  ${f.path} [${f.digest.slice(0, 15)}...]`)
     }
 
     if (!pathValidation.valid) {
