@@ -73,7 +73,7 @@ const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?$/
 const REGISTRY_SCHEMA_URL = 'https://agentrig.ai/schema/registry.v1.json'
 const PLUGIN_SCHEMA_URL = 'https://agentrig.ai/schema/plugin.v1.json'
-const PLUGIN_HISTORY_SCHEMA_URL = 'https://agentrig.ai/schema/plugin-history.v1.json'
+const PLUGIN_HISTORY_SCHEMA_URL = 'https://agentrig.ai/schema/plugin-history.json'
 const PLUGIN_INSTALL_SCHEMA_URL = 'https://agentrig.ai/schema/plugin-install.v1.json'
 
 function sha256(buf: Buffer) {

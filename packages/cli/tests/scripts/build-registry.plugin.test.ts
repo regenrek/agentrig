@@ -61,7 +61,7 @@ describe('buildRegistry plugin output', () => {
       historyManifestPath,
       JSON.stringify(
         {
-          $schema: 'https://agentrig.ai/schema/plugin-history.v1.json',
+          $schema: 'https://agentrig.ai/schema/plugin-history.json',
           id: pluginId,
           name,
           latest: version,
@@ -242,7 +242,7 @@ describe('buildRegistry plugin output', () => {
       path.join(repoRoot, 'manifests', 'demo.json'),
       JSON.stringify(
         {
-          $schema: 'https://agentrig.ai/schema/plugin-history.v1.json',
+          $schema: 'https://agentrig.ai/schema/plugin-history.json',
           id: 'demo',
           name: 'Demo Plugin',
           latest: '10.0.0',

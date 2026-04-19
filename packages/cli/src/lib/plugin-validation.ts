@@ -1,6 +1,7 @@
 import type { PluginManifest, PluginUploadPolicySnapshot } from './types'
 
-export const PLUGIN_ID_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/
+export const PLUGIN_ID_REGEX =
+  /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 export const PLUGIN_VERSION_REGEX =
   /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 

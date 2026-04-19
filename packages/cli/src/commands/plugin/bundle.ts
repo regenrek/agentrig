@@ -1,10 +1,9 @@
 import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
-import { loadAuthSession } from '../../lib/auth'
-import { getPluginUploadPolicy, resolveCommunityBaseUrl } from '../../lib/community-api'
 import { removeIfExists } from '../../lib/fs'
 import { createPluginBundle } from '../../lib/plugin-bundle'
+import { LOCAL_PLUGIN_POLICY } from '../../lib/registry'
 import {
   formatPluginValidationMessages,
   PluginSubmissionValidationError,
@@ -14,7 +13,7 @@ import {
 const command = defineCommand({
   meta: {
     name: 'bundle',
-    description: 'Build a plugin ZIP bundle and validate it against the hosted AgentRig upload policy.',
+    description: 'Build a local plugin ZIP bundle and validate it against the canonical local policy.',
   },
   args: {
     dir: {
@@ -26,10 +25,6 @@ const command = defineCommand({
       type: 'string',
       description: 'Output ZIP path (defaults to <plugin-dir>/<plugin-id>-<version>.zip)',
     },
-    baseUrl: {
-      type: 'string',
-      description: 'AgentRig web base URL (defaults to stored login, AGENTRIG_BASE_URL, or https://agentrig.ai)',
-    },
     help: {
       type: 'boolean',
       alias: 'h',
@@ -40,16 +35,8 @@ const command = defineCommand({
   async run({ args }) {
     if (args.help) return showUsage(command)
 
-    const session = await loadAuthSession()
-    if (!session) {
-      throw new Error(
-        'Not logged in. Run `agentrig login` first so the CLI can fetch the hosted upload policy.'
-      )
-    }
-
     const directory = path.resolve(args.dir ?? process.cwd())
-    const baseUrl = resolveCommunityBaseUrl(args.baseUrl, session.baseUrl)
-    const policy = await getPluginUploadPolicy(baseUrl, session.accessToken)
+    const policy = LOCAL_PLUGIN_POLICY
 
     const bundle = await createPluginBundle({
       dir: directory,

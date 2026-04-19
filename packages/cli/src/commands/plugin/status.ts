@@ -13,12 +13,16 @@ function formatSubmissionOption(submission: {
   scanStatus: string
   pluginId?: string
   pluginVersion?: string
+  upstream_repo?: string
+  upstream_tag?: string
   fileName: string
   createdAt: number
 }) {
   const pluginLabel = submission.pluginId
     ? `${submission.pluginId}${submission.pluginVersion ? `@${submission.pluginVersion}` : ''}`
-    : submission.fileName
+    : submission.upstream_repo && submission.upstream_tag
+      ? `${submission.upstream_repo}@${submission.upstream_tag}`
+      : submission.fileName
   const createdAt = new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -29,7 +33,7 @@ function formatSubmissionOption(submission: {
 const command = defineCommand({
   meta: {
     name: 'status',
-    description: 'Show the status of a previously submitted plugin upload.',
+    description: 'Show the status of a previously submitted canonical plugin review request.',
   },
   args: {
     submissionId: {
@@ -83,6 +87,18 @@ const command = defineCommand({
     console.log(`Submission: ${submission._id}`)
     console.log(`Status: ${submission.status}`)
     console.log(`Scan status: ${submission.scanStatus}`)
+    if (submission.upstream_repo) {
+      console.log(`Upstream repo: ${submission.upstream_repo}`)
+    }
+    if (submission.upstream_tag) {
+      console.log(`Upstream tag: ${submission.upstream_tag}`)
+    }
+    if (submission.upstream_commit_sha) {
+      console.log(`Upstream commit: ${submission.upstream_commit_sha}`)
+    }
+    if (submission.plugin_path) {
+      console.log(`Plugin path: ${submission.plugin_path}`)
+    }
     if (submission.pluginId) {
       const version = submission.pluginVersion ? `@${submission.pluginVersion}` : ''
       console.log(`Plugin: ${submission.pluginId}${version}`)

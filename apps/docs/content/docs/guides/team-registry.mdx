@@ -10,7 +10,12 @@ Teams can host their own registry and publish private plugins without changing t
 
 ## 1. Host the registry
 
-Publish the `registry.json`, `<plugin>.json`, and `plugins/<plugin>/**` files on a static host.
+Publish a static signed registry that follows the canonical contract:
+
+- `registry.json`
+- `plugins/<namespace>/<plugin>/plugin.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/...`
+- `advisories.json`
 
 ## 2. Add the registry explicitly
 
@@ -22,9 +27,11 @@ agentrig registry add acme https://acme.example/registry
 
 ```bash
 agentrig list --available --registry acme
-agentrig plugin install codex acme/infra-safety
+agentrig plugin install codex acme/acme.infra-safety@1.4.2
 ```
 
 ## 4. (Optional) Get listed
 
 Submit your registry to the public directory if you want discovery on agentrig.ai.
+
+Directory listing remains discovery-only and does not upgrade install trust on its own.

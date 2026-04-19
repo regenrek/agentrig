@@ -5,8 +5,6 @@ import type {
   PluginSubmissionListResponse,
   PluginSubmissionCreateResponse,
   PluginSubmissionStatus,
-  PluginUploadUrlResponse,
-  PluginUploadPolicySnapshot,
 } from './types'
 
 const DEFAULT_COMMUNITY_BASE_URL = 'https://agentrig.ai'
@@ -171,55 +169,14 @@ export async function logout(baseUrl: string, accessToken: string) {
   })
 }
 
-export async function getPluginUploadPolicy(baseUrl: string, accessToken: string) {
-  return await request<PluginUploadPolicySnapshot>(baseUrl, '/api/cli/plugins/policy', {
-    accessToken,
-    maxRetries: 0,
-  })
-}
-
-export async function getPluginUploadUrl(baseUrl: string, accessToken: string) {
-  const result = await request<PluginUploadUrlResponse>(baseUrl, '/api/cli/plugins/upload-url', {
-    method: 'POST',
-    accessToken,
-    maxRetries: 0,
-  })
-  return result.uploadUrl
-}
-
-export async function uploadPluginBundle(uploadUrl: string, zipBytes: Uint8Array) {
-  const response = await fetchWithTimeout(
-    uploadUrl,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/zip',
-      },
-      body: Buffer.from(zipBytes),
-    },
-    DEFAULT_FETCH_TIMEOUT_MS
-  )
-
-  if (!response.ok) {
-    throw new CommunityApiError(await readErrorMessage(response), response.status)
-  }
-
-  const payload = (await response.json()) as Record<string, unknown>
-  const storageId = typeof payload.storageId === 'string' ? payload.storageId.trim() : ''
-  if (!storageId) {
-    throw new Error('Upload response did not include a storageId')
-  }
-  return storageId
-}
-
 export async function createPluginSubmission(
   baseUrl: string,
   accessToken: string,
   payload: {
-    storageId: string
-    fileName: string
-    fileSize: number
-    contentType: string
+    upstream_repo: string
+    upstream_tag: string
+    upstream_commit_sha: string
+    plugin_path: string
   }
 ) {
   const result = await request<PluginSubmissionCreateResponse>(baseUrl, '/api/cli/plugins/submissions', {
@@ -228,7 +185,7 @@ export async function createPluginSubmission(
     body: payload,
     maxRetries: 0,
   })
-  return result.submissionId
+  return result
 }
 
 export async function getPluginSubmissionStatus(

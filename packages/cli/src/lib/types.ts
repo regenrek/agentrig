@@ -308,13 +308,26 @@ export type PluginUploadUrlResponse = {
 
 export type PluginSubmissionCreateResponse = {
   submissionId: string
+  deduped: boolean
+}
+
+export type SubmissionIssue = {
+  severity: 'error' | 'warning'
+  category: string
+  code: string
+  message: string
 }
 
 export type PluginSubmissionStatus = {
   _id: string
   fileName: string
+  upstream_repo?: string
+  upstream_tag?: string
+  upstream_commit_sha?: string
+  plugin_path?: string
   status: string
   scanStatus: string
+  issues?: SubmissionIssue[]
   scanErrors?: string[]
   scanWarnings?: string[]
   reviewStatus?: string

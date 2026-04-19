@@ -6,26 +6,55 @@ icon: BadgeCheck
 
 # Official registry
 
-The official registry is served from:
+The official public registry is served from:
 
 ```
 https://agentrig.ai/registry
 ```
 
-It is treated as **trust tier: official** in the CLI.
+It is the canonical public install source for AgentRig and is treated as **trust tier: `official`**.
 
-## What it contains
+## What makes it installable
 
-- `registry.json` - the plugin index
-- `manifests/<plugin>.json` - plugin version history and pointers
-- `plugins/<plugin>/<version>/` - the published plugin payloads
+Only static, git-mirrorable, signed registries are publicly installable.
+
+The official registry is the reference implementation of that contract.
 
 ## Canonical source
 
 The canonical source of truth for the official registry is the [`agentrig-registry`](https://github.com/agentrig/agentrig-registry) GitHub repository.
 
-For local development, run `pnpm build:registry` to generate a local snapshot from the canonical source. The output is gitignored and never committed.
+## Canonical layout
+
+The canonical registry layout is:
+
+- `registry.json`
+- `plugins/<namespace>/<plugin>/plugin.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/`
+- `plugins/<namespace>/<plugin>/versions/<version>/.plugin/plugin.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_SOURCE.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_LOCK.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_REVIEW.json`
+- `advisories.json`
+
+Canonical plugin ids use:
+
+```text
+namespace.plugin
+```
+
+Canonical install refs use:
+
+```text
+<registryAlias>/<namespace.plugin>@<version>
+```
+
+Example:
+
+```text
+agentrig/agentrig.typescript@0.1.0
+```
 
 ## CLI behavior
 
-The CLI automatically trusts the official registry and does not require confirmation prompts.
+The CLI should treat official registry entries as installable without falling back to ad hoc URL, ZIP, or author-repo installs.

@@ -8,32 +8,34 @@ icon: PackagePlus
 
 Contributions are welcome! You can:
 
-- Add a plugin under `plugins/<name>/<version>`
-- Add a registry to the directory at `apps/docs/public/directory/index.json`
+- Add or update a plugin in the canonical registry layout
+- Add a registry to the discovery directory
 
 ## Add a plugin
 
-1. Create `plugins/<plugin-id>/<version>/` and add `.plugin/plugin.json`.
-2. Update `manifests/<plugin-id>.json`.
-3. Update `registry.json`.
-4. Run the registry build to refresh derived delivery output.
-5. Open a PR.
+1. Create or update `plugins/<namespace>/<plugin>/plugin.json`.
+2. Add a version at `plugins/<namespace>/<plugin>/versions/<version>/`.
+3. Include `.plugin/plugin.json`, `AGENTRIG_SOURCE.json`, `AGENTRIG_LOCK.json`, and `AGENTRIG_REVIEW.json`.
+4. Update `registry.json` and `advisories.json` as needed.
+5. Open a PR against `agentrig-registry`.
 
 ## Hard cut
 
-- Do not add committed root `<pluginId>.json` files to the registry source repo.
-- Do not add fallback discovery shapes or compat shims.
-- The canonical source registry path is:
-  - `registry.json -> manifests/<id>.json -> paths.plugin -> plugins/<id>/<version>/.plugin/plugin.json`
-- Any expanded `files[]` or optional `sha256` metadata belongs in the derived `.plugin/install.json` build artifact only, not in committed source metadata.
+- Do not add compatibility shapes, aliases, or fallback metadata.
+- Do not publish installable artifacts from Convex, ZIP uploads, author repos, or arbitrary URLs.
+- The canonical path is:
+  - `registry.json -> plugins/<namespace>/<plugin>/plugin.json -> versions/<version>/...`
+- The canonical install ref is:
+  - `<registryAlias>/<namespace.plugin>@<version>`
 
 ## Add a registry to the directory
 
-Edit `apps/docs/public/directory/index.json` and add a new entry following the directory schema.
+Add a discovery entry following the directory schema. Directory presence is discovery-only and does not grant install trust.
 
-This file is served by the docs app at `/directory/index.json`. Directory updates are Git-based (PR + deploy), not uploads.
+Directory updates are Git-based, not uploads.
 
 ## Keep changes safe
 
-- Keep `.plugin/plugin.json` valid and version-aligned with its directory.
-- Keep `manifests/<id>.json` and `registry.json` aligned with the plugin path.
+- Keep all required version artifacts present and aligned.
+- Keep trust tier, installability, and advisory state internally consistent.
+- Keep discovery terms separate from install terms.

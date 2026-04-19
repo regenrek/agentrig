@@ -18,9 +18,10 @@ Plugin installs resolve and install dependencies before the requested plugin.
 
 ## How it works
 
-- Dependencies can be official plugin names, `registryAlias/plugin` specs, or direct URLs.
-- Dependencies inherit the same registry when a plugin is installed from a configured registry.
-- Direct URL or local-file installs must use explicit dependency specs for any dependent plugins outside that source.
+- Dependencies use canonical plugin ids or canonical install refs.
+- A canonical install ref looks like `<registryAlias>/<namespace.plugin>@<version>`.
+- Dependencies inherit the same registry contract when they resolve inside a configured registry.
+- Direct URLs, local files, and ZIP sources are not part of the public install contract.
 - Dependencies are only installed once per install run.
 
 Use dependencies for shared foundations like linters, security checks, or base prompts.

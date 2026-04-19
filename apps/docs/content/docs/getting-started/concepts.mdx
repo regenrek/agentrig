@@ -10,18 +10,18 @@ Agentrig is built around a few simple primitives.
 
 ## Plugins
 
-A plugin is a versioned bundle of files plus a `.plugin/plugin.json` install plan.
-It can include skills, scripts, hooks, agents, MCP servers, or any file tree you want to distribute.
+A plugin is a versioned bundle of files identified by the canonical id format `namespace.plugin`.
+Published versions carry `.plugin/plugin.json` plus the required source, lock, and review artifacts.
 
 ## Registries
 
-Registries host plugin metadata and files.
+Registries host plugin metadata and files. Public installation is allowed only from static signed registries.
 
 - **Official registry**: `https://agentrig.ai/registry`
-- **Community Plugins (hosted)**: plugins uploaded via `/submit`, published at `https://agentrig.ai/api/community`
-- **Self-hosted registries**: registries you host yourself (static hosting works)
+- **Self-hosted registries**: registries you host yourself, as long as they implement the same contract
+- **Submissions and community pages**: discovery and review surfaces, not install sources
 
-The **directory** (`https://agentrig.ai/directory/index.json`) is a curated list of registries for discovery and trust signals.
+The **directory** (`https://agentrig.ai/directory/index.json`) is a curated list of registries for discovery. Directory presence does not imply install trust.
 
 ## Rigs
 
@@ -29,11 +29,13 @@ A rig is a named set of plugins. Rigs can extend other rigs, allowing team-wide 
 
 ## Trust tiers
 
-Agentrig classifies registries as:
+AgentRig trust tiers are:
 
-- **Official** - `https://agentrig.ai/registry`.
-- **Listed** - registries in the public directory index.
-- **Unlisted** - any direct URL or unknown registry (requires `--yes`).
+- **Official** - installable
+- **Reviewed** - installable
+- **Listed** - discovery-only
+- **Blocked** - hard blocked
+- **Yanked** - historical or advisory only
 
 ## Manifests
 

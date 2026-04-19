@@ -45,7 +45,7 @@ AgentRig starts with a simple consumer flow:
     <p>Optional, but useful if you want to review dependencies, files, and trust before installing.</p>
 
     ```bash
-    agentrig view core-committer
+    agentrig view agentrig/agentrig.core-committer@0.1.0
     ```
   </Step>
   <Step>
@@ -53,7 +53,7 @@ AgentRig starts with a simple consumer flow:
     <p>Choose the provider you actually use in Claude Code, Codex, or Cursor.</p>
 
     ```bash
-    agentrig plugin install codex core-committer
+    agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
     ```
   </Step>
 </Steps>
@@ -61,22 +61,26 @@ AgentRig starts with a simple consumer flow:
 ## Third-party registry flow
 
 Third-party registries are explicit.
-Add the registry first, then install plugins from it with `registryAlias/plugin-name`.
+Add the registry first, then install plugins from it with the canonical install ref:
+
+`<registryAlias>/<namespace.plugin>@<version>`
 
 ```bash
 agentrig registry add georg https://georg.dev/agentrig
 agentrig list --available --registry georg
-agentrig plugin install cursor georg/ts-master-plugin
+agentrig plugin install cursor georg/georg.ts-master-plugin@1.2.0
 ```
 
-## Direct URL or local file flow
+## What is not installable
 
-Direct `.plugin/plugin.json` URLs and local `.plugin/plugin.json` files are treated as unlisted sources.
-Install them only when you trust the source:
+- direct `.plugin/plugin.json` URLs
+- local file paths as public install refs
+- ZIP uploads
+- author repos
+- arbitrary HTTPS manifest URLs
+- Convex-hosted bytes
 
-```bash
-agentrig plugin install codex ./hello-skills/.plugin/plugin.json --yes
-```
+Use those surfaces for authoring, review, or discovery only. Public installs come from static signed registries.
 
 ## Where to go next
 

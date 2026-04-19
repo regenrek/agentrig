@@ -363,7 +363,7 @@ export async function resolvePluginFromRegistryAlias(
 }
 
 const LOCAL_PLUGIN_EXCLUDE = new Set(['node_modules', 'dist', '.git', '.plugin'])
-const LOCAL_PLUGIN_POLICY: PluginUploadPolicySnapshot = {
+export const LOCAL_PLUGIN_POLICY: PluginUploadPolicySnapshot = {
   maxZipBytes: 0,
   maxFileBytes: 0,
   maxTotalBytes: 0,

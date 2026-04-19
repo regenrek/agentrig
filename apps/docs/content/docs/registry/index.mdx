@@ -6,20 +6,42 @@ icon: Globe
 
 # Registry overview
 
-Agentrig uses a flat registry model: one base URL, one `registry.json`, and one `<plugin>.json` per plugin.
+AgentRig separates **installable registries** from **discovery surfaces**.
 
 ## Core pieces
 
 - **Official registry** - hosted at `https://agentrig.ai/registry`.
-- **Third-party registries** - any registry base URL you explicitly add with `agentrig registry add`.
-- **Community Plugins (hosted)** - plugins uploaded via `/submit`, published at `https://agentrig.ai/api/community`.
-- **Directory** - a curated list of public registries at `https://agentrig.ai/directory/index.json`.
+- **Third-party registries** - static signed registries that implement the same contract.
+- **Directory** - a curated discovery index at `https://agentrig.ai/directory/index.json`.
+- **Submissions** - review and discovery inputs that can later be mirrored into an installable registry.
 
-The CLI resolves consumer plugin specs from:
+## Install contract
 
-- The official registry
-- Any configured third-party registry via `registryAlias/plugin-name`
-- The hosted community registry after you add it as a registry
-- Direct URLs or local file paths (unlisted sources)
+Public installation is allowed only from static signed registries.
+
+Canonical install refs use:
+
+```text
+<registryAlias>/<namespace.plugin>@<version>
+```
+
+Canonical ids use:
+
+```text
+namespace.plugin
+```
+
+Direct URLs, local files, ZIP uploads, author repos, and Convex-hosted bytes are **not** installable public sources.
+
+## Discovery contract
+
+The directory and submission surfaces may:
+
+- show external projects
+- show `listed` entries
+- link to upstream repos
+- offer submit-for-review workflows
+
+They must not imply install trust.
 
 Use the pages in this section to host your own registry, understand trust tiers, and get listed in the directory.

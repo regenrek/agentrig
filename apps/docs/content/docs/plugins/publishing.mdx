@@ -6,36 +6,31 @@ icon: Upload
 
 # Publishing plugins
 
-AgentRig supports three first-class publishing paths: hosted community uploads, self-hosted registries, and directory listing.
+AgentRig separates publishing from installability.
 
-## Community Plugins (hosted)
+## Installable publishing paths
 
-Upload plugins to AgentRig via the web UI at `/submit`. Submissions are scanned and reviewed before publishing.
+Installable publication happens through:
 
-Once approved, plugins are published to the hosted community registry at:
+- the official static signed registry
+- a self-hosted static signed registry that implements the same contract
 
-- `https://agentrig.ai/api/community/registry.json`
-- `https://agentrig.ai/api/community/<plugin>.json`
+## Submission and review
 
-<Callout title="Security">
-Scanning and review reduce risk, but they are not a guarantee of safety. Never include secrets in uploads. Always review plugins before installing.
-</Callout>
+Submit canonical upstream snapshots to AgentRig via the web UI at `/submit` when you want review and discovery.
 
-See: [Hosted uploads](/plugins/uploads)
+Submission is not itself an install source.
 
-<Callout title="Tip">
-To install from the hosted community registry:
-
-```bash
-agentrig registry add community https://agentrig.ai/api/community
-agentrig plugin install codex community/<plugin-name>
-```
-</Callout>
+See: [Submission contract](/plugins/uploads)
 
 ## Self-hosted registry
 
-Host your own registry index (`registry.json`), per-plugin JSON (`{name}.json`), and plugin files at a base URL.
-Static hosting works: the CLI only needs a base URL to fetch JSON and files.
+Host your own static signed registry at a base URL.
+
+Use canonical ids and install refs:
+
+- plugin id: `namespace.plugin`
+- install ref: `<registryAlias>/<namespace.plugin>@<version>`
 
 Recommended next steps:
 
@@ -49,9 +44,9 @@ The directory is a curated list of registries published at `https://agentrig.ai/
 Directory listing is for:
 
 - Discovery on the AgentRig homepage
-- Trust signals in the CLI (listed vs unlisted)
+- awareness of registries that exist
 
-It is **not** an upload mechanism. To get listed, open the GitHub issue linked on the homepage and a maintainer will add your entry to the directory index.
+It is **not** an upload mechanism and **not** an install-trust mechanism.
 
 ## Contribute to the official registry
 
