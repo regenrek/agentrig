@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-22
+
 ### Added
 - Added `scripts/check-no-legacy-registry-lane.mjs` guard and wired it into `vp run repo:check` so CI fails on any legacy registry output under derived web trees.
 - Added canonical install ref documentation (`<registryAlias>/<namespace.plugin>@<version>`) across the CLI overview, init, plugin, and marketplace pages so public installs have one unambiguous form.
