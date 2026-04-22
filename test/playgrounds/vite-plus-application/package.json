@@ -10,7 +10,7 @@
     "prepare": "vp config"
   },
   "devDependencies": {
-    "typescript": "~5.9.3",
+    "typescript": "~6.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
     "vite-plus": "latest"
   },
