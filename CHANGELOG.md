@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Added
+- Added `scripts/check-no-legacy-registry-lane.mjs` guard and wired it into `vp run repo:check` so CI fails on any legacy registry output under derived web trees.
+- Added canonical install ref documentation (`<registryAlias>/<namespace.plugin>@<version>`) across the CLI overview, init, plugin, and marketplace pages so public installs have one unambiguous form.
+- Added a clear submission, admin approval, registry PR, and merge path to the official plugin publishing docs so authors and operators see the same flow.
+
+### Changed
+- Restructured `agentrig/` and `agentrig-web/` READMEs so they are short, practical, and free of architectural marketing language.
+- Rewrote the registry README and ADR so they describe the installable snapshot contract and the embedded `signature` object that ships with `registry.json`.
+- Retired `apps/docs/content/docs/getting-started/first-pack.mdx` in favor of `first-plugin.mdx` so the route, nav, and file name all agree on the canonical term.
+- Tightened registry, plugin, and integration docs so examples point at real registry entries (`agentrig/agentrig.core-committer@0.1.0`) and stop referring to non-existent ones.
+- Relabeled the account sidebar entry `Upload plugin` to `Submit plugin` so nav and submission behavior match.
+
+### Removed
+- Removed the legacy `scripts/build-registry.ts` path and its test so the web surface cannot emit a parallel v1 registry, `manifests/` tree, or `.plugin/install.json` artifacts.
+- Removed stale `pnpm registry:build` references from the contribute and guide docs so documented commands match what the repo actually exposes.
+
+### Fixed
+- Fixed the broken CI step that invoked the removed `repo:registry:build` task; CI now runs `vp run repo:check` which chains the legacy-lane guard.
+- Fixed the `/submit` UI so it describes pinned GitHub submissions (repo, tag, commit SHA, plugin path) instead of ZIP uploads, matching the implemented flow.
+
 ## [0.4.0] - 2026-03-28
 
 ### Added
