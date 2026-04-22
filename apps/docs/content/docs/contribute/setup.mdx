@@ -19,24 +19,19 @@ Use this guide if you want to contribute to the repo or run the official registr
 pnpm install
 ```
 
-## Build the registry
-
-```bash
-pnpm registry:build
-```
-
 ## Run the docs app
 
 ```bash
 pnpm docs:dev
 ```
 
-The docs app serves a local registry at `http://localhost:5173/registry`.
+The docs app serves the docs site locally. The canonical official registry lives in the
+separate `agentrig-registry` repo.
 
 ## Run the CLI in dev mode
 
 ```bash
-pnpm dev:cli -- init --registry http://localhost:5173/registry
+pnpm dev:cli -- init --registry https://agentrig.ai/registry
 pnpm dev:cli -- list --available
 pnpm dev:cli -- plugin install codex agentrig/agentrig.core-committer@0.1.0
 ```

@@ -17,8 +17,9 @@ jobs:
 
       - name: Install
         run: vp install --frozen-lockfile
-      - name: Build registry
-        run: vp run repo:registry:build
+
+      - name: Check
+        run: vp run repo:check
 
       - name: Typecheck CLI
         run: vp run repo:typecheck:cli

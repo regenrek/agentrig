@@ -4,9 +4,6 @@ export default defineConfig({
   run: {
     cache: false,
     tasks: {
-      'repo:registry:build': {
-        command: 'vp exec tsx scripts/build-registry.ts',
-      },
       'repo:dev:cli': {
         command: 'tsx src/cli.ts',
         cwd: 'packages/cli',
@@ -59,9 +56,12 @@ export default defineConfig({
       'repo:test:release:smoke': {
         command: 'node scripts/test-release-local.mjs --smoke-only',
       },
+      'repo:check:no-legacy-registry-lane': {
+        command: 'node scripts/check-no-legacy-registry-lane.mjs',
+      },
       'repo:check': {
         command: 'vp run repo:typecheck:cli',
-        dependsOn: ['repo:test', 'repo:playground:vite-plus:check'],
+        dependsOn: ['repo:test', 'repo:playground:vite-plus:check', 'repo:check:no-legacy-registry-lane'],
       },
     },
   },
