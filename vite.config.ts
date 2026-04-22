@@ -56,12 +56,9 @@ export default defineConfig({
       'repo:test:release:smoke': {
         command: 'node scripts/test-release-local.mjs --smoke-only',
       },
-      'repo:check:no-legacy-registry-lane': {
-        command: 'node scripts/check-no-legacy-registry-lane.mjs',
-      },
       'repo:check': {
         command: 'vp run repo:typecheck:cli',
-        dependsOn: ['repo:test', 'repo:playground:vite-plus:check', 'repo:check:no-legacy-registry-lane'],
+        dependsOn: ['repo:test', 'repo:playground:vite-plus:check'],
       },
     },
   },

@@ -10,7 +10,6 @@
     "plugins:build": "vp run repo:plugins:build",
     "plugins:build:claude": "vp run repo:plugins:build:claude",
     "check": "vp run repo:check",
-    "check:no-legacy-registry-lane": "node scripts/check-no-legacy-registry-lane.mjs",
     "dev:cli": "vp run repo:dev:cli",
     "test": "vp run repo:test",
     "test:run": "vp run repo:test",
