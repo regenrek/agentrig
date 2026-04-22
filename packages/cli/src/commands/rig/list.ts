@@ -36,11 +36,11 @@ const command = defineCommand({
     }
     for (const name of names) {
       const rig = cfg.rigs[name]
-      const packs = rig.packs ?? []
+      const plugins = rig.plugins ?? []
       const ext = rig.extends ?? []
       const parts: string[] = []
       if (ext.length) parts.push(`extends: ${ext.join(', ')}`)
-      if (packs.length) parts.push(`packs: ${packs.join(', ')}`)
+      if (plugins.length) parts.push(`plugins: ${plugins.join(', ')}`)
       console.log(`  - ${name}${cfg.defaultRig === name ? ' (default)' : ''}`)
       if (parts.length) console.log(`      ${parts.join(' | ')}`)
     }

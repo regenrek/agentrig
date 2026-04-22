@@ -1,6 +1,6 @@
 ---
 title: Hosting a registry
-description: Serve registry.json and pack files from any static host.
+description: Serve registry.json and plugin files from any static host.
 icon: Server
 ---
 
@@ -10,25 +10,35 @@ A registry is a static folder that contains:
 
 ```
 registry.json
-<pack>.json
-packs/<pack>/**
+plugins/<namespace>/<plugin>/plugin.json
+plugins/<namespace>/<plugin>/versions/<version>/**
+advisories.json
 ```
 
 ## Minimum requirements
 
 - `registry.json` at the registry root.
-- One JSON file per pack (`<pack>.json`).
-- All files referenced by `meta.json` at the paths specified by each `files[].path` entry.
+- One canonical history file per plugin at `plugins/<namespace>/<plugin>/plugin.json`.
+- One version tree per published release under `plugins/<namespace>/<plugin>/versions/<version>/`.
+- Signed `registry.json` plus canonical `AGENTRIG_SOURCE.json`, `AGENTRIG_LOCK.json`, and `AGENTRIG_REVIEW.json` artifacts for each published version.
 
 ## Example
 
 ```
 https://example.com/registry/
   registry.json
-  core-committer.json
-  packs/
-    core-committer/
-      skills/committer/SKILL.md
+  advisories.json
+  plugins/
+    acme/
+      infra-safety/
+        plugin.json
+        versions/
+          1.4.2/
+            .plugin/plugin.json
+            AGENTRIG_SOURCE.json
+            AGENTRIG_LOCK.json
+            AGENTRIG_REVIEW.json
+            skills/infra-safety/SKILL.md
 ```
 
 ## Test locally
@@ -37,5 +47,5 @@ Start any static server at the registry root and add it as a registry:
 
 ```bash
 agentrig registry add example https://example.com/registry
-agentrig plugin install codex example/core-committer
+agentrig plugin install codex example/acme.infra-safety@1.4.2
 ```

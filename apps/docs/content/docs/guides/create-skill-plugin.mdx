@@ -1,0 +1,41 @@
+---
+title: Create a skill plugin
+description: Build a plugin that ships reusable skills.
+icon: WandSparkles
+---
+
+# Create a skill plugin
+
+This guide walks through creating a new plugin for a reusable skill.
+
+## 1. Scaffold
+
+```bash
+agentrig plugin init my-skill-plugin
+```
+
+## 2. Add skill files
+
+Place your skill under `skills/<skill-name>/SKILL.md` and any supporting scripts alongside it.
+
+## 3. Generate .plugin/plugin.json
+
+```bash
+agentrig plugin create . --out .plugin/plugin.json
+```
+
+## 4. Test locally
+
+Keep local author testing separate from the public install surface by exporting a provider-native marketplace from your plugin directory:
+
+```bash
+agentrig plugin export --agent codex --pluginsDir . --plugin my-skill-plugin --out dist/codex-marketplace
+```
+
+## 5. Publish
+
+Publish to your own registry or contribute to the official registry. See [Publishing plugins](/plugins/publishing).
+
+<Callout title="Contributing to the official registry?">
+See [Contribute](/contribute/official-registry) for the canonical `agentrig-registry` PR workflow.
+</Callout>

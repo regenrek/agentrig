@@ -1,0 +1,103 @@
+---
+title: Submission contract
+description: Submit canonical upstream snapshots for review and registry preparation.
+icon: Upload
+---
+
+# Submission contract
+
+Use AgentRig to submit one canonical upstream snapshot for review:
+
+```bash
+agentrig login
+agentrig plugin submit \
+  --upstreamRepo https://github.com/owner/repo \
+  --upstreamTag v1.2.3 \
+  --upstreamCommitSha 1234567890abcdef1234567890abcdef12345678 \
+  --pluginPath plugin
+```
+
+`agentrig plugin submit` creates a review submission from a single pinned upstream source.
+
+To check review progress later:
+
+```bash
+agentrig plugin status
+```
+
+You can also pass a submission id directly:
+
+```bash
+agentrig plugin status <submission-id>
+```
+
+The web submission UI at `/submit` uses the same canonical backend contract.
+
+## What happens after submission
+
+The normal path looks like this:
+
+1. submit one exact upstream snapshot
+2. AgentRig validates and scans it
+3. an admin reviews it in the web app
+4. approval opens or updates a PR into `agentrig-registry`
+5. the version becomes publicly installable only after that PR is merged
+
+## Important boundary
+
+Submission is **not** a public install source.
+
+A submission can support:
+
+- review
+- validation
+- promotion into a canonical registry workflow
+
+It does **not** make author repos, ZIPs, arbitrary URLs, or Convex-hosted payloads installable.
+
+## Canonical input
+
+Submission accepts exactly these origin fields:
+
+- `upstream_repo`
+- `upstream_tag`
+- `upstream_commit_sha`
+- `plugin_path`
+
+Rules:
+
+- `upstream_repo` must be an allowed canonical repo URL.
+- `upstream_tag` must resolve to `upstream_commit_sha`.
+- `upstream_commit_sha` must be a full 40-character commit SHA.
+- `plugin_path` is relative to the upstream repo root.
+- Branch names, `latest`, floating refs, alternate URL shapes, and ZIP uploads are not valid submission inputs.
+
+## Validation boundary
+
+Submission validates at least:
+
+- repo reachability and normalization
+- tag-to-SHA consistency
+- exact plugin root existence
+- `.plugin/plugin.json` presence and validity
+- manifest version consistency with the submitted tag
+- path safety, symlink/submodule rejection, and forbidden file types
+- install surface and scan results needed for later registry artifacts
+
+## Submission statuses
+
+The submission pipeline uses these statuses:
+
+- `pending_validation`
+- `validating`
+- `pending_review`
+- `accepted_for_pr`
+- `rejected`
+- `blocked`
+
+Validation scan status is tracked separately as `pass`, `warn`, or `fail`.
+
+## Security notes
+
+- Never submit sources that contain secrets.
+- Review and validation reduce risk, but install trust still belongs to signed registry state, not to submission itself.

@@ -1,0 +1,46 @@
+---
+title: Your first plugin
+description: Author and test a local plugin.
+icon: Box
+---
+
+# Your first plugin
+
+This page is for plugin authors.
+If you want to consume plugins from registries, start with [Getting started](/getting-started).
+
+A plugin is a folder with `.plugin/plugin.json` and the files you want to distribute.
+
+## Scaffold the plugin
+
+```bash
+agentrig plugin init hello-skills
+```
+
+This creates a folder like:
+
+```text
+hello-skills/
+  .plugin/plugin.json
+  skills/hello-skills/SKILL.md
+  README.md
+```
+
+## Add files
+
+Add skills, scripts, hooks, agents, or MCP config under the plugin directory.
+Then regenerate `.plugin/plugin.json`:
+
+```bash
+agentrig plugin create . --out .plugin/plugin.json
+```
+
+## Test locally
+
+Keep author testing on the local export surface instead of the public install command:
+
+```bash
+agentrig plugin export --agent codex --pluginsDir . --plugin hello-skills --out dist/codex-marketplace
+```
+
+Next, learn about [`.plugin/plugin.json`](/plugins/meta-json) and [`agentrig plugin`](/cli/plugin).

@@ -14,13 +14,22 @@ https://agentrig.ai/schema/registry.json
 
 Required fields:
 
+- `contract_version`
+- `registry_alias`
+- `source_repository`
+- `generated_at`
+- `signature`
+- `items[]`
+
+Each item defines:
+
 - `name`
-- `items[]` with `name`, `title`, `description`, and `meta`
+- `description`
+- `plugin`
+- `latest_version`
+- `history`
+- `active_version`
+- `trust_tier`
+- `installability`
 
-Optional fields:
-
-- `homepage`
-- `generatedAt`
-- `version`, `tags`
-
-This schema powers the registry index consumed by `agentrig list --available`.
+The registry index links to per-plugin history manifests, which in turn link to version artifacts such as `AGENTRIG_SOURCE.json`, `AGENTRIG_LOCK.json`, and `AGENTRIG_REVIEW.json`.

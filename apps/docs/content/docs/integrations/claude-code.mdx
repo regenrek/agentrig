@@ -1,16 +1,16 @@
 ---
 title: Claude Code
-description: Install resolved packs as Claude Code plugins.
+description: Install resolved plugins as Claude Code plugins.
 icon: Sparkles
 ---
 
 # Claude Code integration
 
-Consumers install resolved packs into Claude with the top-level plugin command:
+Consumers install resolved plugins into Claude with the top-level plugin command:
 
 ```bash
-agentrig plugin install claude core-committer
-agentrig plugin install claude georg/ts-master-pack
+agentrig plugin install claude agentrig/agentrig.core-committer@0.1.0
+agentrig plugin install claude georg/georg.ts-master-plugin@1.2.0
 ```
 
 Claude installs use Claude's native marketplace commands under the hood.
@@ -18,15 +18,21 @@ Claude installs use Claude's native marketplace commands under the hood.
 ## Uninstall from Claude Code
 
 ```bash
-agentrig plugin uninstall claude core-committer
+agentrig plugin uninstall claude agentrig/agentrig.core-committer@0.1.0
 ```
 
 ## What AgentRig does
+
+After you run `agentrig plugin install` with the canonical registry ref,
+AgentRig materializes the plugin and drives Claude's native CLI:
 
 ```text
 claude plugin marketplace add <generated-marketplace-dir>
 claude plugin install <plugin>@<marketplace> --scope user|project
 ```
+
+`<plugin>@<marketplace>` is Claude's own native install syntax, not the
+AgentRig install ref. You never pass that form to `agentrig plugin install`.
 
 By default, `--scope auto` resolves to `workspace` for Claude.
 Use `--scope personal` when you want a user-level install instead.

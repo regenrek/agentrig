@@ -1,218 +1,194 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
-import command from '../../src/commands/plugin/install'
-import type { ResolvedConfig } from '../../src/lib/config'
-import { loadConfig } from '../../src/lib/config'
-import {
-  cleanupMaterializedPack,
-  materializeResolvedPackGraph,
-  resolvePackGraph,
-} from '../../src/lib/plugin-consumer'
-import {
-  installPreparedPluginProviders,
-  parsePluginInstallScopeSelector,
-  parsePluginProviderSelector,
-  preparePluginInstall,
-} from '../../src/lib/plugin-providers'
-import { determineTrustTier, requiresConfirmation } from '../../src/lib/trust'
+import type { RegistryRef } from '../../src/lib/types'
 
-vi.mock('../../src/lib/config', () => ({
+const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
-}))
-vi.mock('../../src/lib/plugin-consumer', () => ({
-  resolvePackGraph: vi.fn(),
-  materializeResolvedPackGraph: vi.fn(),
-  cleanupMaterializedPack: vi.fn(),
-}))
-vi.mock('../../src/lib/plugin-providers', () => ({
+  resolvePluginGraph: vi.fn(),
+  materializeResolvedPluginGraph: vi.fn(),
+  cleanupMaterializedPlugin: vi.fn(),
   preparePluginInstall: vi.fn(),
   installPreparedPluginProviders: vi.fn(),
-  parsePluginProviderSelector: vi.fn((value?: string) => value),
-  parsePluginInstallScopeSelector: vi.fn((value?: string) => value ?? 'auto'),
-}))
-vi.mock('../../src/lib/trust', () => ({
-  determineTrustTier: vi.fn(),
-  requiresConfirmation: vi.fn(),
+  parsePluginProviderSelector: vi.fn(),
+  parsePluginInstallScopeSelector: vi.fn(),
+  buildResolvedPluginInstallMetadataMap: vi.fn(),
+  assertInstallableTrust: vi.fn(),
 }))
 
-describe('command:plugin-install', () => {
+vi.mock('../../src/lib/config', () => ({
+  loadConfig: mocks.loadConfig,
+}))
+
+vi.mock('../../src/lib/plugin-consumer', () => ({
+  resolvePluginGraph: mocks.resolvePluginGraph,
+  materializeResolvedPluginGraph: mocks.materializeResolvedPluginGraph,
+  cleanupMaterializedPlugin: mocks.cleanupMaterializedPlugin,
+}))
+
+vi.mock('../../src/lib/plugin-providers', () => ({
+  preparePluginInstall: mocks.preparePluginInstall,
+  installPreparedPluginProviders: mocks.installPreparedPluginProviders,
+  parsePluginProviderSelector: mocks.parsePluginProviderSelector,
+  parsePluginInstallScopeSelector: mocks.parsePluginInstallScopeSelector,
+}))
+
+vi.mock('../../src/lib/plugin-install-spec', () => ({
+  buildResolvedPluginInstallMetadataMap: mocks.buildResolvedPluginInstallMetadataMap,
+}))
+
+vi.mock('../../src/lib/trust', () => ({
+  assertInstallableTrust: mocks.assertInstallableTrust,
+}))
+
+import command from '../../src/commands/plugin/install'
+
+describe('command:plugin install', () => {
   const run = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
 
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
-  })
-
-  it('installs a resolved pack into a single provider', async () => {
-    const cfg: ResolvedConfig = {
-      registries: [{ name: 'official', url: 'https://agentrig.ai/registry' }],
-      rigs: {},
-      paths: {
-        projectConfigPath: '/repo/agentrig.config.json',
-        globalConfigPath: '/home/.agentrig/config.json',
-      },
-    }
-    vi.mocked(loadConfig).mockResolvedValue(cfg)
-    vi.mocked(resolvePackGraph).mockResolvedValue({
-      requestedPack: {
-        meta: {
-          name: 'core-committer',
-          title: 'Core Committer',
-          description: 'Commit helper',
-          version: '1.0.0',
-          files: [],
-        },
-        source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
-        sourceLabel: 'registry:official',
-        trustTier: 'official',
-        registry: { name: 'official', url: 'https://agentrig.ai/registry' },
-      },
-      resolvedPacks: [
-        {
-          meta: {
-            name: 'core-committer',
-            title: 'Core Committer',
-            description: 'Commit helper',
-            version: '1.0.0',
-            files: [],
-          },
-          source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
-          sourceLabel: 'registry:official',
-          trustTier: 'official',
-          registry: { name: 'official', url: 'https://agentrig.ai/registry' },
-        },
-      ],
+    mocks.parsePluginProviderSelector.mockReturnValue('codex')
+    mocks.parsePluginInstallScopeSelector.mockReturnValue('auto')
+    mocks.loadConfig.mockResolvedValue({
+      registries: [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }] satisfies RegistryRef[],
     })
-    vi.mocked(determineTrustTier).mockResolvedValue('official')
-    vi.mocked(requiresConfirmation).mockReturnValue(false)
-    vi.mocked(materializeResolvedPackGraph).mockResolvedValue({
-      resolved: {
-        meta: {
-          name: 'core-committer',
-          title: 'Core Committer',
-          description: 'Commit helper',
-          version: '1.0.0',
-          files: [],
-        },
-        source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
-        sourceLabel: 'registry:official',
-        trustTier: 'official',
-        registry: { name: 'official', url: 'https://agentrig.ai/registry' },
-      },
-      resolvedPacks: [],
-      packsRoot: '/tmp/materialized-pack',
-      packDir: '/tmp/materialized-pack/core-committer',
-    })
-    vi.mocked(parsePluginProviderSelector).mockReturnValue('codex')
-    vi.mocked(parsePluginInstallScopeSelector).mockReturnValue('workspace')
-    vi.mocked(preparePluginInstall).mockResolvedValue({
-      cwd: '/repo',
-      cfg: {
-        pluginPrefix: 'agentrig-',
-        owner: { name: 'Agentrig' },
-        providers: {
-          claude: {
-            marketplaceName: 'agentrig-community',
-            metadata: { description: 'd', version: '1.0.0', pluginRoot: './plugins' },
-          },
-          codex: {
-            marketplaceName: 'agentrig-local',
-            displayName: 'Agentrig Local',
-            category: 'Productivity',
-            installationPolicy: 'AVAILABLE',
-            authenticationPolicy: 'ON_INSTALL',
-            pluginRoot: './plugins',
-          },
-          cursor: {
-            marketplaceName: 'agentrig-marketplace',
-            metadata: { description: 'd', version: '1.0.0', pluginRoot: 'plugins' },
-          },
-        },
-      },
-      packsRoot: '/tmp/materialized-pack',
-      packs: [
-        {
-          meta: {
-            name: 'core-committer',
-            title: 'Core Committer',
-            description: 'Commit helper',
-            version: '1.0.0',
-            files: [],
-          },
-          packDir: '/tmp/materialized-pack/core-committer',
-          pluginName: 'agentrig-core-committer',
-        },
-      ],
-      baseOut: '/tmp/plugin-out',
-      out: undefined,
-      clean: true,
-      force: false,
-      dryRun: false,
-      specIdentitiesByPackName: {
-        'core-committer': {
+    mocks.buildResolvedPluginInstallMetadataMap.mockReturnValue({
+      'demo-plugin': {
+        specIdentity: {
           kind: 'registry',
+          registryAlias: 'agentrig',
           registryUrl: 'https://agentrig.ai/registry',
-          packName: 'core-committer',
+          pluginId: 'demo-plugin',
+          version: '1.2.3',
         },
+        registry: {
+          registryAlias: 'agentrig',
+          registryUrl: 'https://agentrig.ai/registry',
+          sourceRepository: 'https://github.com/agentrig/agentrig-registry',
+          contractVersion: '1',
+          generatedAt: '2026-04-16T11:00:00Z',
+          signature: {
+            algorithm: 'sha256-json-envelope',
+            keyId: 'agentrig-registry',
+            signedDigest: 'sha256:registry',
+          },
+        },
+        snapshotDigest: 'sha256:snapshot',
       },
-      requestedScope: 'workspace',
+    })
+    mocks.resolvePluginGraph.mockResolvedValue({
+      requestedPlugin: {
+        manifest: { id: 'demo-plugin', name: 'Demo Plugin', version: '1.2.3' },
+        source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
+        sourceLabel: 'agentrig/demo-plugin@1.2.3',
+        trustTier: 'reviewed',
+        installability: 'installable',
+        registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
+      },
+      resolvedPlugins: [
+        {
+          manifest: { id: 'dep-plugin', name: 'Dependency Plugin', version: '0.1.0' },
+          source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
+          sourceLabel: 'agentrig/dep-plugin@0.1.0',
+          trustTier: 'official',
+          installability: 'installable',
+          registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
+        },
+        {
+          manifest: { id: 'demo-plugin', name: 'Demo Plugin', version: '1.2.3' },
+          source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
+          sourceLabel: 'agentrig/demo-plugin@1.2.3',
+          trustTier: 'reviewed',
+          installability: 'installable',
+          registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
+        },
+      ],
+    })
+    mocks.materializeResolvedPluginGraph.mockResolvedValue({
+      pluginsRoot: '/tmp/materialized-plugins',
+      pluginDir: '/tmp/materialized-plugins/demo-plugin',
+    })
+    mocks.preparePluginInstall.mockResolvedValue({
+      plugins: [
+        { manifest: { id: 'dep-plugin' } },
+        { manifest: { id: 'demo-plugin' } },
+      ],
+      requestedScope: 'auto',
       providers: [
         {
           provider: 'codex',
           scope: 'workspace',
           preview: {
-            provider: 'codex',
-            scope: 'workspace',
-            locations: ['/repo/plugins/agentrig-core-committer'],
-            actions: ['copy agentrig-core-committer -> /repo/plugins/agentrig-core-committer'],
+            locations: ['/tmp/materialized-plugins/demo-plugin'],
+            actions: ['write marketplace'],
           },
         },
       ],
-      commandRunner: vi.fn(),
-      exportOptions: {
-        cwd: '/repo',
-        agent: 'codex',
-        packsDir: '/tmp/materialized-pack',
-      },
-    } as Awaited<ReturnType<typeof preparePluginInstall>>)
-    vi.mocked(installPreparedPluginProviders).mockResolvedValue([
+    })
+    mocks.installPreparedPluginProviders.mockResolvedValue([
       {
         provider: 'codex',
         scope: 'workspace',
-        installed: ['agentrig-core-committer'],
+        installed: ['demo-plugin'],
         skipped: [],
-        locations: ['/repo/plugins/agentrig-core-committer'],
-        ledgerEntries: [],
+        locations: ['/tmp/materialized-plugins/demo-plugin'],
       },
     ])
+  })
 
+  it('prepares installs from canonical registry install refs and cleans up materialized plugins', async () => {
     await run({
       args: {
         provider: 'codex',
-        spec: 'core-committer',
+        spec: 'agentrig/demo-plugin@1.2.3',
         cwd: '/repo',
-        scope: 'workspace',
+        scope: undefined,
         force: false,
         dryRun: false,
         help: false,
       },
     })
 
-    expect(resolvePackGraph).toHaveBeenCalledWith('core-committer', '/repo', cfg.registries)
-    expect(preparePluginInstall).toHaveBeenCalledWith(
+    expect(mocks.resolvePluginGraph).toHaveBeenCalledWith(
+      'agentrig/demo-plugin@1.2.3',
+      '/repo',
+      [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
+    )
+    expect(mocks.assertInstallableTrust).toHaveBeenCalledWith(
+      'dep-plugin',
+      '0.1.0',
+      'official',
+      'installable',
+    )
+    expect(mocks.preparePluginInstall).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: '/repo',
         agent: 'codex',
-        packsDir: '/tmp/materialized-pack',
-        specIdentitiesByPackName: {
-          'core-committer': {
-            kind: 'registry',
-            registryUrl: 'https://agentrig.ai/registry',
-            packName: 'core-committer',
-          },
-        },
-        scope: 'workspace',
-      })
+        pluginsDir: '/tmp/materialized-plugins',
+      }),
     )
-    expect(cleanupMaterializedPack).toHaveBeenCalledWith('/tmp/materialized-pack')
+    expect(mocks.installPreparedPluginProviders).toHaveBeenCalledTimes(1)
+    expect(mocks.cleanupMaterializedPlugin).toHaveBeenCalledWith('/tmp/materialized-plugins')
+  })
+
+  it('fails fast when trust enforcement rejects a resolved snapshot', async () => {
+    mocks.assertInstallableTrust.mockImplementation(() => {
+      throw new Error('Trust-tier rejection for demo-plugin@1.2.3')
+    })
+
+    await expect(
+      run({
+        args: {
+          provider: 'codex',
+          spec: 'agentrig/demo-plugin@1.2.3',
+          cwd: '/repo',
+          scope: undefined,
+          force: false,
+          dryRun: false,
+          help: false,
+        },
+      }),
+    ).rejects.toThrow(/trust-tier rejection/i)
+    expect(mocks.cleanupMaterializedPlugin).not.toHaveBeenCalled()
   })
 })

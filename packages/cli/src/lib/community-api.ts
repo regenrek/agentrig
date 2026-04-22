@@ -2,11 +2,9 @@ import type {
   CliLoginExchange,
   CliLoginStart,
   CliWhoAmI,
-  PackSubmissionListResponse,
-  PackSubmissionCreateResponse,
-  PackSubmissionStatus,
-  PackUploadUrlResponse,
-  PackUploadPolicySnapshot,
+  PluginSubmissionListResponse,
+  PluginSubmissionCreateResponse,
+  PluginSubmissionStatus,
 } from './types'
 
 const DEFAULT_COMMUNITY_BASE_URL = 'https://agentrig.ai'
@@ -171,74 +169,33 @@ export async function logout(baseUrl: string, accessToken: string) {
   })
 }
 
-export async function getPackUploadPolicy(baseUrl: string, accessToken: string) {
-  return await request<PackUploadPolicySnapshot>(baseUrl, '/api/cli/packs/policy', {
-    accessToken,
-    maxRetries: 0,
-  })
-}
-
-export async function getPackUploadUrl(baseUrl: string, accessToken: string) {
-  const result = await request<PackUploadUrlResponse>(baseUrl, '/api/cli/packs/upload-url', {
-    method: 'POST',
-    accessToken,
-    maxRetries: 0,
-  })
-  return result.uploadUrl
-}
-
-export async function uploadPackBundle(uploadUrl: string, zipBytes: Uint8Array) {
-  const response = await fetchWithTimeout(
-    uploadUrl,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/zip',
-      },
-      body: Buffer.from(zipBytes),
-    },
-    DEFAULT_FETCH_TIMEOUT_MS
-  )
-
-  if (!response.ok) {
-    throw new CommunityApiError(await readErrorMessage(response), response.status)
-  }
-
-  const payload = (await response.json()) as Record<string, unknown>
-  const storageId = typeof payload.storageId === 'string' ? payload.storageId.trim() : ''
-  if (!storageId) {
-    throw new Error('Upload response did not include a storageId')
-  }
-  return storageId
-}
-
-export async function createPackSubmission(
+export async function createPluginSubmission(
   baseUrl: string,
   accessToken: string,
   payload: {
-    storageId: string
-    fileName: string
-    fileSize: number
-    contentType: string
+    upstream_repo: string
+    upstream_tag: string
+    upstream_commit_sha: string
+    plugin_path: string
   }
 ) {
-  const result = await request<PackSubmissionCreateResponse>(baseUrl, '/api/cli/packs/submissions', {
+  const result = await request<PluginSubmissionCreateResponse>(baseUrl, '/api/cli/plugins/submissions', {
     method: 'POST',
     accessToken,
     body: payload,
     maxRetries: 0,
   })
-  return result.submissionId
+  return result
 }
 
-export async function getPackSubmissionStatus(
+export async function getPluginSubmissionStatus(
   baseUrl: string,
   accessToken: string,
   submissionId: string
 ) {
-  return await request<PackSubmissionStatus>(
+  return await request<PluginSubmissionStatus>(
     baseUrl,
-    `/api/cli/packs/submissions/${encodeURIComponent(submissionId)}`,
+    `/api/cli/plugins/submissions/${encodeURIComponent(submissionId)}`,
     {
       accessToken,
       maxRetries: 0,
@@ -246,14 +203,14 @@ export async function getPackSubmissionStatus(
   )
 }
 
-export async function listPackSubmissions(
+export async function listPluginSubmissions(
   baseUrl: string,
   accessToken: string,
   limit = 20
 ) {
-  const response = await request<PackSubmissionListResponse>(
+  const response = await request<PluginSubmissionListResponse>(
     baseUrl,
-    `/api/cli/packs/submissions?limit=${encodeURIComponent(String(limit))}`,
+    `/api/cli/plugins/submissions?limit=${encodeURIComponent(String(limit))}`,
     {
       accessToken,
       maxRetries: 0,

@@ -1,15 +1,15 @@
 ---
 title: Cursor integration
-description: Install resolved packs as local Cursor plugins.
+description: Install resolved plugins as local Cursor plugins.
 icon: Monitor
 ---
 
 # Cursor integration
 
-Install a resolved pack into Cursor:
+Install a resolved plugin into Cursor:
 
 ```bash
-agentrig plugin install cursor core-committer --scope personal
+agentrig plugin install cursor agentrig/agentrig.core-committer@0.1.0 --scope personal
 ```
 
 This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor after installing.
@@ -17,7 +17,7 @@ This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor
 ## Install project-local Cursor plugins
 
 ```bash
-agentrig plugin install cursor georg/ts-master-pack --scope workspace
+agentrig plugin install cursor georg/georg.ts-master-plugin@1.2.0 --scope workspace
 ```
 
 This copies each generated plugin into `<cwd>/.cursor/plugins/local/`.
@@ -28,7 +28,7 @@ If you omit `--scope`, `auto` resolves Cursor installs to `personal`.
 ## Uninstall Cursor plugins
 
 ```bash
-agentrig plugin uninstall cursor core-committer
+agentrig plugin uninstall cursor agentrig/agentrig.core-committer@0.1.0
 ```
 
 Uninstall is safe by default:
@@ -49,6 +49,6 @@ Uninstall is safe by default:
 
 ## Best practices
 
-- Keep Cursor-specific files isolated in a pack.
-- Install third-party packs through explicit registry aliases such as `georg/ts-master-pack`.
+- Keep Cursor-specific files isolated in a plugin.
+- Install third-party plugins through explicit registry aliases such as `georg/georg.ts-master-plugin@1.2.0`.
 - Use `--scope workspace` when you want the Cursor plugin to stay repo-local and easy to remove with the project.

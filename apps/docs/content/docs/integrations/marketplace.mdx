@@ -1,35 +1,38 @@
 ---
 title: Marketplace exports
-description: Export local packs as provider-native marketplaces.
+description: Export local plugins as provider-native marketplaces.
 icon: Store
 ---
 
 # Marketplace exports
 
-Use `agentrig pack plugin export` when you are authoring local packs and want provider-native marketplace output.
+Use `agentrig plugin export` when you are authoring local plugins and want provider-native marketplace output.
 
 Consumers do not need this command for normal installs.
 They should use:
 
 ```bash
-agentrig plugin install <provider> <pack-spec>
+agentrig plugin install <provider> <plugin-spec>
 ```
+
+For public installs, `<plugin-spec>` must be the canonical registry ref
+`<registryAlias>/<namespace.plugin>@<version>`.
 
 ## How export works
 
-![How AgentRig converts packs into native plugins and tracks installs safely](/agentrig_plugin.jpeg)
+![How AgentRig converts plugins into native plugins and tracks installs safely](/agentrig_plugin.jpeg)
 
-- Start with an AgentRig pack as the portable source of truth for prompts, assets, scripts, MCP config, and other workflow files.
-- `agentrig pack plugin export` converts that pack into each provider's native plugin marketplace layout for Claude, Codex, or Cursor.
+- Start with an AgentRig plugin as the portable source of truth for prompts, assets, scripts, MCP config, and other workflow files.
+- `agentrig plugin export` converts that plugin into each provider's native plugin marketplace layout for Claude, Codex, or Cursor.
 
 ```bash
-agentrig pack plugin export --agent all --packsDir registry/packs --out dist/plugins
+agentrig plugin export --agent all --pluginsDir registry/plugins --out dist/plugins
 ```
 
-Export a single pack:
+Export a single plugin:
 
 ```bash
-agentrig pack plugin export --agent all --pack my-pack --packsDir registry/packs --out dist/plugins
+agentrig plugin export --agent all --plugin my-plugin --pluginsDir registry/plugins --out dist/plugins
 ```
 
 This generates:

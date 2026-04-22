@@ -1,3 +1,8 @@
+import type {
+  CanonicalTrustTier,
+  InstallabilityState,
+} from './registry-contract'
+
 export type RegistryRef = {
   name: string
   url: string
@@ -5,12 +10,12 @@ export type RegistryRef = {
 
 export type RigDefinition = {
   extends?: string[]
-  /** Pack specs: official pack, registryAlias/pack, or explicit spec */
-  packs?: string[]
+  /** Canonical public install refs: <registryAlias>/<namespace.plugin>@<version> */
+  plugins?: string[]
 }
 
 /**
- * Directory index entry for a community registry.
+ * Directory entry for a listed registry or discovery catalog.
  */
 export type DirectoryEntry = {
   name: string
@@ -18,14 +23,16 @@ export type DirectoryEntry = {
   url: string
   description?: string
   logo?: string
+  /** Identity-only verification signal. Never treat this as install trust. */
   verified?: boolean
+  /** Directory payloads are discovery-only. */
+  installability: 'discovery_only'
   tags?: string[]
+  keywords?: string[]
 }
 
-/**
- * Trust tier for registry sources.
- */
-export type TrustTier = 'official' | 'listed' | 'unlisted'
+export type TrustTier = CanonicalTrustTier
+export type RegistryInstallability = InstallabilityState
 
 export type AgentRigConfig = {
   $schema?: string
@@ -34,48 +41,115 @@ export type AgentRigConfig = {
   defaultRig?: string
 }
 
-export type RegistryIndexItem = {
+export type PluginFile = {
+  /** File path in the plugin source */
+  path: string
+  /** sha256 integrity hash with algorithm prefix */
+  digest: string
+}
+
+export type RegistryVersionDependency = {
+  plugin: string
+  version: string
+}
+
+export type RegistrySignatureEnvelope = {
+  algorithm: string
+  key_id: string
+  target: string
+  signed_digest: string
+}
+
+export type RegistryVersionRecord = {
+  version: string
+  path: string
+  manifest: string
+  source: string
+  lock: string
+  review: string
+  trust_tier: TrustTier
+  installability: RegistryInstallability
+  snapshot_digest: string
+  published_at: string
+}
+
+export type RegistryHistory = {
+  $schema?: string
+  plugin: string
+  namespace: string
   name: string
-  title: string
   description: string
-  version?: string
-  tags?: string[]
-  meta: string
+  latest_version: string
+  trust_tier: TrustTier
+  installability: RegistryInstallability
+  active_version: RegistryVersionRecord
+  keywords?: string[]
+  advisories?: string[]
+  versions: RegistryVersionRecord[]
+}
+
+export type RegistryIndexItem = {
+  plugin: string
+  name: string
+  description: string
+  latest_version: string
+  history: string
+  active_version: RegistryVersionRecord
+  trust_tier: TrustTier
+  installability: RegistryInstallability
+  keywords?: string[]
+  advisories?: string[]
 }
 
 export type RegistryIndex = {
   $schema?: string
-  name: string
-  homepage?: string
-  generatedAt?: string
+  contract_version: string
+  registry_alias: string
+  source_repository: string
+  generated_at: string
+  signature: RegistrySignatureEnvelope
   items: RegistryIndexItem[]
 }
 
-export type PackFile = {
-  /** File path in the pack source (registry, repo, local folder) */
-  path: string
-  /** Standardized install target metadata */
-  target: string
-  /** Optional file mode as a string, ex: "755" */
-  mode?: string
-  /** Optional sha256 integrity hash (hex) */
-  sha256?: string
+export type RegistryLock = {
+  $schema?: string
+  plugin: string
+  version: string
+  file_digests: PluginFile[]
+  capability_set: string[]
+  declared_network_domains: string[]
+  declared_secrets: string[]
+  runtime_requirements: string[]
+  dependencies: RegistryVersionDependency[]
+  snapshot_digest: string
 }
 
-/**
- * Claude plugin component declarations for pack exports.
- */
-export type PackComponents = {
-  /** Skills included in this pack */
-  skills?: string[]
-  /** Subagents included in this pack */
-  agents?: string[]
-  /** Whether this pack includes hooks (hooks/hooks.json) */
-  hooks?: boolean
-  /** Whether this pack includes MCP servers (.mcp.json) */
-  mcp?: boolean
-  /** Whether this pack includes LSP servers (.lsp.json) */
-  lsp?: boolean
+export type RegistrySource = {
+  $schema?: string
+  upstream_repo: string
+  upstream_tag: string
+  upstream_commit: string
+  plugin_path: string
+  submitted_by: string
+  snapshot_created_at: string
+  snapshot_tree_digest: string
+}
+
+export type RegistryReview = {
+  $schema?: string
+  review_status: string
+  reviewer: string
+  reviewed_at: string
+  scanner_summary: {
+    status: string
+    findings?: string[]
+  }
+  policy_decisions: string[]
+  trust_tier_basis: {
+    trust_tier: TrustTier
+    installability: RegistryInstallability
+    rationale: string
+  }
 }
 
 /**
@@ -133,21 +207,19 @@ export type AgentDefinition = {
   hooks?: HookDefinition[]
 }
 
-export type PackMeta = {
+export type PluginManifest = {
   $schema?: string
-  kind?: 'agentrig:pack'
+  kind: 'agentrig:plugin'
+  id: string
   name: string
-  title: string
   description: string
   version: string
   author?: string
   license?: string
-  tags?: string[]
-  topics?: Record<string, string[]>
-  rigDependencies?: string[]
-  files: PackFile[]
-  /** Claude plugin components included in this pack */
-  components?: PackComponents
+  keywords?: string[]
+  pluginDependencies?: string[]
+  configSchema: Record<string, unknown>
+  'x-agentrig'?: Record<string, unknown>
 }
 
 export type PluginProviderName = 'claude' | 'codex' | 'cursor'
@@ -177,30 +249,38 @@ export type CodexMarketplacePluginRecord = {
 }
 
 export type PluginInstallSpecIdentity =
-  | {
-      kind: 'registry'
-      registryUrl: string
-      packName: string
-    }
-  | {
-      kind: 'url'
-      metaUrl: string
-    }
-  | {
-      kind: 'file'
-      metaPath: string
-    }
+  {
+    kind: 'registry'
+    registryAlias: string
+    registryUrl: string
+    pluginId: string
+    version: string
+  }
+
+export type VerifiedRegistryIdentity = {
+  registryAlias: string
+  registryUrl: string
+  sourceRepository: string
+  contractVersion: string
+  generatedAt: string
+  signature: {
+    algorithm: string
+    keyId: string
+    signedDigest: string
+  }
+}
 
 type PluginInstallRecordBase = {
   id: string
   provider: PluginProviderName
   requestedScope: PluginInstallScopeSelectorName
   specIdentity: PluginInstallSpecIdentity
+  registry: VerifiedRegistryIdentity
   scope: PluginInstallScopeName
-  packName: string
-  packVersion: string
+  pluginId: string
+  pluginVersion: string
+  snapshotDigest: string
   pluginName: string
-  sourceLocation: string
   targetPaths: string[]
   installedAt: string
 }
@@ -241,7 +321,7 @@ export type PluginInstallRecord =
   | CursorPluginInstallRecord
 
 export type PluginInstallLedger = {
-  schemaVersion: 1
+  schemaVersion: 2
   installs: Record<string, PluginInstallRecord>
 }
 
@@ -287,7 +367,7 @@ export type CliWhoAmI = {
   name?: string | null
 }
 
-export type PackUploadPolicySnapshot = {
+export type PluginUploadPolicySnapshot = {
   maxZipBytes: number
   maxFileBytes: number
   maxTotalBytes: number
@@ -300,47 +380,60 @@ export type PackUploadPolicySnapshot = {
   publishedVersionRetention: number
 }
 
-export type PackBundle = {
+export type PluginBundle = {
   directory: string
   bundlePath: string
   fileName: string
-  meta: PackMeta
+  manifest: PluginManifest
   zipBytes: Uint8Array
   temporary: boolean
 }
 
-export type PackPublishValidationResult = {
-  meta: PackMeta
+export type PluginSubmissionValidationResult = {
+  manifest: PluginManifest
   fileCount: number
   totalBytes: number
   zipBytes: number
   warnings: string[]
 }
 
-export type PackUploadUrlResponse = {
+export type PluginUploadUrlResponse = {
   uploadUrl: string
 }
 
-export type PackSubmissionCreateResponse = {
+export type PluginSubmissionCreateResponse = {
   submissionId: string
+  deduped: boolean
 }
 
-export type PackSubmissionStatus = {
+export type SubmissionIssue = {
+  severity: 'error' | 'warning'
+  category: string
+  code: string
+  message: string
+}
+
+export type PluginSubmissionStatus = {
   _id: string
   fileName: string
+  upstream_repo?: string
+  upstream_tag?: string
+  upstream_commit_sha?: string
+  plugin_path?: string
   status: string
   scanStatus: string
+  issues?: SubmissionIssue[]
   scanErrors?: string[]
   scanWarnings?: string[]
   reviewStatus?: string
   reviewNote?: string
-  packMeta?: unknown
-  packName?: string
-  packVersion?: string
+  pluginManifest?: unknown
+  pluginId?: string
+  pluginVersion?: string
   createdAt: number
   updatedAt: number
 }
 
-export type PackSubmissionListResponse = {
-  submissions: PackSubmissionStatus[]
+export type PluginSubmissionListResponse = {
+  submissions: PluginSubmissionStatus[]
 }

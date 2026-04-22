@@ -1,6 +1,6 @@
 {
   "title": "Rigs",
-  "description": "Compose and apply sets of packs",
+  "description": "Compose and apply sets of plugins",
   "icon": "Layers",
   "pages": ["index", "defining", "extending", "applying"]
 }

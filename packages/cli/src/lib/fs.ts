@@ -20,7 +20,9 @@ export async function readTextFile(p: string) {
 
 export async function writeTextFile(p: string, content: string) {
   await ensureDir(path.dirname(p))
-  await fs.writeFile(p, content, 'utf-8')
+  const tempPath = path.join(path.dirname(p), `.${path.basename(p)}.tmp-${process.pid}-${Date.now()}`)
+  await fs.writeFile(tempPath, content, 'utf-8')
+  await fs.rename(tempPath, p)
 }
 
 export async function readJsonFile<T>(p: string): Promise<T | null> {
@@ -31,7 +33,9 @@ export async function readJsonFile<T>(p: string): Promise<T | null> {
 
 export async function writeJsonFile(p: string, data: unknown) {
   await ensureDir(path.dirname(p))
-  await fs.writeFile(p, JSON.stringify(data, null, 2) + '\n', 'utf-8')
+  const tempPath = path.join(path.dirname(p), `.${path.basename(p)}.tmp-${process.pid}-${Date.now()}`)
+  await fs.writeFile(tempPath, JSON.stringify(data, null, 2) + '\n', 'utf-8')
+  await fs.rename(tempPath, p)
 }
 
 export async function removeIfExists(p: string) {

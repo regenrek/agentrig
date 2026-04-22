@@ -6,22 +6,60 @@ icon: BadgeCheck
 
 # Official registry
 
-The official registry is served from:
+The official public registry is served from:
 
 ```
 https://agentrig.ai/registry
 ```
 
-It is treated as **trust tier: official** in the CLI.
+It is the canonical public install source for AgentRig and is treated as **trust tier: `official`**.
 
-## What it contains
+## What makes it installable
 
-- `registry.json` - the pack index
-- `<pack>.json` - individual pack metadata
-- `packs/<pack>/**` - the file contents referenced in each pack
+Only static, git-mirrorable, signed registries are publicly installable.
 
-When running locally in this repo, the registry is served from `apps/docs/public/registry`.
+The official registry is the reference implementation of that contract.
+
+The public directory is not an install source.
+An entry may be visible in the directory before it is installable, but installability still comes only from merged registry state.
+
+## Canonical source
+
+The canonical source of truth for the official registry is the [`agentrig-registry`](https://github.com/regenrek/agentrig-registry) GitHub repository.
+
+## Canonical layout
+
+The canonical registry layout is:
+
+- `registry.json`
+- `plugins/<namespace>/<plugin>/plugin.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/`
+- `plugins/<namespace>/<plugin>/versions/<version>/.plugin/plugin.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_SOURCE.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_LOCK.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_REVIEW.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/README.md`
+- `plugins/<namespace>/<plugin>/versions/<version>/LICENSE`
+- `advisories.json`
+
+Canonical plugin ids use:
+
+```text
+namespace.plugin
+```
+
+Canonical install refs use:
+
+```text
+<registryAlias>/<namespace.plugin>@<version>
+```
+
+Example:
+
+```text
+agentrig/agentrig.core-committer@0.1.0
+```
 
 ## CLI behavior
 
-The CLI automatically trusts the official registry and does not require confirmation prompts.
+The CLI treats official registry entries as installable and does not fall back to ad hoc URL, ZIP, or author-repo installs.

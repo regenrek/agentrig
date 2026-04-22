@@ -3,7 +3,11 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { pathExists } from '../lib/fs'
 import { getGlobalConfigPath, getProjectConfigPath, writeGlobalConfig, writeProjectConfig } from '../lib/config'
-import { normalizeRegistryUrl, OFFICIAL_REGISTRY_URL } from '../lib/registry'
+import {
+  normalizeRegistryUrl,
+  OFFICIAL_REGISTRY_ALIAS,
+  OFFICIAL_REGISTRY_URL,
+} from '../lib/registry'
 import type { AgentRigConfig } from '../lib/types'
 
 const args = {
@@ -36,7 +40,7 @@ const args = {
 function createConfig(registryUrl: string): AgentRigConfig {
   return {
     $schema: 'https://agentrig.ai/schema/config.json',
-    registries: [{ name: 'official', url: registryUrl }],
+    registries: [{ name: OFFICIAL_REGISTRY_ALIAS, url: registryUrl }],
   }
 }
 
@@ -45,7 +49,9 @@ function printNextSteps() {
   console.log('Next steps:')
   console.log('  agentrig list --available')
   console.log('  agentrig registry add <alias> <baseUrl>')
-  console.log('  agentrig plugin install <provider> <pack-name>')
+  console.log(
+    `  agentrig plugin install <provider> ${OFFICIAL_REGISTRY_ALIAS}/${OFFICIAL_REGISTRY_ALIAS}.core-committer@0.1.0`
+  )
 }
 
 const command = defineCommand({

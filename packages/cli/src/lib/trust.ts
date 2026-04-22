@@ -1,20 +1,6 @@
-/**
- * Trust tier management for registry sources.
- *
- * Trust tiers:
- * - official: The official agentrig.ai registry (implicit trust)
- * - listed: A registry the user explicitly configured in AgentRig
- * - unlisted: Direct URLs or unknown sources (requires confirmation)
- */
-
 import path from 'node:path'
-import type { TrustTier, RegistryRef } from './types'
-import { OFFICIAL_REGISTRY_URL, normalizeRegistryUrl, isUrl } from './registry'
+import type { RegistryInstallability, TrustTier } from './types'
 
-/**
- * Allowed target path prefixes for file installation.
- * Files can only be installed to these directories for security.
- */
 export const ALLOWED_TARGET_PREFIXES = [
   '.codex/',
   '.claude/',
@@ -22,35 +8,6 @@ export const ALLOWED_TARGET_PREFIXES = [
   '.agentrig/',
 ]
 
-export async function determineTrustTier(
-  source: string,
-  registries: RegistryRef[] = []
-): Promise<TrustTier> {
-  const normalizedOfficial = normalizeRegistryUrl(OFFICIAL_REGISTRY_URL)
-  const normalizedSource = normalizeRegistryUrl(source)
-
-  if (normalizedSource === normalizedOfficial || normalizedSource.startsWith(`${normalizedOfficial}/`)) {
-    return 'official'
-  }
-
-  if (isUrl(source)) {
-    for (const registry of registries) {
-      const normalizedRegistry = normalizeRegistryUrl(registry.url)
-      if (
-        normalizedSource === normalizedRegistry ||
-        normalizedSource.startsWith(`${normalizedRegistry}/`)
-      ) {
-        return registry.url === OFFICIAL_REGISTRY_URL ? 'official' : 'listed'
-      }
-    }
-  }
-
-  return 'unlisted'
-}
-
-/**
- * Check if a target path is allowed for installation.
- */
 export function isAllowedTargetPath(targetPath: string): boolean {
   const normalized = targetPath.startsWith('/') ? targetPath.slice(1) : targetPath
 
@@ -75,24 +32,15 @@ function normalizeRelativeTargetPath(targetPath: string): string | null {
   return normalized
 }
 
-/**
- * Validate all target paths in a pack are allowed.
- * Returns list of disallowed paths if any.
- */
-export function validateTargetPaths(
-  files: Array<{ target: string }>
+export function validatePluginPaths(
+  files: Array<{ path: string }>
 ): { valid: boolean; disallowed: string[] } {
   const disallowed: string[] = []
 
   for (const file of files) {
-    // Resolve placeholders for validation
-    const resolved = file.target
-      .replace(/\{\{skillsDir\}\}/g, '.codex/skills')
-      .replace(/\{\{[^}]+\}\}/g, '') // Remove other placeholders for validation
-
-    const normalized = normalizeRelativeTargetPath(resolved)
-    if (!normalized || !isAllowedTargetPath(normalized)) {
-      disallowed.push(file.target)
+    const normalized = normalizeRelativeTargetPath(file.path)
+    if (!normalized) {
+      disallowed.push(file.path)
     }
   }
 
@@ -102,44 +50,65 @@ export function validateTargetPaths(
   }
 }
 
-/**
- * Get a human-readable description of a trust tier.
- */
 export function describeTrustTier(tier: TrustTier): string {
   switch (tier) {
     case 'official':
-      return 'Official agentrig.ai registry'
+      return 'Official AgentRig registry artifact'
+    case 'reviewed':
+      return 'Reviewed registry artifact'
     case 'listed':
-      return 'Configured registry'
-    case 'unlisted':
-      return 'Unlisted source (requires confirmation)'
+      return 'Listed registry artifact (discovery only)'
+    case 'blocked':
+      return 'Blocked registry artifact'
+    case 'yanked':
+      return 'Yanked registry artifact'
   }
 }
 
-/**
- * Check if a trust tier requires user confirmation before install.
- */
-export function requiresConfirmation(tier: TrustTier): boolean {
-  return tier === 'unlisted'
+export function assertInstallableTrust(
+  pluginId: string,
+  version: string,
+  trustTier: TrustTier,
+  installability: RegistryInstallability
+) {
+  if (trustTier === 'official' || trustTier === 'reviewed') {
+    if (installability !== 'installable') {
+      throw new Error(
+        `Installability mismatch for ${pluginId}@${version}: ${trustTier} must resolve to an installable registry artifact.`
+      )
+    }
+    return
+  }
+
+  if (trustTier === 'listed') {
+    throw new Error(
+      `Trust-tier rejection for ${pluginId}@${version}: listed registry artifacts are discovery-only and cannot be installed.`
+    )
+  }
+  if (trustTier === 'blocked') {
+    throw new Error(
+      `Blocked install refused for ${pluginId}@${version}: the registry marks this snapshot as blocked.`
+    )
+  }
+  throw new Error(
+    `Yanked install refused for ${pluginId}@${version}: yanked snapshots are not accepted for new installs.`
+  )
 }
 
-/**
- * Format an install plan for display to the user.
- */
 export function formatInstallPlan(
-  packName: string,
-  files: Array<{ path: string; target: string }>,
+  pluginId: string,
+  files: Array<{ path: string }>,
   trustTier: TrustTier
 ): string {
   const lines: string[] = [
-    `Pack: ${packName}`,
+    `Plugin: ${pluginId}`,
     `Trust: ${describeTrustTier(trustTier)}`,
     '',
-    'Files to install:',
+    'Files in plugin:',
   ]
 
   for (const file of files) {
-    lines.push(`  ${file.path} -> ${file.target}`)
+    lines.push(`  ${file.path}`)
   }
 
   return lines.join('\n')

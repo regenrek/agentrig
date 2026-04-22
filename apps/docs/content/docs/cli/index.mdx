@@ -6,18 +6,20 @@ icon: Terminal
 
 # CLI overview
 
-The CLI installs packs, manages registries, and applies rigs.
+The CLI installs plugins, manages registries, and applies rigs.
 Run `agentrig --help` for global help.
 
 ## Common commands
 
 - `agentrig init` - create config file.
-- `agentrig list --available` - browse available packs.
-- `agentrig view <pack>` - inspect a pack before installing.
-- `agentrig plugin install <provider> <pack>` - install a provider plugin.
-- `agentrig plugin uninstall <provider> <pack>` - remove a provider plugin.
+- `agentrig list --available` - browse available plugins.
+- `agentrig view <registryAlias>/<namespace.plugin>@<version>` - inspect a plugin before installing.
+- `agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>` - install a provider plugin.
+- `agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>@<version>` - remove a provider plugin.
 - `agentrig rig apply <provider> <rig>` - apply an advanced rig.
 - `agentrig registry add` - add a registry.
-- `agentrig pack init` - scaffold a new pack.
+- `agentrig plugin init` - scaffold a new plugin.
+
+Public installs use the canonical registry ref `<registryAlias>/<namespace.plugin>@<version>`.
 
 Use the pages in this section for full options and examples.

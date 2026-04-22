@@ -6,30 +6,31 @@ icon: Shield
 
 # Trust tiers
 
-Agentrig assigns each pack source a trust tier before plugin installation.
+AgentRig assigns trust at the registry artifact level. Discovery metadata and author identity stay separate from install trust.
 
 | Tier | Source | Behavior |
 | --- | --- | --- |
-| `official` | `https://agentrig.ai/registry` | Always trusted. |
-| `listed` | Explicitly configured registries in your config | Trusted, no prompt. |
-| `unlisted` | Direct URLs, local files, or unknown registries | Requires confirmation (`--yes`). |
+| `official` | Official AgentRig registry artifact | Installable. |
+| `reviewed` | Reviewed registry artifact that satisfies the canonical contract | Installable. |
+| `listed` | Discovery listing only | Not installable. |
+| `blocked` | Hard-blocked artifact | Not installable. |
+| `yanked` | Historical or advisory-only artifact | Not installable for new installs. |
 
 ## How trust is determined
 
-- **Official**: the pack resolves from the official registry seeded by `agentrig init`.
-- **Listed**: the pack resolves from a registry you explicitly added with `agentrig registry add`.
-- **Unlisted**: the pack resolves from a direct URL, local file, or some other source outside your configured registries.
+- Trust applies to published registry artifacts, not to arbitrary sources.
+- Only static signed registries can publish installable `official` or `reviewed` entries.
+- Directory presence can at most produce `listed`, which is discovery-only.
+- Direct URLs, ZIPs, author repos, and Convex-hosted bytes are outside the install contract.
 
-## Confirmation for unlisted sources
+## Identity is orthogonal
 
-If a pack comes from an unlisted source, AgentRig refuses to continue until you confirm it:
+`verified-author` is **not** a trust tier.
 
-```bash
-agentrig plugin install codex https://example.com/some-pack.json
-# Re-run with:
-agentrig plugin install codex https://example.com/some-pack.json --yes
-```
+It is identity or ownership metadata only and must never be used to imply installability.
 
-## Path validation
+## Discovery versus install
 
-Regardless of trust tier, pack metadata is still validated against AgentRig's allowed target prefixes to block unsafe or non-standardized install targets.
+- Discovery may show `listed` projects, external repos, and submit-for-review flows.
+- Discovery must not present the same install CTA as `official` or `reviewed`.
+- Install trust comes from signed registry state plus digest verification, not from directory or profile metadata.

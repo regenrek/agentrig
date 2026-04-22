@@ -1,6 +1,0 @@
-{
-  "title": "Packs",
-  "description": "Structure, metadata, and publishing",
-  "icon": "Package",
-  "pages": ["index", "structure", "meta-json", "placeholders", "dependencies", "uploads", "publishing"]
-}

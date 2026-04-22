@@ -3,7 +3,13 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../lib/config'
 import { loadPluginInstallLedgers, listPluginInstallRecords } from '../lib/plugin-install-ledger'
-import { isUrl, readRegistryIndex } from '../lib/registry'
+import {
+  OFFICIAL_REGISTRY_ALIAS,
+  OFFICIAL_REGISTRY_URL,
+  readRegistryIndex,
+  resolveConfiguredRegistry,
+} from '../lib/registry'
+import type { RegistryRef } from '../lib/types'
 
 const args = {
   cwd: {
@@ -12,17 +18,17 @@ const args = {
   },
   installed: {
     type: 'boolean',
-    description: 'List installed packs (default)',
+    description: 'List installed plugins (default)',
     default: true,
   },
   available: {
     type: 'boolean',
-    description: 'List packs available in registries',
+    description: 'List plugins available in registries',
     default: false,
   },
   registry: {
     type: 'string',
-    description: 'Registry alias (from config) or a registry base URL',
+    description: 'Registry alias (from config)',
   },
   help: {
     type: 'boolean',
@@ -35,7 +41,7 @@ const args = {
 const command = defineCommand({
   meta: {
     name: 'list',
-    description: 'List installed plugin packs and/or available packs in registries.',
+    description: 'List installed plugins and/or available plugins in registries.',
   },
   args,
   async run({ args }) {
@@ -47,53 +53,49 @@ const command = defineCommand({
     if (args.installed) {
       const ledgers = await loadPluginInstallLedgers(cwd)
       const records = listPluginInstallRecords(ledgers).sort((left, right) =>
-        `${left.provider}:${left.scope}:${left.packName}`.localeCompare(
-          `${right.provider}:${right.scope}:${right.packName}`
+        `${left.provider}:${left.scope}:${left.pluginId}`.localeCompare(
+          `${right.provider}:${right.scope}:${right.pluginId}`
         )
       )
-      console.log('Installed plugin packs:')
+      console.log('Installed plugins:')
       if (!records.length) console.log('  (none)')
       for (const record of records) {
-        console.log(`  - ${record.packName}@${record.packVersion} (${record.provider}, ${record.scope})`)
+        console.log(`  - ${record.pluginId}@${record.pluginVersion} (${record.provider}, ${record.scope})`)
       }
       console.log('')
     }
 
     if (!args.available) return
 
-    const registryUrls: string[] = []
+    const registries: RegistryRef[] = []
     if (args.registry) {
-      if (isUrl(args.registry)) registryUrls.push(args.registry)
-      else {
-        const match = cfg.registries.find((r) => r.name === args.registry)
-        if (!match) {
-          throw new Error(
-            `Registry "${args.registry}" is not configured. Add it first with:\n` +
-              `agentrig registry add ${args.registry} <baseUrl>`
-          )
-        }
-        registryUrls.push(match.url)
-      }
+      registries.push(resolveConfiguredRegistry(String(args.registry), cfg.registries))
+    } else if (cfg.registries.length > 0) {
+      registries.push(...cfg.registries.map((registry) => resolveConfiguredRegistry(registry.name, cfg.registries)))
     } else {
-      for (const r of cfg.registries) registryUrls.push(r.url)
+      registries.push({
+        name: OFFICIAL_REGISTRY_ALIAS,
+        url: OFFICIAL_REGISTRY_URL,
+      })
     }
 
-    if (!registryUrls.length) {
+    if (!registries.length) {
       console.log('No registries configured. Add one in agentrig.config.json or global config.')
       return
     }
 
-    for (const base of registryUrls) {
-      console.log(`Available packs in: ${base}`)
+    for (const registry of registries) {
+      console.log(`Available plugins in: ${registry.name} (${registry.url})`)
       try {
-        const index = await readRegistryIndex(base)
+        const index = await readRegistryIndex(registry)
         if (!index.items?.length) {
           console.log('  (no items)')
           continue
         }
         for (const item of index.items) {
-          const v = item.version ? `@${item.version}` : ''
-          console.log(`  - ${item.name}${v}  ${item.title}`)
+          console.log(
+            `  - ${registry.name}/${item.plugin}@${item.latest_version}  ${item.name} [${item.trust_tier}]`
+          )
         }
       } catch (e) {
         console.log(`  Error: ${String(e)}`)

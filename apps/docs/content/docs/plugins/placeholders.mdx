@@ -1,0 +1,35 @@
+---
+title: Placeholders
+description: Templated target paths in plugin files.
+icon: Braces
+---
+
+# Placeholders
+
+Plugin file targets can include placeholders that are resolved during install.
+
+## Supported placeholders
+
+- `{{skillsDir}}` -> defaults to `.codex/skills` (or the `skillsDir` configured in `agentrig.config.json`).
+
+Example:
+
+```json
+{
+  "path": "skills/committer/SKILL.md",
+  "target": "{{skillsDir}}/committer/SKILL.md"
+}
+```
+
+## Safety rules
+
+The installer validates every resolved path and only allows a small set of safe prefixes:
+
+- `.codex/`
+- `.claude/`
+- `.cursor/`
+- `.agentrig/`
+- `scripts/`
+- `tools/`
+
+Any plugin that targets a path outside these prefixes will be rejected.

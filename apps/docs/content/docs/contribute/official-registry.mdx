@@ -1,6 +1,6 @@
 ---
 title: Official registry workflow
-description: Add packs or registry entries to the official registry.
+description: Add plugins or registry entries to the official registry.
 icon: PackagePlus
 ---
 
@@ -8,22 +8,44 @@ icon: PackagePlus
 
 Contributions are welcome! You can:
 
-- Add a pack under `registry/packs/<name>`
-- Add a registry to the directory at `apps/docs/public/directory/index.json`
+- Add or update a plugin in the canonical registry layout
+- Add a registry to the discovery directory
 
-## Add a pack
+If you already used the submission flow in AgentRig, the destination is still the same:
+an approved submission opens or updates a PR into `agentrig-registry`, and the
+version becomes publicly installable only after that PR is merged.
 
-1. Create the pack folder and add `meta.json`.
-2. Run `pnpm registry:build` to update `apps/docs/public/registry`.
-3. Open a PR.
+## Add a plugin
+
+1. Create or update `plugins/<namespace>/<plugin>/plugin.json`.
+2. Add a version at `plugins/<namespace>/<plugin>/versions/<version>/`.
+3. Include `.plugin/plugin.json`, `AGENTRIG_SOURCE.json`, `AGENTRIG_LOCK.json`, `AGENTRIG_REVIEW.json`, `README.md`, and `LICENSE`.
+4. Run the validator:
+
+```bash
+node scripts/validate-registry.mjs --write
+node scripts/validate-registry.mjs --check
+```
+
+5. Open a PR against `agentrig-registry`.
+
+## Rules
+
+- Do not add compatibility shapes, aliases, or fallback metadata.
+- Do not publish installable artifacts from Convex, ZIP uploads, author repos, or arbitrary URLs.
+- The canonical path is:
+  - `registry.json -> plugins/<namespace>/<plugin>/plugin.json -> versions/<version>/...`
+- The canonical install ref is:
+  - `<registryAlias>/<namespace.plugin>@<version>`
 
 ## Add a registry to the directory
 
-Edit `apps/docs/public/directory/index.json` and add a new entry following the directory schema.
+Add a discovery entry following the directory schema. Directory presence is discovery-only and does not grant install trust.
 
-This file is served by the docs app at `/directory/index.json`. Directory updates are Git-based (PR + deploy), not uploads.
+Directory updates are Git-based, not uploads.
 
 ## Keep changes safe
 
-- Include hashes in `meta.json` (use `agentrig pack create`).
-- Keep targets inside allowed prefixes.
+- Keep all required version artifacts present and aligned.
+- Keep trust tier, installability, and advisory state internally consistent.
+- Keep discovery terms separate from install terms.

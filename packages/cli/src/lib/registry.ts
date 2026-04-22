@@ -1,49 +1,165 @@
-import path from 'node:path'
 import process from 'node:process'
-import { readJsonFile } from './fs'
+import { sha256Hex } from './hash'
+import { validatePluginManifest } from './plugin-validation'
+import { INSTALLABILITY_STATES, REGISTRY_TRUST_TIERS } from './registry-contract'
 import type {
-  PackMeta,
+  PluginManifest,
   RegistryIndex,
   RegistryRef,
-  DirectoryEntry,
+  RegistryHistory,
+  RegistryInstallability,
+  RegistryLock,
+  RegistryReview,
+  RegistrySource,
+  RegistryVersionRecord,
+  PluginUploadPolicySnapshot,
   TrustTier,
 } from './types'
 
-/** Default official registry URL */
+export const OFFICIAL_REGISTRY_ALIAS = 'agentrig'
 export const OFFICIAL_REGISTRY_URL =
   process.env.AGENTRIG_OFFICIAL_REGISTRY_URL ?? 'https://agentrig.ai/registry'
+const OFFICIAL_REGISTRY_KEY_ID = 'agentrig-registry'
+const OFFICIAL_REGISTRY_SOURCE_REPOSITORY = 'https://github.com/agentrig/agentrig-registry'
+const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/
+const VERSION_PATTERN =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
+const DIGEST_EXCLUDED_RELATIVE_PATHS = new Set([
+  'AGENTRIG_LOCK.json',
+  'AGENTRIG_REVIEW.json',
+  'AGENTRIG_SOURCE.json',
+])
 
-/** Default directory index URL */
-export const DIRECTORY_INDEX_URL =
-  process.env.AGENTRIG_DIRECTORY_INDEX_URL ?? 'https://agentrig.ai/directory/index.json'
+export const LOCAL_PLUGIN_POLICY: PluginUploadPolicySnapshot = {
+  maxZipBytes: 0,
+  maxFileBytes: 0,
+  maxTotalBytes: 0,
+  maxFiles: 0,
+  allowedContentTypes: [],
+  blockedExtensions: ['.exe', '.dll', '.dylib', '.so', '.bin', '.app', '.pkg', '.dmg', '.iso', '.jar'],
+  allowedFileExtensions: [
+    '.md',
+    '.txt',
+    '.json',
+    '.yaml',
+    '.yml',
+    '.toml',
+    '.js',
+    '.ts',
+    '.tsx',
+    '.jsx',
+    '.mjs',
+    '.cjs',
+    '.sh',
+    '.bash',
+    '.zsh',
+    '.py',
+    '.rb',
+    '.php',
+    '.go',
+    '.rs',
+    '.java',
+    '.kt',
+    '.swift',
+    '.css',
+    '.scss',
+    '.html',
+    '.mdx',
+    '.sql',
+  ],
+  allowedFilenames: [
+    'README',
+    'README.md',
+    'LICENSE',
+    'NOTICE',
+    'CODEOWNERS',
+    'Makefile',
+    'Dockerfile',
+    '.env',
+    '.gitignore',
+    '.dockerfile',
+    '.Dockerfile',
+  ],
+  allowedTargetPrefixes: [
+    'skills/',
+    'agents/',
+    'hooks/',
+    '.codex/',
+    '.claude/',
+    '.cursor/',
+    '.agentrig/',
+    'scripts/',
+    'tools/',
+  ],
+  publishedVersionRetention: 0,
+}
 
 export type SourceBase =
-  | { type: 'url'; baseUrl: string }
-  | { type: 'fs'; baseDir: string }
+  { type: 'url'; baseUrl: string }
 
-export type ResolvedPack = {
-  meta: PackMeta
+export type ResolvedPlugin = {
+  manifest: PluginManifest
+  registryDocument: RegistryIndex
+  history: RegistryHistory
+  versionRecord: RegistryVersionRecord
+  lockArtifact: RegistryLock
+  sourceArtifact: RegistrySource
+  reviewArtifact: RegistryReview
+  snapshotDigest: string
   source: SourceBase
   sourceLabel: string
-  trustTier?: TrustTier
-  registry?: RegistryRef
+  trustTier: TrustTier
+  installability: RegistryInstallability
+  registry: RegistryRef
 }
 
-export function isUrl(spec: string) {
-  return /^https?:\/\//i.test(spec)
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(message)
 }
 
-export function isFileish(spec: string) {
-  return spec.endsWith('.json') || spec.startsWith('./') || spec.startsWith('../') || spec.startsWith('/') || spec.includes('\\')
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function expectRecord(value: unknown, where: string): Record<string, unknown> {
+  assert(isRecord(value), `Invalid ${where}: expected an object`)
+  return value
+}
+
+function expectString(value: unknown, where: string) {
+  assert(typeof value === 'string' && value.trim().length > 0, `Invalid ${where}: expected a non-empty string`)
+  return value.trim()
+}
+
+function expectStringArray(value: unknown, where: string) {
+  assert(Array.isArray(value), `Invalid ${where}: expected an array`)
+  return value.map((entry, index) => expectString(entry, `${where}[${index}]`))
+}
+
+function expectDate(value: unknown, where: string) {
+  const normalized = expectString(value, where)
+  assert(ISO_DATE_PATTERN.test(normalized), `Invalid ${where}: expected an ISO UTC timestamp`)
+  return normalized
+}
+
+function expectSha256Digest(value: unknown, where: string) {
+  const normalized = expectString(value, where)
+  assert(SHA256_PATTERN.test(normalized), `Invalid ${where}: expected sha256:<hex>`)
+  return normalized
 }
 
 export function joinUrl(baseUrl: string, rel: string) {
-  // Normalize base so URL(rel, base) behaves like path-joining.
-  // This also catches protocol-relative URLs like "//evil.com/x" as absolute URLs.
-  const base = new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
+  const base = new URL(baseUrl)
+  if (!base.pathname.endsWith('/')) {
+    base.pathname = `${base.pathname}/`
+  }
   const resolved = new URL(rel, base)
   if (resolved.origin !== base.origin) {
-    throw new Error(`External URLs are not allowed for pack files: ${rel}`)
+    throw new Error(`External URLs are not allowed for plugin files: ${rel}`)
+  }
+  if (!resolved.search && base.search && !/[?#]/.test(rel)) {
+    resolved.search = base.search
   }
   return resolved.toString()
 }
@@ -52,8 +168,16 @@ export function normalizeRegistryUrl(url: string) {
   return url.replace(/\/+$/, '')
 }
 
-export function isOfficialRegistry(registry: RegistryRef) {
-  return normalizeRegistryUrl(registry.url) === normalizeRegistryUrl(OFFICIAL_REGISTRY_URL)
+function isCanonicalRelativePath(value: string) {
+  if (!value || value.startsWith('/') || value.startsWith('\\')) return false
+  if (value.includes('\0')) return false
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value)) return false
+  const normalized = value.replace(/\\/g, '/')
+  if (normalized.includes('//')) return false
+  if (normalized.split('/').some((segment) => !segment || segment === '.' || segment === '..')) {
+    return false
+  }
+  return true
 }
 
 const DEFAULT_FETCH_TIMEOUT_MS = 15000
@@ -104,110 +228,550 @@ async function fetchJson<T>(url: string, headers?: Record<string, string>): Prom
   throw new Error(`Request failed after retries for ${url}`)
 }
 
-/**
- * Fetch the directory index from agentrig.ai or a custom URL.
- */
-export async function fetchDirectoryIndex(
-  url: string = DIRECTORY_INDEX_URL
-): Promise<DirectoryEntry[]> {
-  return fetchJson<DirectoryEntry[]>(url)
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortKeys(entry))
+  }
+  if (!isRecord(value)) {
+    return value
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, sortKeys(entry)])
+  )
 }
 
-/**
- * Find a registry entry in the directory by namespace.
- */
-export async function findRegistryInDirectory(
-  namespace: string,
-  directoryUrl: string = DIRECTORY_INDEX_URL
-): Promise<DirectoryEntry | null> {
-  const entries = await fetchDirectoryIndex(directoryUrl)
-  return entries.find((e) => e.name === namespace) ?? null
+function stableJson(value: unknown) {
+  return JSON.stringify(sortKeys(value))
 }
 
-export async function readRegistryIndex(registryUrl: string): Promise<RegistryIndex> {
-  const u = joinUrl(registryUrl, 'registry.json')
-  return fetchJson<RegistryIndex>(u)
+function digestJsonEnvelope(value: unknown) {
+  return `sha256:${sha256Hex(new TextEncoder().encode(stableJson(value)))}`
 }
 
-function getRegistryByName(name: string, registries: RegistryRef[]) {
-  return registries.find((registry) => registry.name === name)
+function splitPluginId(pluginId: string) {
+  const [namespace, pluginName, extra] = pluginId.split('.')
+  assert(namespace && pluginName && !extra, `Invalid plugin id: ${pluginId}`)
+  return { namespace, pluginName }
 }
 
-function getPrimaryRegistry(registries: RegistryRef[]) {
-  return registries.find((registry) => registry.name === 'official')
+function expectedVersionRoot(pluginId: string, version: string) {
+  const { namespace, pluginName } = splitPluginId(pluginId)
+  return `plugins/${namespace}/${pluginName}/versions/${version}/`
 }
 
-export async function resolvePackFromRegistryRef(
-  registry: RegistryRef,
-  packName: string
-): Promise<ResolvedPack> {
-  const metaUrl = joinUrl(registry.url, `${packName}.json`)
-  const meta = await fetchJson<PackMeta>(metaUrl)
-  return {
-    meta,
-    source: { type: 'url', baseUrl: registry.url },
-    sourceLabel: `registry:${registry.name}`,
-    trustTier: isOfficialRegistry(registry) ? 'official' : 'listed',
-    registry,
+function mapInstallability(trustTier: TrustTier): RegistryInstallability {
+  switch (trustTier) {
+    case 'official':
+    case 'reviewed':
+      return 'installable'
+    case 'listed':
+      return 'discovery_only'
+    case 'blocked':
+      return 'blocked'
+    case 'yanked':
+      return 'yanked'
   }
 }
 
-export async function resolvePackByName(
-  name: string,
-  registries: RegistryRef[]
-): Promise<ResolvedPack> {
-  const primaryRegistry = getPrimaryRegistry(registries)
-  if (!primaryRegistry) {
-    throw new Error(
-      'No primary registry is configured. Run `agentrig init` to create a fresh config.'
+function validateVersionRecord(
+  raw: unknown,
+  pluginId: string,
+  where: string
+): RegistryVersionRecord {
+  const record = expectRecord(raw, where)
+  const version = expectString(record.version, `${where}.version`)
+  assert(VERSION_PATTERN.test(version), `Invalid ${where}.version: expected exact semver`)
+  const root = expectedVersionRoot(pluginId, version)
+  const trustTier = expectString(record.trust_tier, `${where}.trust_tier`) as TrustTier
+  assert(REGISTRY_TRUST_TIERS.includes(trustTier), `Invalid ${where}.trust_tier: ${trustTier}`)
+  const installability = expectString(record.installability, `${where}.installability`) as RegistryInstallability
+  assert(INSTALLABILITY_STATES.includes(installability), `Invalid ${where}.installability: ${installability}`)
+  assert(
+    installability === mapInstallability(trustTier),
+    `Invalid ${where}.installability: expected "${mapInstallability(trustTier)}"`
+  )
+  const normalized: RegistryVersionRecord = {
+    version,
+    path: expectString(record.path, `${where}.path`),
+    manifest: expectString(record.manifest, `${where}.manifest`),
+    source: expectString(record.source, `${where}.source`),
+    lock: expectString(record.lock, `${where}.lock`),
+    review: expectString(record.review, `${where}.review`),
+    trust_tier: trustTier,
+    installability,
+    snapshot_digest: expectSha256Digest(record.snapshot_digest, `${where}.snapshot_digest`),
+    published_at: expectDate(record.published_at, `${where}.published_at`),
+  }
+  assert(normalized.path === root, `Invalid ${where}.path: expected "${root}"`)
+  assert(
+    normalized.manifest === `${root}.plugin/plugin.json`,
+    `Invalid ${where}.manifest: expected "${root}.plugin/plugin.json"`
+  )
+  assert(
+    normalized.source === `${root}AGENTRIG_SOURCE.json`,
+    `Invalid ${where}.source: expected "${root}AGENTRIG_SOURCE.json"`
+  )
+  assert(
+    normalized.lock === `${root}AGENTRIG_LOCK.json`,
+    `Invalid ${where}.lock: expected "${root}AGENTRIG_LOCK.json"`
+  )
+  assert(
+    normalized.review === `${root}AGENTRIG_REVIEW.json`,
+    `Invalid ${where}.review: expected "${root}AGENTRIG_REVIEW.json"`
+  )
+  return normalized
+}
+
+function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items'][number] {
+  const item = expectRecord(raw, where)
+  const pluginId = expectString(item.plugin, `${where}.plugin`)
+  const { namespace, pluginName } = splitPluginId(pluginId)
+  const latestVersion = expectString(item.latest_version, `${where}.latest_version`)
+  assert(VERSION_PATTERN.test(latestVersion), `Invalid ${where}.latest_version: expected exact semver`)
+  const trustTier = expectString(item.trust_tier, `${where}.trust_tier`) as TrustTier
+  assert(REGISTRY_TRUST_TIERS.includes(trustTier), `Invalid ${where}.trust_tier: ${trustTier}`)
+  const installability = expectString(item.installability, `${where}.installability`) as RegistryInstallability
+  assert(INSTALLABILITY_STATES.includes(installability), `Invalid ${where}.installability: ${installability}`)
+  assert(
+    installability === mapInstallability(trustTier),
+    `Invalid ${where}.installability: expected "${mapInstallability(trustTier)}"`
+  )
+  const history = expectString(item.history, `${where}.history`)
+  assert(
+    history === `plugins/${namespace}/${pluginName}/plugin.json`,
+    `Invalid ${where}.history: expected "plugins/${namespace}/${pluginName}/plugin.json"`
+  )
+  const activeVersion = validateVersionRecord(item.active_version, pluginId, `${where}.active_version`)
+  assert(
+    activeVersion.version === latestVersion,
+    `Invalid ${where}.active_version.version: expected "${latestVersion}"`
+  )
+  assert(
+    activeVersion.trust_tier === trustTier,
+    `Invalid ${where}.active_version.trust_tier: expected "${trustTier}"`
+  )
+  assert(
+    activeVersion.installability === installability,
+    `Invalid ${where}.active_version.installability: expected "${installability}"`
+  )
+  return {
+    plugin: pluginId,
+    name: expectString(item.name, `${where}.name`),
+    description: expectString(item.description, `${where}.description`),
+    latest_version: latestVersion,
+    history,
+    active_version: activeVersion,
+    trust_tier: trustTier,
+    installability,
+    keywords: item.keywords == null ? undefined : expectStringArray(item.keywords, `${where}.keywords`),
+    advisories: item.advisories == null ? undefined : expectStringArray(item.advisories, `${where}.advisories`),
+  }
+}
+
+function validateRegistryDocument(
+  raw: unknown,
+  expectedAlias: string,
+  expectedUrl: string
+): RegistryIndex {
+  const document = expectRecord(raw, 'registry.json')
+  const signature = expectRecord(document.signature, 'registry.json.signature')
+  const items = Array.isArray(document.items)
+    ? document.items.map((entry, index) => validateRegistryItem(entry, `registry.json.items[${index}]`))
+    : (() => { throw new Error('Invalid registry.json.items: expected an array') })()
+  const normalized: RegistryIndex = {
+    $schema: typeof document.$schema === 'string' ? document.$schema : undefined,
+    contract_version: expectString(document.contract_version, 'registry.json.contract_version'),
+    registry_alias: expectString(document.registry_alias, 'registry.json.registry_alias'),
+    source_repository: expectString(document.source_repository, 'registry.json.source_repository'),
+    generated_at: expectDate(document.generated_at, 'registry.json.generated_at'),
+    signature: {
+      algorithm: expectString(signature.algorithm, 'registry.json.signature.algorithm'),
+      key_id: expectString(signature.key_id, 'registry.json.signature.key_id'),
+      target: expectString(signature.target, 'registry.json.signature.target'),
+      signed_digest: expectSha256Digest(signature.signed_digest, 'registry.json.signature.signed_digest'),
+    },
+    items,
+  }
+  assert(normalized.contract_version === '1', 'Invalid registry.json.contract_version: expected "1"')
+  assert(
+    normalized.registry_alias === expectedAlias,
+    `Registry alias mismatch for ${expectedUrl}: expected "${expectedAlias}", got "${normalized.registry_alias}".`
+  )
+  assert(
+    normalized.signature.algorithm === 'sha256-json-envelope',
+    'Invalid registry.json.signature.algorithm: expected "sha256-json-envelope"'
+  )
+  assert(
+    normalized.signature.target === 'registry.json',
+    'Invalid registry.json.signature.target: expected "registry.json"'
+  )
+  if (expectedAlias === OFFICIAL_REGISTRY_ALIAS) {
+    assert(
+      normalized.signature.key_id === OFFICIAL_REGISTRY_KEY_ID,
+      `Invalid registry.json.signature.key_id for ${expectedAlias}: expected "${OFFICIAL_REGISTRY_KEY_ID}".`
+    )
+    assert(
+      normalized.source_repository === OFFICIAL_REGISTRY_SOURCE_REPOSITORY,
+      `Invalid registry.json.source_repository for ${expectedAlias}: expected "${OFFICIAL_REGISTRY_SOURCE_REPOSITORY}".`
     )
   }
-
-  return resolvePackFromRegistryRef(primaryRegistry, name)
+  const unsignedPayload = {
+    $schema: normalized.$schema,
+    contract_version: normalized.contract_version,
+    registry_alias: normalized.registry_alias,
+    source_repository: normalized.source_repository,
+    generated_at: normalized.generated_at,
+    items: normalized.items,
+  }
+  const actualDigest = digestJsonEnvelope(unsignedPayload)
+  assert(
+    normalized.signature.signed_digest === actualDigest,
+    `Registry signature verification failed for ${expectedAlias}: digest mismatch.`
+  )
+  return normalized
 }
 
-export async function resolvePackFromRegistryAlias(
+function validateHistoryDocument(
+  raw: unknown,
+  pluginId: string,
+  expectedHistoryPath: string
+): RegistryHistory {
+  const history = expectRecord(raw, expectedHistoryPath)
+  const versions = Array.isArray(history.versions)
+    ? history.versions.map((entry, index) =>
+        validateVersionRecord(entry, pluginId, `${expectedHistoryPath}.versions[${index}]`)
+      )
+    : (() => { throw new Error(`Invalid ${expectedHistoryPath}.versions: expected an array`) })()
+  assert(versions.length > 0, `Invalid ${expectedHistoryPath}.versions: expected at least one version`)
+  const activeVersion = validateVersionRecord(
+    history.active_version,
+    pluginId,
+    `${expectedHistoryPath}.active_version`
+  )
+  const trustTier = expectString(history.trust_tier, `${expectedHistoryPath}.trust_tier`) as TrustTier
+  assert(REGISTRY_TRUST_TIERS.includes(trustTier), `Invalid ${expectedHistoryPath}.trust_tier: ${trustTier}`)
+  const installability = expectString(history.installability, `${expectedHistoryPath}.installability`) as RegistryInstallability
+  assert(
+    INSTALLABILITY_STATES.includes(installability),
+    `Invalid ${expectedHistoryPath}.installability: ${installability}`
+  )
+  assert(
+    installability === mapInstallability(trustTier),
+    `Invalid ${expectedHistoryPath}.installability: expected "${mapInstallability(trustTier)}"`
+  )
+  const latestVersion = expectString(history.latest_version, `${expectedHistoryPath}.latest_version`)
+  const normalized: RegistryHistory = {
+    $schema: typeof history.$schema === 'string' ? history.$schema : undefined,
+    plugin: expectString(history.plugin, `${expectedHistoryPath}.plugin`),
+    namespace: expectString(history.namespace, `${expectedHistoryPath}.namespace`),
+    name: expectString(history.name, `${expectedHistoryPath}.name`),
+    description: expectString(history.description, `${expectedHistoryPath}.description`),
+    latest_version: latestVersion,
+    trust_tier: trustTier,
+    installability,
+    active_version: activeVersion,
+    keywords: history.keywords == null ? undefined : expectStringArray(history.keywords, `${expectedHistoryPath}.keywords`),
+    advisories: history.advisories == null ? undefined : expectStringArray(history.advisories, `${expectedHistoryPath}.advisories`),
+    versions,
+  }
+  assert(normalized.plugin === pluginId, `Invalid ${expectedHistoryPath}.plugin: expected "${pluginId}"`)
+  assert(
+    `${normalized.namespace}.${splitPluginId(pluginId).pluginName}` === pluginId,
+    `Invalid ${expectedHistoryPath}.namespace for "${pluginId}".`
+  )
+  assert(
+    activeVersion.version === latestVersion,
+    `Invalid ${expectedHistoryPath}.active_version.version: expected "${latestVersion}"`
+  )
+  assert(
+    activeVersion.trust_tier === trustTier,
+    `Invalid ${expectedHistoryPath}.active_version.trust_tier: expected "${trustTier}"`
+  )
+  assert(
+    activeVersion.installability === installability,
+    `Invalid ${expectedHistoryPath}.active_version.installability: expected "${installability}"`
+  )
+  return normalized
+}
+
+function validateFileDigests(raw: unknown, where: string) {
+  assert(Array.isArray(raw), `Invalid ${where}: expected an array`)
+  let previousPath: string | null = null
+  const seenPaths = new Set<string>()
+  return raw.map((entry, index) => {
+    const digestEntry = expectRecord(entry, `${where}[${index}]`)
+    const filePath = expectString(digestEntry.path, `${where}[${index}].path`)
+    assert(
+      isCanonicalRelativePath(filePath) && !DIGEST_EXCLUDED_RELATIVE_PATHS.has(filePath),
+      `Invalid ${where}[${index}].path: ${filePath}`
+    )
+    assert(!seenPaths.has(filePath), `Invalid ${where}: duplicate digest path "${filePath}"`)
+    if (previousPath != null) {
+      assert(previousPath.localeCompare(filePath) < 0, `Invalid ${where}: file_digests must be sorted by path`)
+    }
+    seenPaths.add(filePath)
+    previousPath = filePath
+    return {
+      path: filePath,
+      digest: expectSha256Digest(digestEntry.digest, `${where}[${index}].digest`),
+    }
+  })
+}
+
+function validateLockArtifact(
+  raw: unknown,
+  pluginId: string,
+  version: string,
+  expectedSnapshotDigest: string,
+  where: string
+): RegistryLock {
+  const artifact = expectRecord(raw, where)
+  const fileDigests = validateFileDigests(artifact.file_digests, `${where}.file_digests`)
+  const dependencies = Array.isArray(artifact.dependencies)
+    ? artifact.dependencies.map((entry, index) => {
+        const dependency = expectRecord(entry, `${where}.dependencies[${index}]`)
+        const plugin = expectString(dependency.plugin, `${where}.dependencies[${index}].plugin`)
+        const dependencyVersion = expectString(
+          dependency.version,
+          `${where}.dependencies[${index}].version`
+        )
+        assert(VERSION_PATTERN.test(dependencyVersion), `Invalid ${where}.dependencies[${index}].version`)
+        splitPluginId(plugin)
+        return { plugin, version: dependencyVersion }
+      })
+    : (() => { throw new Error(`Invalid ${where}.dependencies: expected an array`) })()
+  const snapshotDigest = digestJsonEnvelope(fileDigests)
+  assert(
+    snapshotDigest === expectedSnapshotDigest,
+    `Snapshot digest verification failed for ${pluginId}@${version}: lock file digest set does not match ${expectedSnapshotDigest}.`
+  )
+  const normalized: RegistryLock = {
+    $schema: typeof artifact.$schema === 'string' ? artifact.$schema : undefined,
+    plugin: expectString(artifact.plugin, `${where}.plugin`),
+    version: expectString(artifact.version, `${where}.version`),
+    file_digests: fileDigests,
+    capability_set: expectStringArray(artifact.capability_set, `${where}.capability_set`),
+    declared_network_domains: expectStringArray(artifact.declared_network_domains, `${where}.declared_network_domains`),
+    declared_secrets: expectStringArray(artifact.declared_secrets, `${where}.declared_secrets`),
+    runtime_requirements: expectStringArray(artifact.runtime_requirements, `${where}.runtime_requirements`),
+    dependencies,
+    snapshot_digest: expectSha256Digest(artifact.snapshot_digest, `${where}.snapshot_digest`),
+  }
+  assert(normalized.plugin === pluginId, `Invalid ${where}.plugin: expected "${pluginId}"`)
+  assert(normalized.version === version, `Invalid ${where}.version: expected "${version}"`)
+  assert(
+    normalized.snapshot_digest === expectedSnapshotDigest,
+    `Invalid ${where}.snapshot_digest: expected "${expectedSnapshotDigest}".`
+  )
+  return normalized
+}
+
+function validateSourceArtifact(
+  raw: unknown,
+  expectedSnapshotDigest: string,
+  where: string
+): RegistrySource {
+  const artifact = expectRecord(raw, where)
+  const normalized: RegistrySource = {
+    $schema: typeof artifact.$schema === 'string' ? artifact.$schema : undefined,
+    upstream_repo: expectString(artifact.upstream_repo, `${where}.upstream_repo`),
+    upstream_tag: expectString(artifact.upstream_tag, `${where}.upstream_tag`),
+    upstream_commit: expectString(artifact.upstream_commit, `${where}.upstream_commit`),
+    plugin_path: expectString(artifact.plugin_path, `${where}.plugin_path`),
+    submitted_by: expectString(artifact.submitted_by, `${where}.submitted_by`),
+    snapshot_created_at: expectDate(artifact.snapshot_created_at, `${where}.snapshot_created_at`),
+    snapshot_tree_digest: expectSha256Digest(
+      artifact.snapshot_tree_digest,
+      `${where}.snapshot_tree_digest`
+    ),
+  }
+  assert(
+    normalized.snapshot_tree_digest === expectedSnapshotDigest,
+    `Invalid ${where}.snapshot_tree_digest: expected "${expectedSnapshotDigest}".`
+  )
+  assert(
+    isCanonicalRelativePath(normalized.plugin_path),
+    `Invalid ${where}.plugin_path: expected a canonical relative path`
+  )
+  return normalized
+}
+
+function validateReviewArtifact(
+  raw: unknown,
+  trustTier: TrustTier,
+  installability: RegistryInstallability,
+  where: string
+): RegistryReview {
+  const artifact = expectRecord(raw, where)
+  const scannerSummary = expectRecord(artifact.scanner_summary, `${where}.scanner_summary`)
+  const trustTierBasis = expectRecord(artifact.trust_tier_basis, `${where}.trust_tier_basis`)
+  const normalized: RegistryReview = {
+    $schema: typeof artifact.$schema === 'string' ? artifact.$schema : undefined,
+    review_status: expectString(artifact.review_status, `${where}.review_status`),
+    reviewer: expectString(artifact.reviewer, `${where}.reviewer`),
+    reviewed_at: expectDate(artifact.reviewed_at, `${where}.reviewed_at`),
+    scanner_summary: {
+      status: expectString(scannerSummary.status, `${where}.scanner_summary.status`),
+      findings: scannerSummary.findings == null
+        ? undefined
+        : expectStringArray(scannerSummary.findings, `${where}.scanner_summary.findings`),
+    },
+    policy_decisions: expectStringArray(artifact.policy_decisions, `${where}.policy_decisions`),
+    trust_tier_basis: {
+      trust_tier: expectString(trustTierBasis.trust_tier, `${where}.trust_tier_basis.trust_tier`) as TrustTier,
+      installability: expectString(
+        trustTierBasis.installability,
+        `${where}.trust_tier_basis.installability`
+      ) as RegistryInstallability,
+      rationale: expectString(trustTierBasis.rationale, `${where}.trust_tier_basis.rationale`),
+    },
+  }
+  assert(
+    normalized.trust_tier_basis.trust_tier === trustTier,
+    `Invalid ${where}.trust_tier_basis.trust_tier: expected "${trustTier}".`
+  )
+  assert(
+    normalized.trust_tier_basis.installability === installability,
+    `Invalid ${where}.trust_tier_basis.installability: expected "${installability}".`
+  )
+  return normalized
+}
+
+export function resolveConfiguredRegistry(
   alias: string,
-  packName: string,
   registries: RegistryRef[]
-): Promise<ResolvedPack> {
-  const registry = getRegistryByName(alias, registries)
+): RegistryRef {
+  if (alias === OFFICIAL_REGISTRY_ALIAS) {
+    const configured = registries.find((entry) => entry.name === alias)
+    return configured
+      ? { name: configured.name, url: normalizeRegistryUrl(configured.url) }
+      : {
+      name: OFFICIAL_REGISTRY_ALIAS,
+      url: normalizeRegistryUrl(OFFICIAL_REGISTRY_URL),
+    }
+  }
+  const registry = registries.find((entry) => entry.name === alias)
   if (!registry) {
     throw new Error(
-      `Registry "${alias}" is not configured. Add it first with:\n` +
+      `Unknown registry alias "${alias}". Add it first with:\n` +
         `agentrig registry add ${alias} <baseUrl>`
     )
   }
-
-  return resolvePackFromRegistryRef(registry, packName)
+  return {
+    name: registry.name,
+    url: normalizeRegistryUrl(registry.url),
+  }
 }
 
-export async function resolvePackFromMetaSpec(spec: string, cwd: string): Promise<ResolvedPack> {
-  if (isUrl(spec)) {
-    const metaUrl = spec
-    const meta = await fetchJson<PackMeta>(metaUrl)
-    // Base is the meta URL directory, so relative file paths work naturally.
-    const baseUrl = metaUrl.replace(/\/[^/]*$/, '/')
-    return { meta, source: { type: 'url', baseUrl }, sourceLabel: `url:${metaUrl}` }
-  }
+export async function readRegistryIndex(registry: RegistryRef): Promise<RegistryIndex> {
+  const registryUrl = normalizeRegistryUrl(registry.url)
+  const raw = await fetchJson<unknown>(joinUrl(registryUrl, 'registry.json'))
+  return validateRegistryDocument(raw, registry.name, registryUrl)
+}
 
-  // local file
-  const abs = path.isAbsolute(spec) ? spec : path.join(cwd, spec)
-  const meta = await readJsonFile<PackMeta>(abs)
-  if (!meta) throw new Error(`Meta file not found: ${abs}`)
-  return { meta, source: { type: 'fs', baseDir: path.dirname(abs) }, sourceLabel: `file:${abs}` }
+async function readHistoryDocument(
+  registry: RegistryRef,
+  registryDocument: RegistryIndex,
+  pluginId: string
+) {
+  const item = registryDocument.items.find((entry) => entry.plugin === pluginId)
+  if (!item) {
+    throw new Error(`Unknown plugin "${pluginId}" in registry "${registry.name}".`)
+  }
+  const raw = await fetchJson<unknown>(joinUrl(registry.url, item.history))
+  const history = validateHistoryDocument(raw, pluginId, item.history)
+  assert(
+    history.latest_version === item.latest_version,
+    `Registry history mismatch for "${pluginId}": latest version drift.`
+  )
+  assert(
+    history.trust_tier === item.trust_tier,
+    `Registry history mismatch for "${pluginId}": trust tier drift.`
+  )
+  assert(
+    history.installability === item.installability,
+    `Registry history mismatch for "${pluginId}": installability drift.`
+  )
+  return history
 }
 
 export async function readSourceFile(source: SourceBase, relPath: string): Promise<Uint8Array> {
-  if (source.type === 'url') {
-    const url = joinUrl(source.baseUrl, relPath)
-    const res = await fetchWithTimeout(url, {})
-    if (!res.ok) throw new Error(`Request failed (${res.status}) for ${url}`)
-    return new Uint8Array(await res.arrayBuffer())
+  const url = joinUrl(source.baseUrl, relPath)
+  const res = await fetchWithTimeout(url, {})
+  if (!res.ok) throw new Error(`Request failed (${res.status}) for ${url}`)
+  return new Uint8Array(await res.arrayBuffer())
+}
+
+export async function resolvePluginFromRegistryRef(
+  registry: RegistryRef,
+  pluginId: string,
+  version: string
+): Promise<ResolvedPlugin> {
+  const normalizedRegistry: RegistryRef = {
+    name: registry.name,
+    url: normalizeRegistryUrl(registry.url),
+  }
+  const registryDocument = await readRegistryIndex(normalizedRegistry)
+  const history = await readHistoryDocument(normalizedRegistry, registryDocument, pluginId)
+  const versionRecord = history.versions.find((entry) => entry.version === version)
+  if (!versionRecord) {
+    throw new Error(
+      `Unknown version "${version}" for plugin "${pluginId}" in registry "${normalizedRegistry.name}".`
+    )
   }
 
-  // fs
-  const p = path.isAbsolute(relPath) ? relPath : path.join(source.baseDir, relPath)
-  const data = await import('node:fs/promises').then((m) => m.readFile(p))
-  return new Uint8Array(data)
+  const [manifestRaw, lockRaw, sourceRaw, reviewRaw] = await Promise.all([
+    fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.manifest)),
+    fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.lock)),
+    fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.source)),
+    fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.review)),
+  ])
+  const manifest = validatePluginManifest(manifestRaw)
+  assert(manifest.id === pluginId, `Registry manifest id mismatch for "${pluginId}".`)
+  assert(manifest.version === version, `Registry manifest version mismatch for "${pluginId}@${version}".`)
+  const lockArtifact = validateLockArtifact(
+    lockRaw,
+    pluginId,
+    version,
+    versionRecord.snapshot_digest,
+    versionRecord.lock
+  )
+  const sourceArtifact = validateSourceArtifact(
+    sourceRaw,
+    versionRecord.snapshot_digest,
+    versionRecord.source
+  )
+  const reviewArtifact = validateReviewArtifact(
+    reviewRaw,
+    versionRecord.trust_tier,
+    versionRecord.installability,
+    versionRecord.review
+  )
+  return {
+    manifest,
+    registryDocument,
+    history,
+    versionRecord,
+    lockArtifact,
+    sourceArtifact,
+    reviewArtifact,
+    snapshotDigest: versionRecord.snapshot_digest,
+    source: { type: 'url', baseUrl: joinUrl(normalizedRegistry.url, versionRecord.path) },
+    sourceLabel: `${normalizedRegistry.name}/${pluginId}@${version}`,
+    trustTier: versionRecord.trust_tier,
+    installability: versionRecord.installability,
+    registry: normalizedRegistry,
+  }
+}
+
+export async function resolvePluginFromRegistryAlias(
+  alias: string,
+  pluginId: string,
+  version: string,
+  registries: RegistryRef[]
+): Promise<ResolvedPlugin> {
+  const registry = resolveConfiguredRegistry(alias, registries)
+  return resolvePluginFromRegistryRef(registry, pluginId, version)
 }

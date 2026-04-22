@@ -3,14 +3,14 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../../lib/config'
 import {
-  cleanupMaterializedPack,
-  materializeResolvedPackGraph,
-  resolvePackGraph,
-  type ResolvedPackGraph,
+  cleanupMaterializedPlugin,
+  materializeResolvedPluginGraph,
+  resolvePluginGraph,
+  type ResolvedPluginGraph,
 } from '../../lib/plugin-consumer'
 import { loadPluginInstallLedgers, listPluginInstallRecords } from '../../lib/plugin-install-ledger'
 import {
-  buildResolvedPackSpecIdentityMap,
+  buildResolvedPluginInstallMetadataMap,
   getPluginInstallSpecIdentityKey,
 } from '../../lib/plugin-install-spec'
 import {
@@ -20,11 +20,11 @@ import {
   preparePluginInstall,
   uninstallPluginProviders,
 } from '../../lib/plugin-providers'
-import { determineTrustTier, requiresConfirmation } from '../../lib/trust'
-import type { ResolvedPack } from '../../lib/registry'
+import { assertInstallableTrust } from '../../lib/trust'
+import type { ResolvedPlugin } from '../../lib/registry'
 
-function resolveRigPacks(
-  rigs: Record<string, { extends?: string[]; packs?: string[] }>,
+function resolveRigPlugins(
+  rigs: Record<string, { extends?: string[]; plugins?: string[] }>,
   rigName: string,
   seen: Set<string> = new Set(),
 ): string[] {
@@ -37,9 +37,9 @@ function resolveRigPacks(
   const result: string[] = []
 
   for (const parent of rig.extends ?? []) {
-    result.push(...resolveRigPacks(rigs, parent, seen))
+    result.push(...resolveRigPlugins(rigs, parent, seen))
   }
-  for (const p of rig.packs ?? []) result.push(p)
+  for (const p of rig.plugins ?? []) result.push(p)
 
   // de-dupe while preserving order
   const out: string[] = []
@@ -78,18 +78,12 @@ const args = {
   },
   prune: {
     type: 'boolean',
-    description: 'Remove installed packs that are not part of the rig',
+    description: 'Remove installed plugins that are not part of the rig',
     default: true,
   },
   dryRun: {
     type: 'boolean',
     description: 'Show what would happen without writing files or invoking provider CLIs.',
-    default: false,
-  },
-  yes: {
-    type: 'boolean',
-    alias: 'y',
-    description: 'Skip confirmation prompts for unlisted sources.',
     default: false,
   },
   help: {
@@ -102,7 +96,7 @@ const args = {
 
 function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginInstall>>) {
   console.log('Install plan:')
-  console.log(`  packs: ${plan.packs.map((pack) => pack.meta.name).join(', ')}`)
+  console.log(`  plugins: ${plan.plugins.map((plugin) => plugin.manifest.id).join(', ')}`)
   console.log(`  requested scope: ${plan.requestedScope}`)
 
   for (const provider of plan.providers) {
@@ -116,25 +110,25 @@ function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginIn
   }
 }
 
-function mergePackGraphs(graphs: ResolvedPackGraph[]) {
-  const ordered: ResolvedPack[] = []
+function mergePluginGraphs(graphs: ResolvedPluginGraph[]) {
+  const ordered: ResolvedPlugin[] = []
   const visitKeys = new Set<string>()
-  const sourcesByPackName = new Map<string, string>()
+  const sourcesByPluginId = new Map<string, string>()
 
   for (const graph of graphs) {
-    for (const resolved of graph.resolvedPacks) {
-      const visitKey = `${resolved.sourceLabel}:${resolved.meta.name}`
+    for (const resolved of graph.resolvedPlugins) {
+      const visitKey = `${resolved.sourceLabel}:${resolved.manifest.id}`
       if (visitKeys.has(visitKey)) continue
 
-      const existingSource = sourcesByPackName.get(resolved.meta.name)
+      const existingSource = sourcesByPluginId.get(resolved.manifest.id)
       if (existingSource && existingSource !== resolved.sourceLabel) {
         throw new Error(
-          `Rig resolves pack "${resolved.meta.name}" from multiple sources (${existingSource}, ${resolved.sourceLabel}). Use one canonical source per pack name.`
+          `Rig resolves plugin "${resolved.manifest.id}" from multiple sources (${existingSource}, ${resolved.sourceLabel}). Use one canonical source per plugin id.`
         )
       }
 
       visitKeys.add(visitKey)
-      sourcesByPackName.set(resolved.meta.name, resolved.sourceLabel)
+      sourcesByPluginId.set(resolved.manifest.id, resolved.sourceLabel)
       ordered.push(resolved)
     }
   }
@@ -145,7 +139,7 @@ function mergePackGraphs(graphs: ResolvedPackGraph[]) {
 const command = defineCommand({
   meta: {
     name: 'apply',
-    description: 'Apply a rig by installing its pack specs as provider plugins.',
+    description: 'Apply a rig by installing its plugin specs as provider plugins.',
   },
   args,
   async run({ args }) {
@@ -161,9 +155,9 @@ const command = defineCommand({
     const rigName = args.name ?? cfg.defaultRig
     if (!rigName) throw new Error('No rig name provided and config.defaultRig is not set.')
 
-    const packSpecs = resolveRigPacks(cfg.rigs, rigName)
-    if (!packSpecs.length) {
-      console.log(`Rig "${rigName}" has no packs.`)
+    const pluginSpecs = resolveRigPlugins(cfg.rigs, rigName)
+    if (!pluginSpecs.length) {
+      console.log(`Rig "${rigName}" has no plugins.`)
       return
     }
 
@@ -173,43 +167,35 @@ const command = defineCommand({
 
     console.log(`Applying rig: ${rigName}`)
     console.log(`provider: ${provider}`)
-    console.log(`pack specs: ${packSpecs.join(', ')}`)
+    console.log(`plugin specs: ${pluginSpecs.join(', ')}`)
     console.log('')
 
-    const graphs: ResolvedPackGraph[] = []
-    for (const packSpec of packSpecs) {
-      graphs.push(await resolvePackGraph(packSpec, cwd, cfg.registries))
+    const graphs: ResolvedPluginGraph[] = []
+    for (const pluginSpec of pluginSpecs) {
+      graphs.push(await resolvePluginGraph(pluginSpec, cwd, cfg.registries))
     }
-    const resolvedPacks = mergePackGraphs(graphs)
-    const unlistedPacks: string[] = []
-    for (const resolved of resolvedPacks) {
-      const trustTier = resolved.trustTier ?? await determineTrustTier(
-        resolved.source.type === 'url' ? resolved.source.baseUrl : resolved.sourceLabel,
-        cfg.registries
-      )
-      if (requiresConfirmation(trustTier)) {
-        unlistedPacks.push(resolved.meta.name)
-      }
-    }
-    if (unlistedPacks.length > 0 && !args.yes) {
-      throw new Error(
-        `This rig includes pack(s) from unlisted sources: ${unlistedPacks.join(', ')}.\n` +
-          'Re-run with --yes to confirm install.'
+    const resolvedPlugins = mergePluginGraphs(graphs)
+    for (const resolved of resolvedPlugins) {
+      assertInstallableTrust(
+        resolved.manifest.id,
+        resolved.manifest.version,
+        resolved.trustTier,
+        resolved.installability
       )
     }
 
-    const materialized = await materializeResolvedPackGraph({
-      requestedPack: graphs[0]!.requestedPack,
-      resolvedPacks,
+    const materialized = await materializeResolvedPluginGraph({
+      requestedPlugin: graphs[0]!.requestedPlugin,
+      resolvedPlugins,
     })
-    const specIdentitiesByPackName = buildResolvedPackSpecIdentityMap(resolvedPacks)
+    const installMetadataByPluginId = buildResolvedPluginInstallMetadataMap(resolvedPlugins)
 
     try {
       const plan = await preparePluginInstall({
         cwd,
         agent: provider,
-        packsDir: materialized.packsRoot,
-        specIdentitiesByPackName,
+        pluginsDir: materialized.pluginsRoot,
+        installMetadataByPluginId,
         scope,
         force: args.force,
         dryRun: args.dryRun,
@@ -230,8 +216,8 @@ const command = defineCommand({
       const effectiveScope = plan.providers[0]?.scope
       if (args.prune && effectiveScope) {
         const want = new Set(
-          Object.values(specIdentitiesByPackName).map((identity) =>
-            getPluginInstallSpecIdentityKey(identity)
+          Object.values(installMetadataByPluginId).map((entry) =>
+            getPluginInstallSpecIdentityKey(entry.specIdentity)
           )
         )
         const ledgers = await loadPluginInstallLedgers(cwd)
@@ -244,7 +230,7 @@ const command = defineCommand({
         if (toRemove.length) {
           console.log('')
           console.log(
-            `Pruning ${toRemove.length} plugin install(s): ${toRemove.map((record) => record.packName).join(', ')}`
+            `Pruning ${toRemove.length} plugin install(s): ${toRemove.map((record) => record.pluginId).join(', ')}`
           )
           const pruneResults = await uninstallPluginProviders(toRemove, {
             cwd,
@@ -261,7 +247,7 @@ const command = defineCommand({
         }
       }
     } finally {
-      await cleanupMaterializedPack(materialized.packsRoot)
+      await cleanupMaterializedPlugin(materialized.pluginsRoot)
     }
 
     if (!args.prune) {

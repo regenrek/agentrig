@@ -7,23 +7,28 @@ icon: GitMerge
 # Extending rigs
 
 Rigs can extend other rigs using the `extends` array.
-The CLI resolves packs in order and de-duplicates while preserving order.
+The CLI resolves plugins in order and de-duplicates while preserving order.
 
 Example:
 
 ```json
 {
   "rigs": {
-    "core": { "packs": ["core-committer", "security-check"] },
-    "website": { "extends": ["core"], "packs": ["typescript"] }
+    "core": {
+      "plugins": [
+        "agentrig/agentrig.core-committer@0.1.0",
+        "agentrig/agentrig.security-check@0.1.0"
+      ]
+    },
+    "website": { "extends": ["core"], "plugins": ["agentrig/community.typescript@0.1.0"] }
   }
 }
 ```
 
 When you apply `website`, agentrig installs:
 
-1. `core-committer`
-2. `security-check`
-3. `typescript`
+1. `agentrig/agentrig.core-committer@0.1.0`
+2. `agentrig/agentrig.security-check@0.1.0`
+3. `agentrig/community.typescript@0.1.0`
 
 This keeps shared foundations in one place.

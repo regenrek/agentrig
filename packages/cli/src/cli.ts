@@ -8,7 +8,7 @@ const main = defineCommand({
   meta: {
     name: 'agentrig',
     version: packageJson.version,
-    description: 'Compose and apply skills/workflows via packs and registries.',
+    description: 'Compose and apply skills/workflows via plugins and registries.',
   },
   args: {
     help: {
@@ -28,7 +28,6 @@ const main = defineCommand({
     rig: () => import('./commands/rig').then((m) => m.default),
     registry: () => import('./commands/registry').then((m) => m.default),
     plugin: () => import('./commands/plugin').then((m) => m.default),
-    pack: () => import('./commands/pack').then((m) => m.default),
   },
   async run({ args, rawArgs }) {
     if (args.help) {

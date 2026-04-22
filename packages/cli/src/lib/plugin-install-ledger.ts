@@ -13,21 +13,25 @@ import type {
 const pluginProviderSchema = z.enum(['claude', 'codex', 'cursor'])
 const pluginInstallScopeSchema = z.enum(['personal', 'workspace'])
 const pluginInstallScopeSelectorSchema = z.enum(['auto', 'personal', 'workspace'])
-const pluginInstallSpecIdentitySchema = z.discriminatedUnion('kind', [
-  z.strictObject({
-    kind: z.literal('registry'),
-    registryUrl: z.string().min(1),
-    packName: z.string().min(1),
+const pluginInstallSpecIdentitySchema = z.strictObject({
+  kind: z.literal('registry'),
+  registryAlias: z.string().min(1),
+  registryUrl: z.string().min(1),
+  pluginId: z.string().min(1),
+  version: z.string().min(1),
+})
+const verifiedRegistryIdentitySchema = z.strictObject({
+  registryAlias: z.string().min(1),
+  registryUrl: z.string().min(1),
+  sourceRepository: z.string().min(1),
+  contractVersion: z.string().min(1),
+  generatedAt: z.string().min(1),
+  signature: z.strictObject({
+    algorithm: z.string().min(1),
+    keyId: z.string().min(1),
+    signedDigest: z.string().min(1),
   }),
-  z.strictObject({
-    kind: z.literal('url'),
-    metaUrl: z.string().min(1),
-  }),
-  z.strictObject({
-    kind: z.literal('file'),
-    metaPath: z.string().min(1),
-  }),
-])
+})
 const pluginInstalledFileSchema = z.strictObject({
   path: z.string().min(1),
   sha256: z.string().min(1),
@@ -37,11 +41,12 @@ const pluginInstallRecordBaseSchema = z.strictObject({
   provider: pluginProviderSchema,
   requestedScope: pluginInstallScopeSelectorSchema,
   specIdentity: pluginInstallSpecIdentitySchema,
+  registry: verifiedRegistryIdentitySchema,
   scope: pluginInstallScopeSchema,
-  packName: z.string().min(1),
-  packVersion: z.string().min(1),
+  pluginId: z.string().min(1),
+  pluginVersion: z.string().min(1),
+  snapshotDigest: z.string().min(1),
   pluginName: z.string().min(1),
-  sourceLocation: z.string().min(1),
   targetPaths: z.array(z.string().min(1)),
   installedAt: z.string().min(1),
 })
@@ -78,7 +83,7 @@ const pluginInstallRecordSchema = z.discriminatedUnion('provider', [
   cursorPluginInstallRecordSchema,
 ])
 const pluginInstallLedgerSchema = z.strictObject({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   installs: z.record(z.string(), pluginInstallRecordSchema),
 })
 
@@ -103,9 +108,20 @@ export async function loadPluginInstallLedger(
   const raw = await readJsonFile<unknown>(ledgerPath)
   if (!raw) {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       installs: {},
     }
+  }
+
+  if (
+    typeof raw === 'object' &&
+    raw != null &&
+    'schemaVersion' in raw &&
+    (raw as { schemaVersion?: unknown }).schemaVersion === 1
+  ) {
+    throw new Error(
+      `Unsupported plugin install ledger at ${ledgerPath}: schemaVersion 1 cannot represent verified registry snapshots. Remove the old ledger or reinstall under the current registry-only contract.`
+    )
   }
 
   const parsed = pluginInstallLedgerSchema.safeParse(raw)

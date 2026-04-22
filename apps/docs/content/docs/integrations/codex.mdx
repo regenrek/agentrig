@@ -1,16 +1,16 @@
 ---
 title: Codex
-description: Install resolved packs as local Codex plugins.
+description: Install resolved plugins as local Codex plugins.
 icon: Bot
 ---
 
 # Codex integration
 
-Install a resolved pack into Codex:
+Install a resolved plugin into Codex:
 
 ```bash
-agentrig plugin install codex core-committer
-agentrig plugin install codex georg/ts-master-pack --scope workspace
+agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
+agentrig plugin install codex georg/georg.ts-master-plugin@1.2.0 --scope workspace
 ```
 
 `--scope auto` is the default selector.
@@ -19,7 +19,7 @@ For Codex, `auto` resolves to `workspace`.
 ## Install for your user
 
 ```bash
-agentrig plugin install codex core-committer --scope personal
+agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0 --scope personal
 ```
 
 This copies plugins into `~/.codex/plugins/` and updates `~/.agents/plugins/marketplace.json`.
@@ -27,7 +27,7 @@ This copies plugins into `~/.codex/plugins/` and updates `~/.agents/plugins/mark
 ## Install for the current repo
 
 ```bash
-agentrig plugin install codex core-committer --scope workspace
+agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0 --scope workspace
 ```
 
 This writes a repo-local marketplace at `.agents/plugins/marketplace.json` and copies plugins into `./plugins/`.
@@ -35,7 +35,7 @@ This writes a repo-local marketplace at `.agents/plugins/marketplace.json` and c
 ## Uninstall Codex plugins
 
 ```bash
-agentrig plugin uninstall codex core-committer
+agentrig plugin uninstall codex agentrig/agentrig.core-committer@0.1.0
 ```
 
 Uninstall is ledger-backed and hash-guarded:

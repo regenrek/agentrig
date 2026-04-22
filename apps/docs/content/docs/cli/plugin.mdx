@@ -1,0 +1,48 @@
+---
+title: plugin
+description: Authoring utilities for creating, packaging, and exporting plugins.
+icon: PackagePlus
+---
+
+# `agentrig plugin`
+
+`agentrig plugin` is the author workflow.
+Use it when you are creating or exporting local plugins.
+
+If you are consuming plugins from registries, use the top-level commands instead:
+
+```bash
+agentrig list --available
+agentrig view <plugin-spec>
+agentrig plugin install <provider> <plugin-spec>
+```
+
+For public installs, `<plugin-spec>` must be the canonical registry ref
+`<registryAlias>/<namespace.plugin>@<version>`.
+
+## init
+
+```bash
+agentrig plugin init my-plugin
+```
+
+Options: `--template`, `--dir`, `--title`, `--description`, `--author`, `--force`.
+
+## create
+
+```bash
+agentrig plugin create . --out .plugin/plugin.json
+```
+
+Scans a plugin directory, hashes files, and writes `.plugin/plugin.json`.
+
+## export
+
+```bash
+agentrig plugin export --agent all --pluginsDir registry/plugins --out dist/plugins
+```
+
+Exports local plugin directories as provider-native plugin marketplaces for `claude`, `codex`, `cursor`, or `all`.
+
+Options: `--agent`, `--pluginsDir`, `--out`, `--config`, `--marketplaceName`, `--ownerName`, `--ownerEmail`, `--pluginPrefix`, `--plugin`, `--clean`.
+
