@@ -1,7 +1,7 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
-import { ensureDir, readJsonFile, writeJsonFile } from './fs'
+import { ensureDir, pathExists, readJsonFile, writeJsonFile } from './fs'
 import { codexMarketplacePluginSchema } from './plugin-providers/schemas'
 import type {
   PluginInstallLedger,
@@ -87,6 +87,34 @@ const pluginInstallLedgerSchema = z.strictObject({
   installs: z.record(z.string(), pluginInstallRecordSchema),
 })
 
+function getLegacyPluginInstallLedgerBackupPath(ledgerPath: string) {
+  const parsed = path.parse(ledgerPath)
+  return path.join(parsed.dir, `${parsed.name}.v1-backup${parsed.ext}`)
+}
+
+async function cutOverLegacyPluginInstallLedger(
+  cwd: string,
+  scope: PluginInstallScopeName,
+  ledgerPath: string,
+  raw: unknown
+): Promise<PluginInstallLedger> {
+  const backupPath = getLegacyPluginInstallLedgerBackupPath(ledgerPath)
+  const emptyLedger: PluginInstallLedger = {
+    schemaVersion: 2,
+    installs: {},
+  }
+
+  await ensureDir(path.dirname(ledgerPath))
+  if (!(await pathExists(backupPath))) {
+    await writeJsonFile(backupPath, raw)
+  }
+  await savePluginInstallLedger(cwd, scope, emptyLedger)
+  console.warn(
+    `Archived unsupported schemaVersion 1 plugin install ledger to ${backupPath} and reset ${ledgerPath} to the current registry-only contract.`
+  )
+  return emptyLedger
+}
+
 export function getPluginInstallLedgerPath(cwd: string, scope: PluginInstallScopeName) {
   const root = scope === 'workspace' ? cwd : homedir()
   return path.join(root, '.agentrig', 'plugin-installs.json')
@@ -119,9 +147,7 @@ export async function loadPluginInstallLedger(
     'schemaVersion' in raw &&
     (raw as { schemaVersion?: unknown }).schemaVersion === 1
   ) {
-    throw new Error(
-      `Unsupported plugin install ledger at ${ledgerPath}: schemaVersion 1 cannot represent verified registry snapshots. Remove the old ledger or reinstall under the current registry-only contract.`
-    )
+    return cutOverLegacyPluginInstallLedger(cwd, scope, ledgerPath, raw)
   }
 
   const parsed = pluginInstallLedgerSchema.safeParse(raw)

@@ -2,17 +2,24 @@
 
 __PLUGIN_DESCRIPTION__
 
-## Installation
+## Publishing
+
+This scaffold is for authoring and local testing. Publish it to a static signed
+registry before using the public install command.
+
+## Local testing
 
 ```bash
-agentrig plugin install codex __PLUGIN_ID__
+agentrig plugin bundle .
+cd ..
+agentrig plugin export --agent claude --pluginsDir ./__PLUGIN_ID__ --out dist/claude-marketplace
 ```
 
-Or install from a custom registry:
+After publishing, install it with the canonical registry ref:
 
 ```bash
 agentrig registry add your-registry https://example.com/agentrig
-agentrig plugin install codex your-registry/__PLUGIN_ID__
+agentrig plugin install codex your-registry/__PLUGIN_ID__@0.1.0
 ```
 
 ## Usage
@@ -26,7 +33,7 @@ __PLUGIN_ID__/
 ├── .plugin/
 │   └── plugin.json     # Plugin manifest
 ├── skills/             # Skills directory
-│   └── __PLUGIN_ID__/  # Main skill
+│   └── __PLUGIN_SLUG__/  # Main skill
 │       └── SKILL.md    # Skill instructions
 ├── agents/             # Subagents (optional)
 ├── hooks/              # Hooks (optional)
@@ -46,7 +53,8 @@ Update `.plugin/plugin.json` when plugin identity or public metadata changes.
 ### Export for Claude Marketplace
 
 ```bash
-agentrig plugin export --agent claude --pluginsDir . --out dist/claude-marketplace
+cd ..
+agentrig plugin export --agent claude --pluginsDir ./__PLUGIN_ID__ --out dist/claude-marketplace
 ```
 
 ## License

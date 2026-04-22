@@ -32,11 +32,11 @@ const DIGEST_EXCLUDED_RELATIVE_PATHS = new Set([
 ])
 
 export const LOCAL_PLUGIN_POLICY: PluginUploadPolicySnapshot = {
-  maxZipBytes: 0,
-  maxFileBytes: 0,
-  maxTotalBytes: 0,
-  maxFiles: 0,
-  allowedContentTypes: [],
+  maxZipBytes: 10 * 1024 * 1024,
+  maxFileBytes: 1024 * 1024,
+  maxTotalBytes: 10 * 1024 * 1024,
+  maxFiles: 100,
+  allowedContentTypes: ['application/zip'],
   blockedExtensions: ['.exe', '.dll', '.dylib', '.so', '.bin', '.app', '.pkg', '.dmg', '.iso', '.jar'],
   allowedFileExtensions: [
     '.md',

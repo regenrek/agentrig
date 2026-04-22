@@ -8,6 +8,7 @@ import {
   PluginSubmissionValidationError,
   validatePluginBundle,
 } from '../../src/lib/plugin-submission-validation'
+import { LOCAL_PLUGIN_POLICY } from '../../src/lib/registry'
 import type { PluginUploadPolicySnapshot } from '../../src/lib/types'
 
 const TEST_POLICY: PluginUploadPolicySnapshot = {
@@ -89,6 +90,42 @@ async function buildZip(entries: Array<{ path: string; content: string }>) {
 }
 
 describe('validatePluginBundle', () => {
+  it('accepts a tiny canonical bundle under the local plugin policy', async () => {
+    const zipBytes = await buildZip([
+      {
+        path: '.plugin/plugin.json',
+        content: JSON.stringify({
+          $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+          kind: 'agentrig:plugin',
+          id: 'demo.test-plugin',
+          name: 'Test Plugin',
+          description: 'Demo plugin',
+          version: '1.0.0',
+          configSchema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {},
+          },
+        }),
+      },
+      {
+        path: 'README.md',
+        content: '# Demo plugin\n',
+      },
+      {
+        path: 'skills/test-plugin/SKILL.md',
+        content: '# Demo skill\n',
+      },
+    ])
+
+    await expect(validatePluginBundle(zipBytes, LOCAL_PLUGIN_POLICY)).resolves.toMatchObject({
+      fileCount: 3,
+      manifest: expect.objectContaining({
+        id: 'demo.test-plugin',
+      }),
+    })
+  })
+
   it('rejects user-supplied derived install metadata', async () => {
     const zipBytes = await buildZip([
       {
@@ -96,7 +133,7 @@ describe('validatePluginBundle', () => {
         content: JSON.stringify({
           $schema: 'https://agentrig.ai/schema/plugin.v1.json',
           kind: 'agentrig:plugin',
-          id: 'demo-plugin',
+          id: 'demo.demo-plugin',
           name: 'Demo Plugin',
           description: 'Demo plugin',
           version: '1.0.0',

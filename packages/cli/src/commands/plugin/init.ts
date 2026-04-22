@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { defineCommand, showUsage } from 'citty'
 import { downloadTemplate } from 'giget'
+import { isValidPluginId } from '../../lib/plugin-validation'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_TEMPLATE = 'github:regenrek/agentrig/templates/plugin-starter'
@@ -193,8 +194,9 @@ async function dirHasAnyFiles(dir: string): Promise<boolean> {
 /**
  * Derive display name from plugin id.
  */
-function deriveDisplayName(name: string): string {
-  return name
+function deriveDisplayName(pluginId: string): string {
+  const slug = pluginId.split('.').at(-1) ?? pluginId
+  return slug
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
@@ -213,9 +215,11 @@ const command = defineCommand({
     const parentDir = args.dir ? path.resolve(args.dir) : process.cwd()
     const destDir = path.join(parentDir, pluginId)
 
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(pluginId)) {
+    if (!isValidPluginId(pluginId)) {
       console.error(`Invalid plugin id: ${pluginId}`)
-      console.error('Plugin ids must be lowercase, use hyphens, start/end with alphanumeric.')
+      console.error(
+        'Plugin ids must use the canonical namespace.plugin format with lowercase letters, numbers, and hyphens.'
+      )
       process.exit(1)
     }
 
@@ -239,6 +243,7 @@ const command = defineCommand({
     }
 
     const templateSpec = args.template || DEFAULT_TEMPLATE
+    const pluginSlug = pluginId.split('.').at(-1) ?? pluginId
     const displayName = args.title || deriveDisplayName(pluginId)
     const description = args.description || `${displayName} plugin for AgentRig`
     const author = args.author || ''
@@ -246,6 +251,7 @@ const command = defineCommand({
     // Substitution map
     const contentSubs: Record<string, string> = {
       '__PLUGIN_ID__': pluginId,
+      '__PLUGIN_SLUG__': pluginSlug,
       '__PLUGIN_NAME__': displayName,
       '__PLUGIN_DESCRIPTION__': description,
       '__PLUGIN_AUTHOR__': author,
@@ -323,8 +329,9 @@ const command = defineCommand({
       console.log('\nNext steps:')
       console.log(`  cd ${pluginId}`)
       console.log('  # Edit .plugin/plugin.json and component directories')
-      console.log('  agentrig plugin create .')
-      console.log('  agentrig plugin export --agent all --pluginsDir . --out dist/plugins')
+      console.log('  agentrig plugin bundle .')
+      console.log('  cd ..')
+      console.log(`  agentrig plugin export --agent all --pluginsDir ./${pluginId} --out dist/plugins`)
     } finally {
       // Cleanup temp dir if used
       if (tempDir) {

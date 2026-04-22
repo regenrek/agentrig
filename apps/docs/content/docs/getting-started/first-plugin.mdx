@@ -14,13 +14,13 @@ A plugin is a folder with `.plugin/plugin.json` and the files you want to distri
 ## Scaffold the plugin
 
 ```bash
-agentrig plugin init hello-skills
+agentrig plugin init acme.hello-skills
 ```
 
 This creates a folder like:
 
 ```text
-hello-skills/
+acme.hello-skills/
   .plugin/plugin.json
   skills/hello-skills/SKILL.md
   README.md
@@ -29,10 +29,10 @@ hello-skills/
 ## Add files
 
 Add skills, scripts, hooks, agents, or MCP config under the plugin directory.
-Then regenerate `.plugin/plugin.json`:
+The scaffold already creates `.plugin/plugin.json`. Update it after you add your real files:
 
 ```bash
-agentrig plugin create . --out .plugin/plugin.json
+$EDITOR .plugin/plugin.json
 ```
 
 ## Test locally
@@ -40,7 +40,8 @@ agentrig plugin create . --out .plugin/plugin.json
 Keep author testing on the local export surface instead of the public install command:
 
 ```bash
-agentrig plugin export --agent codex --pluginsDir . --plugin hello-skills --out dist/codex-marketplace
+cd ..
+agentrig plugin export --agent codex --pluginsDir ./acme.hello-skills --out dist/codex-marketplace
 ```
 
 Next, learn about [`.plugin/plugin.json`](/plugins/meta-json) and [`agentrig plugin`](/cli/plugin).

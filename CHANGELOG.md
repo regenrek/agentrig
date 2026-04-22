@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-22
+
+### Changed
+- Hard-cut `plugin init` to require canonical `namespace.plugin` ids and updated the starter template so scaffolded skills use the plugin slug (`skills/<plugin-name>/`) instead of the full namespaced id in directory paths.
+- Updated authoring docs, README examples, and the starter template README so the documented local test/export flow matches the actual CLI behavior.
+
+### Fixed
+- Fixed `agentrig plugin bundle` local validation by restoring real size and file-count limits in `LOCAL_PLUGIN_POLICY` instead of the accidental all-zero values that made every bundle fail.
+- Fixed the stale `schemaVersion: 1` plugin-install ledger crash by archiving the old ledger at the exact on-disk boundary and resetting the canonical v2 ledger shape.
+- Fixed top-level CLI error output so expected failures print a clean message instead of a full Node stack trace.
+- Fixed the default scaffold guidance from `plugin init` so the printed next steps use the working `plugin bundle` and `plugin export --pluginsDir ./<plugin-id>` flow.
+
 ## [0.5.0] - 2026-04-22
 
 ### Added

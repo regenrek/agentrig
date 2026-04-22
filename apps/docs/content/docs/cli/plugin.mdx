@@ -23,23 +23,27 @@ For public installs, `<plugin-spec>` must be the canonical registry ref
 ## init
 
 ```bash
-agentrig plugin init my-plugin
+agentrig plugin init acme.my-plugin
 ```
+
+`init` requires the canonical plugin id format `namespace.plugin`.
 
 Options: `--template`, `--dir`, `--title`, `--description`, `--author`, `--force`.
 
 ## create
 
+The scaffold already writes `.plugin/plugin.json`. Use `plugin create` when you need to generate a manifest for an existing plugin directory:
+
 ```bash
-agentrig plugin create . --out .plugin/plugin.json
+agentrig plugin create ./acme.my-plugin --out ./acme.my-plugin/.plugin/plugin.json
 ```
 
-Scans a plugin directory, hashes files, and writes `.plugin/plugin.json`.
+Scans an existing plugin directory and writes `.plugin/plugin.json`.
 
 ## export
 
 ```bash
-agentrig plugin export --agent all --pluginsDir registry/plugins --out dist/plugins
+agentrig plugin export --agent all --pluginsDir ./acme.my-plugin --out dist/plugins
 ```
 
 Exports local plugin directories as provider-native plugin marketplaces for `claude`, `codex`, `cursor`, or `all`.

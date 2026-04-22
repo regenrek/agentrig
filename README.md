@@ -38,8 +38,8 @@ agentrig plugin install cursor georg/georg.ts-master-plugin@1.2.0
 ## Create a plugin
 
 ```bash
-agentrig plugin init my-plugin
-agentrig plugin create my-plugin
+agentrig plugin init acme.my-plugin
+agentrig plugin create acme.my-plugin
 ```
 
 ## Export or apply plugins

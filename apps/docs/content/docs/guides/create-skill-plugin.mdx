@@ -11,25 +11,24 @@ This guide walks through creating a new plugin for a reusable skill.
 ## 1. Scaffold
 
 ```bash
-agentrig plugin init my-skill-plugin
+agentrig plugin init acme.my-skill-plugin
 ```
 
 ## 2. Add skill files
 
 Place your skill under `skills/<skill-name>/SKILL.md` and any supporting scripts alongside it.
 
-## 3. Generate .plugin/plugin.json
+## 3. Update `.plugin/plugin.json`
 
-```bash
-agentrig plugin create . --out .plugin/plugin.json
-```
+The scaffold already creates `.plugin/plugin.json`. Edit it in place after you add your real metadata and files.
 
 ## 4. Test locally
 
 Keep local author testing separate from the public install surface by exporting a provider-native marketplace from your plugin directory:
 
 ```bash
-agentrig plugin export --agent codex --pluginsDir . --plugin my-skill-plugin --out dist/codex-marketplace
+cd ..
+agentrig plugin export --agent codex --pluginsDir ./acme.my-skill-plugin --out dist/codex-marketplace
 ```
 
 ## 5. Publish
