@@ -24,8 +24,8 @@
     "test:e2e:run": "vp pack && vp test --run --config vitest.e2e.config.ts"
   },
   "dependencies": {
-    "@zip.js/zip.js": "^2.8.23",
-    "citty": "^0.2.1",
+    "@zip.js/zip.js": "^2.8.26",
+    "citty": "^0.2.2",
     "giget": "^3.2.0",
     "zod": "^4.3.6"
   },
