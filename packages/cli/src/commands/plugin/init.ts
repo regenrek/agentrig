@@ -328,7 +328,7 @@ const command = defineCommand({
       console.log(`\nCreated ${created.length} file(s) in ${destDir}`)
       console.log('\nNext steps:')
       console.log(`  cd ${pluginId}`)
-      console.log('  # Edit .plugin/plugin.json and component directories')
+      console.log('  # Edit .plugin/plugin.json and add optional agents/hooks/scripts directories if needed')
       console.log('  agentrig plugin bundle .')
       console.log('  cd ..')
       console.log(`  agentrig plugin export --agent all --pluginsDir ./${pluginId} --out dist/plugins`)
