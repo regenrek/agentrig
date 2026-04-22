@@ -33,6 +33,16 @@ agentrig plugin status <submission-id>
 
 The web submission UI at `/submit` uses the same canonical backend contract.
 
+## What happens after submission
+
+The normal path looks like this:
+
+1. submit one exact upstream snapshot
+2. AgentRig validates and scans it
+3. an admin reviews it in the web app
+4. approval opens or updates a PR into `agentrig-registry`
+5. the version becomes publicly installable only after that PR is merged
+
 ## Important boundary
 
 Submission is **not** a public install source.

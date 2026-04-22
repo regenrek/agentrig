@@ -25,7 +25,7 @@ An entry may be visible in the directory before it is installable, but installab
 
 ## Canonical source
 
-The canonical source of truth for the official registry is the [`agentrig-registry`](https://github.com/agentrig/agentrig-registry) GitHub repository.
+The canonical source of truth for the official registry is the [`agentrig-registry`](https://github.com/regenrek/agentrig-registry) GitHub repository.
 
 ## Canonical layout
 
@@ -38,6 +38,8 @@ The canonical registry layout is:
 - `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_SOURCE.json`
 - `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_LOCK.json`
 - `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_REVIEW.json`
+- `plugins/<namespace>/<plugin>/versions/<version>/README.md`
+- `plugins/<namespace>/<plugin>/versions/<version>/LICENSE`
 - `advisories.json`
 
 Canonical plugin ids use:
@@ -55,9 +57,9 @@ Canonical install refs use:
 Example:
 
 ```text
-agentrig/agentrig.typescript@0.1.0
+agentrig/agentrig.core-committer@0.1.0
 ```
 
 ## CLI behavior
 
-The CLI should treat official registry entries as installable without falling back to ad hoc URL, ZIP, or author-repo installs.
+The CLI treats official registry entries as installable and does not fall back to ad hoc URL, ZIP, or author-repo installs.

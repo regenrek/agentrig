@@ -13,11 +13,13 @@ Run `agentrig --help` for global help.
 
 - `agentrig init` - create config file.
 - `agentrig list --available` - browse available plugins.
-- `agentrig view <plugin>` - inspect a plugin before installing.
-- `agentrig plugin install <provider> <plugin>` - install a provider plugin.
-- `agentrig plugin uninstall <provider> <plugin>` - remove a provider plugin.
+- `agentrig view <registryAlias>/<namespace.plugin>@<version>` - inspect a plugin before installing.
+- `agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>` - install a provider plugin.
+- `agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>@<version>` - remove a provider plugin.
 - `agentrig rig apply <provider> <rig>` - apply an advanced rig.
 - `agentrig registry add` - add a registry.
 - `agentrig plugin init` - scaffold a new plugin.
+
+Public installs use the canonical registry ref `<registryAlias>/<namespace.plugin>@<version>`.
 
 Use the pages in this section for full options and examples.
