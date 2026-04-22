@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-import { defineCommand, runMain, showUsage } from 'citty'
+import { defineCommand, runCommand, showUsage } from 'citty'
 import packageJson from '../package.json'
 import { shouldShowParentUsage } from './lib/command'
+import { runCliMain } from './lib/run-cli-main'
 
 const main = defineCommand({
   meta: {
@@ -39,9 +40,9 @@ const main = defineCommand({
   },
 })
 
-Promise.resolve(runMain(main)).catch((error) => {
-  const message =
-    error instanceof Error ? error.message : String(error)
-  console.error(message)
-  process.exit(1)
+runCliMain({
+  main,
+  runCommand,
+  showUsage,
+  meta: { version: packageJson.version },
 })

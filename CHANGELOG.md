@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-04-22
+
+### Fixed
+- Replaced citty's `runMain` with a local entrypoint that prints only `error.message` on expected failures (not logged in, invalid spec, missing config) and exits 1, instead of letting citty dump the full `Error` object with a Node stack trace.
+- Added regression coverage (`tests/lib/run-cli-main.test.ts`) so stack traces on expected errors can't silently regress again.
+
 ## [0.5.1] - 2026-04-22
 
 ### Changed
