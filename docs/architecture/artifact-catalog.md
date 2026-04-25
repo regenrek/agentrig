@@ -16,8 +16,9 @@ The catalog must support:
 
 - standalone plugins, skills, MCPs, hooks, and later commands/agents.
 - bundled child artifacts extracted from a signed plugin lock.
-- partial installs of a bundled child artifact without reinstalling the whole
-  plugin.
+- selection-based installs of one or more child artifacts from a plugin,
+  registry item, or arbitrary repo scan without forcing the user to install the
+  full source bundle.
 - one signed installability and trust boundary owned by the registry.
 - one SDK-owned artifact extraction and deterministic scan contract consumed by
   CLI and web.
@@ -59,6 +60,11 @@ Directory presence is never installability. A skill directory inside a plugin is
 browsable only after the parent plugin registry item is accepted, and installable
 only when the source registry item is installable. `blocked` and `yanked` always
 win.
+
+Selection is first-class, but individual artifacts are not independent local
+package-manager nodes in v1. AgentRig installs and uninstalls an
+AgentRig-managed **Selection Bundle** that records the exact selected artifacts,
+source provenance, closure/dependencies, target paths, and written hashes.
 
 ## Current Anchors
 
@@ -112,7 +118,7 @@ type BundledArtifactIdentity = ArtifactIdentity & {
   parentArtifactId: string
   parentArtifactKind: 'plugin'
   parentVersion: string
-  subSelector: string
+  selector: string
 }
 ```
 
@@ -120,18 +126,72 @@ Rules:
 
 - `artifactId` is registry-global within `(kind, id)`, not globally reused by
   path alone.
-- bundled child artifacts keep their own `artifactId`, but their installability
-  is inherited from the parent signed registry item unless P2 creates a
-  standalone signed item for that child.
-- `subSelector` is the stable name after `#`, for example
-  `agentrig/core@0.1.0#codex-analysis`.
+- bundled child artifacts keep browse identity, but their installability is
+  inherited from the parent signed registry item unless P2 creates a standalone
+  signed item for that child.
+- `selector` is the stable artifact-local name used in `--pick`, for example
+  `skill:codex-analysis`.
 - commands and agents are reserved in the model now, but CLI/web routes can ship
   later.
 
+## Selection Bundle Model
+
+The install/uninstall lifecycle atom is a Selection Bundle:
+
+```ts
+type SelectionBundle = {
+  selectionId: string
+  provider: 'claude' | 'codex' | 'cursor'
+  scope: 'personal' | 'workspace'
+  source: {
+    kind: 'registry-artifact' | 'registry-plugin' | 'external-repo-scan'
+    registryRef?: string
+    repo?: string
+    ref?: string
+    commit?: string
+    sourcePath?: string
+    scanDigest: string
+  }
+  selectedArtifacts: Array<{
+    kind: ArtifactKind
+    name: string
+    selector: string
+    files: Array<{ path: string; digest: string }>
+    dependencies: Array<{ kind: ArtifactKind; selector: string }>
+    closureStatus: 'closed' | 'requires-dependencies' | 'requires-full-source'
+  }>
+  targetPaths: string[]
+  installedFileHashes: Array<{ path: string; digest: string }>
+  jsonWrites: Array<{
+    path: string
+    keyPath: string
+    writtenValueDigest: string
+    previousValueDigest?: string
+  }>
+}
+```
+
+Selection Bundle rules:
+
+- A user can select one skill, many skills, a skill plus an MCP, or any future
+  supported artifact mix from the same scanned source.
+- The bundle is one ledger record and one uninstall target. This avoids a
+  dependency-package-manager explosion while still solving the real product
+  problem: installing 2 desired skills from a 100-skill repo.
+- A selected artifact is installable only if it is **closed**: all required files
+  live under the artifact root or are explicitly declared as dependencies in the
+  source/lock metadata.
+- If a skill references implicit shared files such as `../shared/*`, the CLI/web
+  must require one of: add declared dependencies to the selection, install the
+  full source plugin, or refuse the selection install.
+- MCP and hook JSON merges are hash-owned. Uninstall removes only keys whose
+  current value still matches the AgentRig-written digest. Modified user entries
+  are kept and reported.
+
 ## SDK Contract
 
-Add SDK modules: `provider/artifact-kinds.ts` and
-`provider/extract-artifacts.ts`.
+Add SDK modules: `provider/artifact-kinds.ts`,
+`provider/extract-artifacts.ts`, and `provider/selection-bundle.ts`.
 
 The SDK exports:
 
@@ -155,6 +215,8 @@ export type ExtractedArtifact = {
 }
 
 export function extractArtifactsFromPluginLock(lock: RegistryLock): ExtractedArtifact[]
+export function detectArtifactClosure(tree: VirtualTree, artifact: ExtractedArtifact): ArtifactClosure
+export function buildSelectionBundle(input: SelectionBundleInput): SelectionBundle
 ```
 
 Extraction rules:
@@ -171,6 +233,9 @@ Extraction rules:
 - Child file digest is copied from the lock. Child digest is computed from the
   selected file digest set and parent identity, not from web/CLI rescans.
 - Empty or malformed child candidates are omitted with deterministic warnings.
+- Closure detection is deterministic and does not read provider state.
+- Selection Bundle construction is deterministic for the same source digest and
+  selected artifact set.
 
 The SDK must not know Convex tables or CLI output formatting. It owns pure
 contracts and deterministic transforms.
@@ -188,34 +253,41 @@ agentrig plugin submit --upstreamRepo ... --upstreamTag ... --upstreamCommitSha 
 Add subcommand-first artifact grammar:
 
 ```sh
-agentrig skill install <provider> <alias>/<id>@<version>
-agentrig mcp install <provider> <alias>/<id>@<version>
-agentrig hook install <provider> <alias>/<id>@<version>
+agentrig skill install <provider> <source> --pick <skill-name> [--pick <skill-name>...]
+agentrig mcp install <provider> <source> --pick <mcp-name> [--pick <mcp-name>...]
+agentrig hook install <provider> <source> --pick <hook-name> [--pick <hook-name>...]
 
-agentrig skill install <provider> <alias>/<plugin-id>@<version>#<skill-name>
-agentrig mcp install <provider> <alias>/<plugin-id>@<version>#<mcp-name>
-agentrig hook install <provider> <alias>/<plugin-id>@<version>#<hook-name>
+agentrig install <provider> <source> \
+  --pick skill:best-practice-coding \
+  --pick skill:computer-use-skill
 
 agentrig skill submit --upstreamRepo ... --upstreamTag ... --upstreamCommitSha ... --artifactPath ...
 agentrig mcp submit --upstreamRepo ... --upstreamTag ... --upstreamCommitSha ... --artifactPath ...
 agentrig hook submit --upstreamRepo ... --upstreamTag ... --upstreamCommitSha ... --artifactPath ...
 ```
 
-P3 may add the shortcut:
+`<source>` may be a signed registry plugin, a standalone signed artifact, or an
+external repo/URL accepted by the existing inspect/use source resolver. The CLI
+materializes the selected artifacts into one Selection Bundle and writes one
+ledger record for that bundle.
+
+P3 may add shorter interactive or shorthand commands, but they must still
+materialize to Selection Bundles:
 
 ```sh
-agentrig install <provider> <ref> [--kind skill|mcp|hook|plugin]
+agentrig skill install <provider> <source> --interactive
+agentrig mcp install <provider> <source> --interactive
 ```
 
-Install ref parsing remains canonical. The parser becomes artifact-aware, but
-`plugin install` remains a compatibility-preserving alias to kind `plugin`, not
-a second implementation.
+Install source parsing remains canonical. The parser becomes selection-aware,
+but `plugin install` remains a compatibility-preserving full plugin path, not a
+second implementation.
 
 ## Provider Install Contract
 
 Provider adapters get one explicit provider-by-kind table. The table lives near
-the existing provider install surface, but SDK owns the materialized artifact
-selection that feeds it.
+the existing provider install surface, but SDK owns the materialized Selection
+Bundle that feeds it.
 
 | kind | claude | codex | cursor |
 | --- | --- | --- | --- |
@@ -230,25 +302,29 @@ Provider-specific merge behavior must be deterministic:
 
 - validate JSON before merge.
 - reject duplicate keys unless `--force` is passed.
-- record exact installed or merged paths in the ledger.
+- record exact installed files, merged JSON keys, and written value digests in
+  the selection ledger.
 - uninstall only removes files or JSON entries with matching recorded digests.
+- if a user modifies an AgentRig-written JSON key, uninstall keeps it and reports
+  `kept modified`.
 
 ## Install Ledger
 
 The ledger remains the local uninstall authority, but it becomes
-artifact-aware.
+selection-aware.
 
 New fields:
 
 ```ts
-type ArtifactInstallRecordBase = {
-  artifactKind: ArtifactKind
-  artifactId: string
-  artifactVersion: string
-  origin: ArtifactOrigin
-  parentPluginId?: string
-  parentPluginVersion?: string
-  subSelector?: string
+type SelectionInstallRecord = {
+  selectionId: string
+  provider: PluginProviderId
+  scope: PluginInstallScope
+  source: SelectionBundle['source']
+  selectedArtifacts: SelectionBundle['selectedArtifacts']
+  targetPaths: string[]
+  installedFileHashes: SelectionBundle['installedFileHashes']
+  jsonWrites: SelectionBundle['jsonWrites']
 }
 ```
 
@@ -256,10 +332,13 @@ Rules:
 
 - Registry installs still require verified registry metadata.
 - External repo installs still must not include verified registry metadata.
-- Bundled sub-selector installs record both child identity and parent plugin
-  registry identity.
-- Record IDs include provider, scope, kind, and child identity, so installing a
-  skill from a plugin does not collide with the full plugin install.
+- Selection installs from signed plugins record parent registry identity plus
+  selected artifact selectors.
+- Selection installs from external repo scans record repo/ref/commit/source path
+  and scan digest, not registry trust.
+- Record IDs include provider, scope, and `selectionId`, so multiple selections
+  from the same 100-skill source can coexist without pretending each artifact is
+  a global package dependency.
 - Ledger migration is hard-cut by schema version. Do not keep dual readers
   beyond the single explicit migration boundary.
 
@@ -372,10 +451,18 @@ P0 web is read-only and registry-derived:
 - `PluginCard`, `PluginFilesPanel`, and install card components become
   artifact-agnostic components with default `kind: 'plugin'`.
 
-P1 web adds install snippets for bundled child pages:
+P1 web adds install snippets and selection UI for bundled child pages:
 
 ```sh
-agentrig skill install codex agentrig/agentrig.core-committer@0.1.0#codex-analysis
+agentrig install codex agentrig/agentrig.core-committer@0.1.0 --pick skill:codex-analysis
+```
+
+Plugin/repo scan pages must support multi-select:
+
+```sh
+agentrig install codex <source> \
+  --pick skill:best-practice-coding \
+  --pick skill:computer-use-skill
 ```
 
 P2 web adds standalone submission:
@@ -397,6 +484,9 @@ Trust rules:
   registry trust.
 - bundled child installability inherits parent plugin signed status unless the
   child has its own standalone signed registry entry.
+- selection installs inherit the trust status of their source. A selection from
+  an external repo scan is external-repo provenance only; it is never displayed
+  or logged as registry verified.
 - `blocked` and `yanked` are terminal for normal installs.
 - AI enrichment can suggest descriptions, keywords, or summaries only. It cannot
   change deterministic scan digest, picked files, artifact paths, or lock file
@@ -421,6 +511,13 @@ Registry validation must reject:
 - blocked delivery archives in source payload.
 - kind/path mismatches, for example a skill item pointing at `.plugin/plugin.json`.
 
+Selection validation must reject or require explicit user action for:
+
+- selected artifacts whose file closure is incomplete.
+- undeclared shared dependencies.
+- duplicate MCP JSON keys unless `--force` is passed.
+- attempts to remove or overwrite user-modified JSON entries during uninstall.
+
 ## Phasing
 
 P0: discovery only.
@@ -430,12 +527,15 @@ P0: discovery only.
   `ArtifactCard`, `ArtifactFilesPanel`, and kind badge.
 - No CLI, Convex, or registry layout changes.
 
-P1: bundled sub-selector install.
+P1: selection-based bundled/repo artifact install.
 
-- CLI: `skill|mcp|hook install <provider> <plugin-ref>#<name>`.
-- Provider adapters: `installArtifactSubset`.
-- Ledger: kind, origin, parent plugin, and sub-selector fields.
-- Web: bundled artifact install snippets.
+- SDK: closure detection and Selection Bundle construction.
+- CLI: `install <provider> <source> --pick kind:name` and kind-specific helper
+  commands for selecting skills/MCPs/hooks.
+- Provider adapters: install from a materialized Selection Bundle.
+- Ledger: one selection record with source provenance, selected artifacts,
+  target paths, file hashes, and JSON write ownership.
+- Web: bundled/repo artifact multi-select and install snippets.
 - Registry still plugin-only for standalone signed items.
 
 P2: standalone artifact submission.
@@ -458,6 +558,9 @@ P3: command unification and trusted publisher.
 
 - Copy ClawHub's `skills` plus `packages` persistence split. Rejected: one
   artifact table is the AgentRig source of truth.
+- Treat every selected artifact as an independent local package dependency.
+  Rejected: causes ledger explosion, MCP refcounting, and hard update semantics.
+  Selection Bundles are the lifecycle atom.
 - Encode kind inside refs like `skill:<alias>/<id>@<version>`. Rejected:
   subcommand-first grammar is clearer and matches existing CLI shape.
 - Let web scan plugin locks with local path rules. Rejected: SDK owns artifact
@@ -476,7 +579,8 @@ Every implementation phase must prove:
 - no duplicate scanner/digest/materializer/artifact extractor in CLI or web.
 - registry installability is checked before all signed installs.
 - direct repo installs do not fabricate `VerifiedRegistryIdentity`.
-- bundled child installs record parent registry provenance.
+- selection installs record source provenance, selected artifacts, closure
+  decisions, and written hashes.
 - provider merge installs are uninstall-safe.
 - Convex has one artifact model.
 - old `agentrig plugin install/uninstall/submit` commands still work.
