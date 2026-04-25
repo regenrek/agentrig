@@ -188,25 +188,6 @@ export async function createPluginSubmission(
   return result
 }
 
-export async function createArtifactSubmission(
-  baseUrl: string,
-  accessToken: string,
-  payload: {
-    kind: 'skill' | 'mcp' | 'hook'
-    upstream_repo: string
-    upstream_tag: string
-    upstream_commit_sha: string
-    artifact_path: string
-  }
-) {
-  return await request<PluginSubmissionCreateResponse>(baseUrl, '/api/cli/artifacts/submissions', {
-    method: 'POST',
-    accessToken,
-    body: payload,
-    maxRetries: 0,
-  })
-}
-
 export async function getPluginSubmissionStatus(
   baseUrl: string,
   accessToken: string,

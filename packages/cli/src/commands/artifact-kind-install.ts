@@ -4,7 +4,7 @@ import { defineCommand, showUsage } from 'citty'
 import type { SelectableArtifactKind } from '@agentrig/sdk'
 import { loadAuthSession } from '../lib/auth'
 import {
-  createArtifactSubmission,
+  createPluginSubmission,
   resolveCommunityBaseUrl,
 } from '../lib/community-api'
 import { loadConfig } from '../lib/config'
@@ -151,6 +151,11 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
         type: 'string',
         description: 'Canonical artifact_path relative to the repo root',
       },
+      dryRun: {
+        type: 'boolean',
+        description: 'Print the canonical submit payload without creating a review request.',
+        default: false,
+      },
       help: {
         type: 'boolean',
         alias: 'h',
@@ -170,16 +175,24 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
         )
       }
       const baseUrl = resolveCommunityBaseUrl(args.baseUrl, session.baseUrl)
-      const created = await createArtifactSubmission(baseUrl, session.accessToken, {
-        kind,
+      const payload = {
         upstream_repo: args.upstreamRepo,
         upstream_tag: args.upstreamTag,
         upstream_commit_sha: args.upstreamCommitSha,
-        artifact_path: args.artifactPath,
-      })
+        plugin_path: args.artifactPath,
+      }
+
+      if (args.dryRun) {
+        console.log('Publish shape: plugin_selected')
+        console.log(JSON.stringify(payload, null, 2))
+        return
+      }
+
+      const created = await createPluginSubmission(baseUrl, session.accessToken, payload)
       console.log(`Submission: ${created.submissionId}`)
+      console.log('Publish shape: plugin_selected')
       if (created.deduped) console.log('Result: existing submission reused')
-      console.log(`${kind} submission recorded for validation and review`)
+      console.log(`${kind} submission recorded through canonical plugin review`)
     },
   })
 

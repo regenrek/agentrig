@@ -65,6 +65,11 @@ const command = defineCommand({
       type: 'string',
       description: 'Canonical plugin_path relative to the repo root',
     },
+    dryRun: {
+      type: 'boolean',
+      description: 'Print the canonical submit payload without creating a review request.',
+      default: false,
+    },
     help: {
       type: 'boolean',
       alias: 'h',
@@ -86,14 +91,23 @@ const command = defineCommand({
     }
 
     const baseUrl = resolveCommunityBaseUrl(args.baseUrl, session.baseUrl)
-    const created = await createPluginSubmission(baseUrl, session.accessToken, {
+    const payload = {
       upstream_repo: args.upstreamRepo,
       upstream_tag: args.upstreamTag,
       upstream_commit_sha: args.upstreamCommitSha,
       plugin_path: args.pluginPath,
-    })
+    }
+
+    if (args.dryRun) {
+      console.log('Publish shape: plugin_all')
+      console.log(JSON.stringify(payload, null, 2))
+      return
+    }
+
+    const created = await createPluginSubmission(baseUrl, session.accessToken, payload)
 
     console.log(`Submission: ${created.submissionId}`)
+    console.log('Publish shape: plugin_all')
     if (created.deduped) {
       console.log('Result: existing submission reused')
     }
