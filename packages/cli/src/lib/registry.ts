@@ -258,15 +258,36 @@ function splitPluginId(pluginId: string) {
   return { namespace, pluginName }
 }
 
+function splitArtifactId(artifactId: string) {
+  const [namespace, artifactName, extra] = artifactId.split('.')
+  assert(namespace && artifactName && !extra, `Invalid artifact id: ${artifactId}`)
+  return { namespace, artifactName }
+}
+
 function expectArtifactKind(value: unknown, where: string): ArtifactKind {
   const kind = expectString(value, where) as ArtifactKind
   assert((REGISTRY_ARTIFACT_KINDS as readonly string[]).includes(kind), `Invalid ${where}: ${kind}`)
   return kind
 }
 
-function expectedVersionRoot(pluginId: string, version: string) {
-  const { namespace, pluginName } = splitPluginId(pluginId)
-  return `plugins/${namespace}/${pluginName}/versions/${version}/`
+function artifactLayout(kind: ArtifactKind) {
+  if (kind === 'plugin') return { root: 'plugins', historyFile: 'plugin.json', manifestDir: '.plugin', manifestFile: 'plugin.json' }
+  if (kind === 'skill') return { root: 'skills', historyFile: 'skill.json', manifestDir: '.skill', manifestFile: 'skill.json' }
+  if (kind === 'mcp') return { root: 'mcps', historyFile: 'mcp.json', manifestDir: '.mcp', manifestFile: 'mcp.json' }
+  if (kind === 'hook') return { root: 'hooks', historyFile: 'hook.json', manifestDir: '.hook', manifestFile: 'hook.json' }
+  throw new Error(`Unsupported registry artifact kind: ${kind}`)
+}
+
+function expectedVersionRoot(kind: ArtifactKind, artifactId: string, version: string) {
+  const { namespace, artifactName } = splitArtifactId(artifactId)
+  const layout = artifactLayout(kind)
+  return `${layout.root}/${namespace}/${artifactName}/versions/${version}/`
+}
+
+function expectedHistoryPath(kind: ArtifactKind, artifactId: string) {
+  const { namespace, artifactName } = splitArtifactId(artifactId)
+  const layout = artifactLayout(kind)
+  return `${layout.root}/${namespace}/${artifactName}/${layout.historyFile}`
 }
 
 function mapInstallability(trustTier: TrustTier): RegistryInstallability {
@@ -285,13 +306,15 @@ function mapInstallability(trustTier: TrustTier): RegistryInstallability {
 
 function validateVersionRecord(
   raw: unknown,
-  pluginId: string,
+  kind: ArtifactKind,
+  artifactId: string,
   where: string
 ): RegistryVersionRecord {
   const record = expectRecord(raw, where)
   const version = expectString(record.version, `${where}.version`)
   assert(VERSION_PATTERN.test(version), `Invalid ${where}.version: expected exact semver`)
-  const root = expectedVersionRoot(pluginId, version)
+  const root = expectedVersionRoot(kind, artifactId, version)
+  const layout = artifactLayout(kind)
   const trustTier = expectString(record.trust_tier, `${where}.trust_tier`) as TrustTier
   assert(REGISTRY_TRUST_TIERS.includes(trustTier), `Invalid ${where}.trust_tier: ${trustTier}`)
   const installability = expectString(record.installability, `${where}.installability`) as RegistryInstallability
@@ -314,8 +337,8 @@ function validateVersionRecord(
   }
   assert(normalized.path === root, `Invalid ${where}.path: expected "${root}"`)
   assert(
-    normalized.manifest === `${root}.plugin/plugin.json`,
-    `Invalid ${where}.manifest: expected "${root}.plugin/plugin.json"`
+    normalized.manifest === `${root}${layout.manifestDir}/${layout.manifestFile}`,
+    `Invalid ${where}.manifest: expected "${root}${layout.manifestDir}/${layout.manifestFile}"`
   )
   assert(
     normalized.source === `${root}AGENTRIG_SOURCE.json`,
@@ -334,12 +357,15 @@ function validateVersionRecord(
 
 function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items'][number] {
   const item = expectRecord(raw, where)
-  const pluginId = expectString(item.plugin, `${where}.plugin`)
   const kind = expectArtifactKind(item.kind, `${where}.kind`)
-  assert(kind === 'plugin', `Invalid ${where}.kind: CLI plugin resolver only accepts plugin rows`)
   const artifact = expectString(item.artifact, `${where}.artifact`)
-  assert(artifact === pluginId, `Invalid ${where}.artifact: expected "${pluginId}"`)
-  const { namespace, pluginName } = splitPluginId(pluginId)
+  splitArtifactId(artifact)
+  const pluginId = item.plugin == null ? undefined : expectString(item.plugin, `${where}.plugin`)
+  if (kind === 'plugin') {
+    assert(pluginId === artifact, `Invalid ${where}.plugin: expected "${artifact}"`)
+  } else {
+    assert(pluginId == null, `Invalid ${where}.plugin: standalone artifact rows must not carry plugin aliases`)
+  }
   const latestVersion = expectString(item.latest_version, `${where}.latest_version`)
   assert(VERSION_PATTERN.test(latestVersion), `Invalid ${where}.latest_version: expected exact semver`)
   const trustTier = expectString(item.trust_tier, `${where}.trust_tier`) as TrustTier
@@ -352,10 +378,10 @@ function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items
   )
   const history = expectString(item.history, `${where}.history`)
   assert(
-    history === `plugins/${namespace}/${pluginName}/plugin.json`,
-    `Invalid ${where}.history: expected "plugins/${namespace}/${pluginName}/plugin.json"`
+    history === expectedHistoryPath(kind, artifact),
+    `Invalid ${where}.history: expected "${expectedHistoryPath(kind, artifact)}"`
   )
-  const activeVersion = validateVersionRecord(item.active_version, pluginId, `${where}.active_version`)
+  const activeVersion = validateVersionRecord(item.active_version, kind, artifact, `${where}.active_version`)
   assert(
     activeVersion.version === latestVersion,
     `Invalid ${where}.active_version.version: expected "${latestVersion}"`
@@ -455,12 +481,13 @@ function validateHistoryDocument(
   const history = expectRecord(raw, expectedHistoryPath)
   const versions = Array.isArray(history.versions)
     ? history.versions.map((entry, index) =>
-        validateVersionRecord(entry, pluginId, `${expectedHistoryPath}.versions[${index}]`)
+        validateVersionRecord(entry, 'plugin', pluginId, `${expectedHistoryPath}.versions[${index}]`)
       )
     : (() => { throw new Error(`Invalid ${expectedHistoryPath}.versions: expected an array`) })()
   assert(versions.length > 0, `Invalid ${expectedHistoryPath}.versions: expected at least one version`)
   const activeVersion = validateVersionRecord(
     history.active_version,
+    'plugin',
     pluginId,
     `${expectedHistoryPath}.active_version`
   )
@@ -696,7 +723,7 @@ async function readHistoryDocument(
   registryDocument: RegistryIndex,
   pluginId: string
 ) {
-  const item = registryDocument.items.find((entry) => entry.plugin === pluginId)
+  const item = registryDocument.items.find((entry) => entry.kind === 'plugin' && entry.plugin === pluginId)
   if (!item) {
     throw new Error(`Unknown plugin "${pluginId}" in registry "${registry.name}".`)
   }

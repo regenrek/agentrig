@@ -77,6 +77,18 @@ function buildCanonicalArtifacts() {
     snapshot_digest: snapshotDigest,
     published_at: '2026-04-15T18:30:00Z',
   } as const
+  const skillVersionRecord = {
+    version,
+    path: `skills/community/review/versions/${version}/`,
+    manifest: `skills/community/review/versions/${version}/.skill/skill.json`,
+    source: `skills/community/review/versions/${version}/AGENTRIG_SOURCE.json`,
+    lock: `skills/community/review/versions/${version}/AGENTRIG_LOCK.json`,
+    review: `skills/community/review/versions/${version}/AGENTRIG_REVIEW.json`,
+    trust_tier: 'reviewed',
+    installability: 'installable',
+    snapshot_digest: snapshotDigest,
+    published_at: '2026-04-15T18:30:00Z',
+  } as const
   const history = {
     $schema: 'https://agentrig.ai/schema/plugin-history.json',
     kind: 'plugin',
@@ -111,6 +123,18 @@ function buildCanonicalArtifacts() {
         trust_tier: 'reviewed',
         installability: 'installable',
         keywords: ['typescript'],
+      },
+      {
+        kind: 'skill',
+        artifact: 'community.review',
+        name: 'Review skill',
+        description: 'Standalone review skill.',
+        latest_version: version,
+        history: 'skills/community/review/skill.json',
+        active_version: skillVersionRecord,
+        trust_tier: 'reviewed',
+        installability: 'installable',
+        keywords: ['review'],
       },
     ],
   }
