@@ -52,6 +52,27 @@ describe('artifact extraction', () => {
     expect(artifacts.map((artifact) => artifact.selector)).toEqual(['mcp:mcp', 'skill:review'])
     expect(artifacts[0].origin).toBe('standalone')
   })
+
+  it('attaches only selector-scoped dependencies to bundled artifacts', () => {
+    const artifacts = extractArtifactsFromPluginLock({
+      plugin: 'agentrig.core',
+      version: '1.0.0',
+      snapshot_digest: 'sha256:snapshot',
+      dependencies: [
+        { kind: 'skill', artifact: 'shared' },
+        { required_by: 'skill:review', kind: 'mcp', artifact: 'github' },
+      ],
+      file_digests: [
+        { path: 'skills/review/SKILL.md', digest: 'sha256:review' },
+        { path: 'skills/other/SKILL.md', digest: 'sha256:other' },
+      ],
+    })
+
+    expect(artifacts.find((artifact) => artifact.selector === 'skill:review')?.dependencies).toEqual([
+      { kind: 'mcp', selector: 'mcp:github' },
+    ])
+    expect(artifacts.find((artifact) => artifact.selector === 'skill:other')?.dependencies).toEqual([])
+  })
 })
 
 describe('artifact closure', () => {

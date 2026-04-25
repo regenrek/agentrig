@@ -55,7 +55,15 @@ export type RegistryLockArtifact = {
   declared_network_domains?: string[]
   declared_secrets?: string[]
   runtime_requirements?: string[]
-  dependencies?: Array<{ kind?: string; artifact?: string; selector?: string; version?: string }>
+  dependencies?: Array<{
+    kind?: string
+    artifact?: string
+    selector?: string
+    version?: string
+    required_by?: string
+    requiredBy?: string
+    for_selector?: string
+  }>
   snapshot_digest: string
 }
 
@@ -294,6 +302,7 @@ function artifactFromLockGroup(
 
 function dependenciesForSelector(lock: RegistryLockArtifact, selector: string): ArtifactDependency[] {
   return (lock.dependencies ?? [])
+    .filter((dependency) => dependencyOwnerSelector(dependency) === selector)
     .map((dependency) => {
       const dependencySelector = dependency.selector ?? dependency.artifact
       if (!dependency.kind || !dependencySelector) return null
@@ -308,6 +317,16 @@ function dependenciesForSelector(lock: RegistryLockArtifact, selector: string): 
     })
     .filter((dependency): dependency is ArtifactDependency => dependency != null && dependency.selector !== selector)
     .sort((left, right) => left.selector.localeCompare(right.selector))
+}
+
+function dependencyOwnerSelector(dependency: NonNullable<RegistryLockArtifact['dependencies']>[number]) {
+  const owner = dependency.required_by ?? dependency.requiredBy ?? dependency.for_selector
+  if (!owner) return null
+  try {
+    return owner.includes(':') ? owner : formatArtifactSelector('skill', owner)
+  } catch {
+    return null
+  }
 }
 
 function isWithinSourcePath(path: string, sourcePath: string) {
