@@ -9,7 +9,7 @@ import {
   readRegistryIndex,
   resolveConfiguredRegistry,
 } from '../lib/registry'
-import type { RegistryRef } from '../lib/types'
+import type { PluginInstallSpecIdentity, RegistryRef } from '../lib/types'
 
 const args = {
   cwd: {
@@ -60,7 +60,9 @@ const command = defineCommand({
       console.log('Installed plugins:')
       if (!records.length) console.log('  (none)')
       for (const record of records) {
-        console.log(`  - ${record.pluginId}@${record.pluginVersion} (${record.provider}, ${record.scope})`)
+        console.log(
+          `  - ${record.pluginId}@${record.pluginVersion} (${record.provider}, ${record.scope})${formatInstallSource(record.specIdentity)}`
+        )
       }
       console.log('')
     }
@@ -104,5 +106,12 @@ const command = defineCommand({
     }
   },
 })
+
+function formatInstallSource(identity: PluginInstallSpecIdentity) {
+  if (identity.kind !== 'external-repo') return ''
+  const repo = identity.repoUrl || [identity.owner, identity.repo].filter(Boolean).join('/') || 'external repo'
+  const revision = identity.commitSha || identity.ref || identity.scanDigest.slice(0, 12)
+  return ` from ${repo}@${revision}`
+}
 
 export default command

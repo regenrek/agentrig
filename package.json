@@ -17,6 +17,7 @@
     "test:release:local": "vp run repo:test:release:local",
     "test:release:smoke": "vp run repo:test:release:smoke",
     "coverage": "vp run repo:coverage",
+    "build:sdk": "vp run repo:build:sdk",
     "build:cli": "vp run repo:build:cli",
     "docs:dev": "vp run repo:docs:dev",
     "docs:build": "vp run repo:docs:build",

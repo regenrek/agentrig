@@ -1,0 +1,9 @@
+{
+  "languageServers": {
+    "typescript": {
+      "command": "typescript-language-server",
+      "args": ["--stdio"]
+    }
+  }
+}
+

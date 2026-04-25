@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import type { PluginFeatures } from '@agentrig/sdk'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
@@ -86,20 +87,7 @@ export type PluginEntry = {
   pluginName: string
 }
 
-export type PluginFeatures = {
-  hasReadme: boolean
-  hasSkills: boolean
-  hasCommands: boolean
-  hasAgents: boolean
-  hasRules: boolean
-  hasHooks: boolean
-  hasAssets: boolean
-  hasScripts: boolean
-  hasSettings: boolean
-  hasClaudeMcp: boolean
-  hasClaudeLsp: boolean
-  hasCodexApp: boolean
-}
+export type { PluginFeatures }
 
 export type ProviderExportResult = {
   provider: PluginProviderId
@@ -151,7 +139,7 @@ export type ExternalCommandRunner = (command: string, args: string[]) => Promise
 
 export type ResolvedPluginInstallMetadata = {
   specIdentity: PluginInstallSpecIdentity
-  registry: VerifiedRegistryIdentity
+  registry?: VerifiedRegistryIdentity
   snapshotDigest: string
 }
 

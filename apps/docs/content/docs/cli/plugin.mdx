@@ -20,6 +20,62 @@ agentrig plugin install <provider> <plugin-spec>
 For public installs, `<plugin-spec>` must be the canonical registry ref
 `<registryAlias>/<namespace.plugin>@<version>`.
 
+For third-party repos that are not in a signed registry, use the top-level
+`inspect` and `use` commands. Those commands create external-repo provenance,
+not registry identity.
+
+## inspect and use
+
+```bash
+agentrig inspect jxnl/dots
+agentrig inspect github:jxnl/dots --only-kind skill,mcp --json
+agentrig use jxnl/dots --as-plugin acme.dots-pick --pick skills/foo
+agentrig use jxnl/dots --install --provider codex --pick prompts/review
+```
+
+`inspect` and `use` scan third-party repos deterministically. The scan digest is
+computed from detector output only; AI output never changes it.
+
+`use --as-plugin <id>` writes a local plugin directory with `x-agentrig.source`
+provenance. `use --install` stages the same external-repo plugin shape and installs
+it through the provider installer. Both paths record external-repo provenance, not
+registry trust.
+
+## Local BYOK enrichment
+
+CLI AI enrichment is opt-in and local only:
+
+```bash
+export AGENTRIG_AI_BASE_URL="https://api.openai.com/v1"
+export AGENTRIG_AI_API_KEY="..."
+export AGENTRIG_AI_MODEL="gpt-4.1-mini"
+export AGENTRIG_AI_TIMEOUT_MS="30000"      # optional
+export AGENTRIG_AI_MAX_TOKENS="2000"       # optional; useful for reasoning models
+
+agentrig use jxnl/dots \
+  --as-plugin acme.dots-pick \
+  --pick skills/foo \
+  --enrich-ai=local
+```
+
+`--enrich-ai` resolves to `--enrich-ai=local`. No hosted CLI enrichment exists in
+v1. If any required `AGENTRIG_AI_*` variable is missing, the command fails and
+prints the required variables instead of falling back to AgentRig-hosted AI.
+
+The CLI posts to `{AGENTRIG_AI_BASE_URL}/chat/completions` with plain `fetch`.
+Your provider key stays on your machine and is sent only to your configured
+OpenAI-compatible provider. AgentRig servers do not receive the key or the prompt.
+Use the provider's OpenAI-compatible base URL without `/chat/completions`; the CLI
+adds that path. Some reasoning models spend output budget on hidden reasoning, so
+raise `AGENTRIG_AI_MAX_TOKENS` if the provider reports a token-limit truncation.
+
+The response must pass the shared `AiEnrichmentDraft` schema. Suggested description,
+keywords, and plugin id fields are draft metadata only.
+
+Hosted AI enrichment is web-only in v1. The `/submit` flow requires login,
+Turnstile, product quotas, and admin review before any AI-suggested field can be
+accepted.
+
 ## init
 
 ```bash
@@ -49,4 +105,3 @@ agentrig plugin export --agent all --pluginsDir ./acme.my-plugin --out dist/plug
 Exports local plugin directories as provider-native plugin marketplaces for `claude`, `codex`, `cursor`, or `all`.
 
 Options: `--agent`, `--pluginsDir`, `--out`, `--config`, `--marketplaceName`, `--ownerName`, `--ownerEmail`, `--pluginPrefix`, `--plugin`, `--clean`.
-

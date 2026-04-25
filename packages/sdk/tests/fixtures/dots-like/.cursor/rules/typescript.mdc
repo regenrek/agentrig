@@ -1,0 +1,7 @@
+---
+title: TypeScript Boundary Rule
+description: Keep generated and domain TypeScript imports behind canonical modules.
+---
+
+Use typed contracts at boundaries and reject loose unknown values early.
+

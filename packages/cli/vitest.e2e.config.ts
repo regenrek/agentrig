@@ -4,8 +4,8 @@ export default defineConfig({
   test: {
     include: ['tests/e2e/**/*.test.ts'],
     passWithNoTests: true,
-    testTimeout: 60_000,
-    hookTimeout: 60_000,
+    testTimeout: Number.parseInt(process.env.AGENTRIG_REAL_REPO_TEST_TIMEOUT_MS ?? '180000', 10),
+    hookTimeout: Number.parseInt(process.env.AGENTRIG_REAL_REPO_TEST_TIMEOUT_MS ?? '180000', 10),
     fileParallelism: false,
   },
 })

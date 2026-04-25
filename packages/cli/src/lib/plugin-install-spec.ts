@@ -72,6 +72,12 @@ export function buildResolvedPluginInstallMetadataMap(resolvedPlugins: ResolvedP
 }
 
 export function getPluginInstallSpecIdentityKey(identity: PluginInstallSpecIdentity) {
+  if (identity.kind === 'external-repo') {
+    const repo = identity.repoUrl || [identity.owner, identity.repo].filter(Boolean).join('/') || 'local'
+    const revision = identity.commitSha || identity.ref || identity.scanDigest
+    const picked = identity.pickedSignalPaths.join(',')
+    return `external-repo:${repo}:${revision}:${identity.subdir ?? ''}:${identity.pluginId}@${identity.version}:${picked}`
+  }
   return `registry:${identity.registryAlias}:${identity.pluginId}@${identity.version}`
 }
 

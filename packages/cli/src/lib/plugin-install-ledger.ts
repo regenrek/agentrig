@@ -13,13 +13,30 @@ import type {
 const pluginProviderSchema = z.enum(['claude', 'codex', 'cursor'])
 const pluginInstallScopeSchema = z.enum(['personal', 'workspace'])
 const pluginInstallScopeSelectorSchema = z.enum(['auto', 'personal', 'workspace'])
-const pluginInstallSpecIdentitySchema = z.strictObject({
+const registryPluginInstallSpecIdentitySchema = z.strictObject({
   kind: z.literal('registry'),
   registryAlias: z.string().min(1),
   registryUrl: z.string().min(1),
   pluginId: z.string().min(1),
   version: z.string().min(1),
 })
+const externalRepoPluginInstallSpecIdentitySchema = z.strictObject({
+  kind: z.literal('external-repo'),
+  repoUrl: z.string().min(1).optional(),
+  owner: z.string().min(1).optional(),
+  repo: z.string().min(1).optional(),
+  ref: z.string().min(1).optional(),
+  commitSha: z.string().min(1).optional(),
+  subdir: z.string().min(1).optional(),
+  scanDigest: z.string().min(1),
+  pickedSignalPaths: z.array(z.string().min(1)),
+  pluginId: z.string().min(1),
+  version: z.string().min(1),
+})
+const pluginInstallSpecIdentitySchema = z.discriminatedUnion('kind', [
+  registryPluginInstallSpecIdentitySchema,
+  externalRepoPluginInstallSpecIdentitySchema,
+])
 const verifiedRegistryIdentitySchema = z.strictObject({
   registryAlias: z.string().min(1),
   registryUrl: z.string().min(1),
@@ -41,7 +58,7 @@ const pluginInstallRecordBaseSchema = z.strictObject({
   provider: pluginProviderSchema,
   requestedScope: pluginInstallScopeSelectorSchema,
   specIdentity: pluginInstallSpecIdentitySchema,
-  registry: verifiedRegistryIdentitySchema,
+  registry: verifiedRegistryIdentitySchema.optional(),
   scope: pluginInstallScopeSchema,
   pluginId: z.string().min(1),
   pluginVersion: z.string().min(1),
@@ -81,7 +98,22 @@ const pluginInstallRecordSchema = z.discriminatedUnion('provider', [
   claudePluginInstallRecordSchema,
   codexPluginInstallRecordSchema,
   cursorPluginInstallRecordSchema,
-])
+]).superRefine((record, ctx) => {
+  if (record.specIdentity.kind === 'registry' && !record.registry) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Registry install records require verified registry metadata',
+      path: ['registry'],
+    })
+  }
+  if (record.specIdentity.kind === 'external-repo' && record.registry) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'External repo install records must not include registry metadata',
+      path: ['registry'],
+    })
+  }
+})
 const pluginInstallLedgerSchema = z.strictObject({
   schemaVersion: z.literal(2),
   installs: z.record(z.string(), pluginInstallRecordSchema),
