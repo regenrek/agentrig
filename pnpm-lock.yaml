@@ -159,9 +159,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@agentrig/sdk':
-        specifier: workspace:*
-        version: link:../sdk
       '@zip.js/zip.js':
         specifier: ^2.8.26
         version: 2.8.26
@@ -175,6 +172,9 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      '@agentrig/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0

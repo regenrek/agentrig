@@ -50,6 +50,12 @@ apps/docs/public/registry/
 .codex/
 .claude/
 
+# Test fixtures intentionally model agent dot-directories.
+!packages/sdk/tests/fixtures/**/.codex/
+!packages/sdk/tests/fixtures/**/.codex/**
+!packages/sdk/tests/fixtures/**/.claude/
+!packages/sdk/tests/fixtures/**/.claude/**
+
 # Local plans
 .plans/
 

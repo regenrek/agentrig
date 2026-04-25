@@ -15,6 +15,9 @@ export default defineConfig({
   },
   pack: {
     clean: true,
+    deps: {
+      alwaysBundle: ['@agentrig/sdk'],
+    },
     dts: true,
     entry: ['./src/cli.ts'],
     format: ['esm'],
