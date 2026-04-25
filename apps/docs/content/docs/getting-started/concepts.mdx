@@ -13,6 +13,33 @@ Agentrig is built around a few simple primitives.
 A plugin is a versioned bundle of files identified by the canonical id format `namespace.plugin`.
 Published versions carry `.plugin/plugin.json` plus the required source, lock, and review artifacts.
 
+Plugins are AgentRig's primary distribution unit. A plugin can contain skills,
+MCP servers, hooks, commands, assets, and supporting files.
+
+## Skills, MCPs, and hooks
+
+Skills, MCPs, and hooks are first-class discovery views over plugin contents.
+They help you find the exact capability you need without manually digging
+through a large repo.
+
+When you want the whole bundle, install the plugin:
+
+```bash
+agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
+```
+
+When you only want specific artifacts, install a Selection Bundle:
+
+```bash
+agentrig install codex agentrig/agentrig.core-committer@0.1.0 \
+  --pick skill:codex-analysis \
+  --pick skill:gitwhat
+```
+
+Selection Bundles are local install records for selected artifacts. They keep
+the plugin source provenance and let AgentRig safely uninstall the selected
+files or JSON entries later.
+
 ## Registries
 
 Registries host plugin metadata and files. Public installation is allowed only from static signed registries.

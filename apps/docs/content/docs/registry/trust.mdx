@@ -34,3 +34,13 @@ It is identity or ownership metadata only and must never be used to imply instal
 - Discovery may show `listed` projects, external repos, and submit-for-review flows.
 - Discovery must not present the same install CTA as `official` or `reviewed`.
 - Install trust comes from signed registry state plus digest verification, not from directory or profile metadata.
+
+## Selection installs
+
+Selection installs inherit trust from their signed registry source. Selecting a
+skill, MCP, or hook from a plugin does not create new trust; the parent registry
+artifact must still be installable.
+
+AgentRig refuses selection installs from `listed`, `blocked`, or `yanked`
+entries. Directory presence, author identity, or AI-enriched metadata never
+override registry installability.

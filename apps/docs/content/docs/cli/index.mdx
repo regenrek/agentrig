@@ -6,7 +6,8 @@ icon: Terminal
 
 # CLI overview
 
-The CLI installs plugins, manages registries, and applies rigs.
+The CLI installs full plugin bundles, installs selected artifacts from those
+bundles, manages registries, and applies rigs.
 Run `agentrig --help` for global help.
 
 ## Common commands
@@ -14,12 +15,17 @@ Run `agentrig --help` for global help.
 - `agentrig init` - create config file.
 - `agentrig list --available` - browse available plugins.
 - `agentrig view <registryAlias>/<namespace.plugin>@<version>` - inspect a plugin before installing.
-- `agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>` - install a provider plugin.
+- `agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>` - install the full plugin bundle.
+- `agentrig install <provider> <registryAlias>/<namespace.plugin>@<version> --pick skill:<name>` - install selected skills, MCPs, or hooks from a plugin as a Selection Bundle.
 - `agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>@<version>` - remove a provider plugin.
+- `agentrig skill uninstall <provider> <registryAlias>/<namespace.plugin>@<version> --pick <name>` - remove an AgentRig-managed selected-artifact install.
 - `agentrig rig apply <provider> <rig>` - apply an advanced rig.
 - `agentrig registry add` - add a registry.
 - `agentrig plugin init` - scaffold a new plugin.
 
-Public installs use the canonical registry ref `<registryAlias>/<namespace.plugin>@<version>`.
+Public installs use the canonical registry ref
+`<registryAlias>/<namespace.plugin>@<version>`. Plugin install remains the
+primary full-bundle path. Selection install is the selective path for choosing
+specific artifacts from an installable registry plugin.
 
 Use the pages in this section for full options and examples.

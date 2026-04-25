@@ -6,8 +6,9 @@ icon: PackagePlus
 
 # `agentrig plugin`
 
-`agentrig plugin` is the author workflow.
-Use it when you are creating or exporting local plugins.
+`agentrig plugin` is the plugin workflow. Plugins are the primary AgentRig
+distribution unit: a plugin can bundle skills, MCPs, hooks, commands, assets,
+and provider metadata.
 
 If you are consuming plugins from registries, use the top-level commands instead:
 
@@ -19,6 +20,49 @@ agentrig plugin install <provider> <plugin-spec>
 
 For public installs, `<plugin-spec>` must be the canonical registry ref
 `<registryAlias>/<namespace.plugin>@<version>`.
+
+## Full plugin install
+
+Use `plugin install` when you want the complete bundle:
+
+```bash
+agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
+agentrig plugin uninstall codex agentrig/agentrig.core-committer@0.1.0
+```
+
+This is not a legacy path. It is the main path for installing an entire
+published plugin.
+
+## Selected artifact install
+
+Use top-level `install --pick` when you want only specific artifacts from an
+installable plugin:
+
+```bash
+agentrig install codex agentrig/agentrig.core-committer@0.1.0 \
+  --pick skill:codex-analysis \
+  --pick skill:gitwhat
+```
+
+Kind-specific helpers are available when all picks have the same kind:
+
+```bash
+agentrig skill install codex agentrig/agentrig.core-committer@0.1.0 \
+  --pick codex-analysis \
+  --pick gitwhat
+
+agentrig mcp install claude agentrig/acme.tools@1.0.0 --pick github
+agentrig hook install cursor agentrig/acme.workflow@1.0.0 --pick pre-submit
+```
+
+AgentRig records selected-artifact installs as Selection Bundles. A Selection
+Bundle is one local ledger record with source provenance, selected artifact
+selectors, closure status, written files, and hash-owned JSON writes. Uninstall
+removes only files and JSON entries still matching the recorded hashes; user
+modified files or MCP entries are kept and reported.
+
+Selection install is currently registry-backed. For arbitrary third-party repos,
+use `inspect` and `use` to scan and materialize a local plugin first.
 
 For third-party repos that are not in a signed registry, use the top-level
 `inspect` and `use` commands. Those commands create external-repo provenance,

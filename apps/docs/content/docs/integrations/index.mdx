@@ -19,6 +19,18 @@ agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>
 agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>@<version>
 ```
 
+Use `plugin install` for the full bundle. Use selection install when you only
+want specific skills, MCPs, or hooks from that bundle:
+
+```bash
+agentrig install <provider> <registryAlias>/<namespace.plugin>@<version> \
+  --pick skill:<name> \
+  --pick mcp:<name>
+```
+
+Selection install materializes an AgentRig-managed Selection Bundle. The
+provider receives only the selected artifacts that pass SDK closure checks.
+
 Public install refs are exact and registry-only:
 
 - `agentrig/agentrig.core-committer@0.1.0`
