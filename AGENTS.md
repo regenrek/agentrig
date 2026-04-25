@@ -6,6 +6,13 @@
 - Keep a single source of truth for business rules/policy (validation, enums, flags, constants, config).
 - Clean API invariants: define required inputs, validate up front, fail fast.
 - Use latest stable libs/docs; if unsure, do a web search.
+- For artifact catalog work, `@agentrig/sdk` is the canonical owner of artifact
+  kind contracts, extraction, closure detection, scan/tree digests, and
+  Selection Bundle construction. CLI and web must consume SDK outputs instead of
+  duplicating scanner, materializer, closure, or enrichment validation logic.
+- Registry installability is the public trust boundary. Directory presence,
+  profile ownership, discovery submissions, or AI enrichment never override
+  `blocked` or `yanked` registry states.
 
 ## Codex behaviour
  - If files change unexpectedly, assume parallel edits and continue; keep your diff scoped. Stop only for conflicts/breakage, then ask the user.

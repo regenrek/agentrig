@@ -27,6 +27,32 @@ agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
 `agentrig init` adds the official registry to your config.  
 Public install refs use `<registryAlias>/<namespace.plugin>@<version>`.
 
+## Install selected artifacts
+
+Plugins can bundle skills, MCPs, hooks, commands, and agents. AgentRig exposes
+skills, MCPs, and hooks as first-class selectable artifacts while keeping the
+local install/uninstall atom as one managed Selection Bundle:
+
+```bash
+agentrig install codex agentrig/community.typescript@0.1.0 \
+  --pick skill:best-practice-coding \
+  --pick skill:computer-use-skill
+```
+
+Kind-specific helpers route to the same selection-bundle install path:
+
+```bash
+agentrig skill install codex agentrig/community.typescript@0.1.0 --pick best-practice-coding
+agentrig mcp install cursor agentrig/acme.devtools@1.0.0 --pick github
+agentrig hook install claude agentrig/acme.workflow@1.0.0 --pick pre-submit
+```
+
+Selection installs are closure-checked by `@agentrig/sdk`. The CLI does not
+install a partial artifact when SDK closure reports missing dependencies or
+files outside the selected artifact root. MCP and hook JSON writes are
+hash-owned; uninstall removes only AgentRig-written values that still match the
+ledger.
+
 ## Inspect or reuse a repo
 
 ```bash
@@ -77,6 +103,8 @@ agentrig rig apply codex my-rig --scope workspace
 ## A few terms
 
 - `plugin` - a bundle of AI workflow files
+- `artifact` - a plugin, skill, MCP, hook, command, or agent
+- `Selection Bundle` - one AgentRig-managed install/uninstall ledger record for selected artifacts
 - `registry` - a source of installable plugin versions
 - `directory` - a discovery surface
 - `external-repo` - local provenance for scanned repo reuse, not registry trust
