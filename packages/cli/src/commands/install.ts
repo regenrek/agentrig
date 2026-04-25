@@ -14,11 +14,7 @@ import {
 } from '../lib/plugin-providers'
 import { assertInstallableTrust } from '../lib/trust'
 import { installArtifactSelection } from '../lib/artifact-selection-install'
-
-function listArgs(value: unknown) {
-  const values = Array.isArray(value) ? value.map(String) : value == null ? [] : [String(value)]
-  return values.flatMap((item) => item.split(',')).map((item) => item.trim()).filter(Boolean)
-}
+import { listRepeatedOptionValues } from '../lib/repeated-options'
 
 const command = defineCommand({
   meta: {
@@ -65,9 +61,9 @@ const command = defineCommand({
       default: false,
     },
   },
-  async run({ args }) {
+  async run({ args, rawArgs }) {
     if (args.help) return showUsage(command)
-    const picks = listArgs(args.pick)
+    const picks = listRepeatedOptionValues(args.pick, rawArgs, 'pick')
     if (picks.length === 0) {
       throw new Error('Selection install requires at least one --pick kind:name value.')
     }

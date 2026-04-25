@@ -357,10 +357,14 @@ function validateVersionRecord(
 
 function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items'][number] {
   const item = expectRecord(raw, where)
-  const kind = expectArtifactKind(item.kind, `${where}.kind`)
-  const artifact = expectString(item.artifact, `${where}.artifact`)
+  const kind = item.kind == null ? 'plugin' : expectArtifactKind(item.kind, `${where}.kind`)
+  const artifact = item.artifact == null && kind === 'plugin'
+    ? expectString(item.plugin, `${where}.plugin`)
+    : expectString(item.artifact, `${where}.artifact`)
   splitArtifactId(artifact)
-  const pluginId = item.plugin == null ? undefined : expectString(item.plugin, `${where}.plugin`)
+  const pluginId = item.plugin == null && kind === 'plugin'
+    ? artifact
+    : item.plugin == null ? undefined : expectString(item.plugin, `${where}.plugin`)
   if (kind === 'plugin') {
     assert(pluginId === artifact, `Invalid ${where}.plugin: expected "${artifact}"`)
   } else {
@@ -458,12 +462,12 @@ function validateRegistryDocument(
     )
   }
   const unsignedPayload = {
-    $schema: normalized.$schema,
-    contract_version: normalized.contract_version,
-    registry_alias: normalized.registry_alias,
-    source_repository: normalized.source_repository,
-    generated_at: normalized.generated_at,
-    items: normalized.items,
+    $schema: typeof document.$schema === 'string' ? document.$schema : undefined,
+    contract_version: document.contract_version,
+    registry_alias: document.registry_alias,
+    source_repository: document.source_repository,
+    generated_at: document.generated_at,
+    items: document.items,
   }
   const actualDigest = digestJsonEnvelope(unsignedPayload)
   assert(
@@ -503,14 +507,16 @@ function validateHistoryDocument(
     `Invalid ${expectedHistoryPath}.installability: expected "${mapInstallability(trustTier)}"`
   )
   const latestVersion = expectString(history.latest_version, `${expectedHistoryPath}.latest_version`)
-  const kind = expectArtifactKind(history.kind, `${expectedHistoryPath}.kind`)
+  const kind = history.kind == null ? 'plugin' : expectArtifactKind(history.kind, `${expectedHistoryPath}.kind`)
   assert(kind === 'plugin', `Invalid ${expectedHistoryPath}.kind: CLI plugin resolver only accepts plugin histories`)
-  const artifact = expectString(history.artifact, `${expectedHistoryPath}.artifact`)
+  const artifact = history.artifact == null
+    ? expectString(history.plugin, `${expectedHistoryPath}.plugin`)
+    : expectString(history.artifact, `${expectedHistoryPath}.artifact`)
   const normalized: RegistryHistory = {
     $schema: typeof history.$schema === 'string' ? history.$schema : undefined,
     kind,
     artifact,
-    plugin: expectString(history.plugin, `${expectedHistoryPath}.plugin`),
+    plugin: history.plugin == null ? artifact : expectString(history.plugin, `${expectedHistoryPath}.plugin`),
     namespace: expectString(history.namespace, `${expectedHistoryPath}.namespace`),
     name: expectString(history.name, `${expectedHistoryPath}.name`),
     description: expectString(history.description, `${expectedHistoryPath}.description`),

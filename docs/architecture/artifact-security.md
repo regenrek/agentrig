@@ -90,7 +90,7 @@ Hooks must declare hook event names, command/prompt type, timeout if applicable,
 runtime requirements, declared secrets, and declared network domains.
 
 Skills must declare dependencies when they require files outside the skill root.
-Implicit `../shared/*` references are not enough for partial install.
+Implicit `../shared/*` references are not enough for selection install.
 
 ## Selection Closure
 
@@ -117,7 +117,7 @@ Install behavior:
 - `closed`: install may continue.
 - `requires-dependencies`: CLI/web must show required selectors and require user
   confirmation or explicit `--pick` additions.
-- `requires-full-source`: partial install must stop unless user chooses full
+- `requires-full-source`: selection install must stop unless user chooses full
   plugin/source install.
 
 AI enrichment cannot change closure status, picked files, dependency decisions,

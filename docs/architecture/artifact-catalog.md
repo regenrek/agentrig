@@ -16,9 +16,10 @@ The catalog must support:
 
 - standalone plugins, skills, MCPs, hooks, and later commands/agents.
 - bundled child artifacts extracted from a signed plugin lock.
-- selection-based installs of one or more child artifacts from a plugin,
-  registry item, or arbitrary repo scan without forcing the user to install the
-  full source bundle.
+- selection-based installs of one or more child artifacts from signed registry
+  plugins or standalone registry items without forcing the user to install the
+  full source bundle. Arbitrary repo scan selection remains future work; repo
+  reuse currently goes through `agentrig use` materialization.
 - one signed installability and trust boundary owned by the registry.
 - one SDK-owned artifact extraction and deterministic scan contract consumed by
   CLI and web.
@@ -266,10 +267,11 @@ agentrig mcp submit --upstreamRepo ... --upstreamTag ... --upstreamCommitSha ...
 agentrig hook submit --upstreamRepo ... --upstreamTag ... --upstreamCommitSha ... --artifactPath ...
 ```
 
-`<source>` may be a signed registry plugin, a standalone signed artifact, or an
-external repo/URL accepted by the existing inspect/use source resolver. The CLI
-materializes the selected artifacts into one Selection Bundle and writes one
-ledger record for that bundle.
+`<source>` is a signed registry plugin or standalone signed artifact. External
+repo selection provenance is reserved in the SDK contract, but the current CLI
+does not expose `agentrig install ... --pick` for arbitrary repo URLs; external
+repo reuse remains the existing `agentrig use` materialization flow until a
+dedicated repo-selection installer lands.
 
 P3 may add shorter interactive or shorthand commands, but they must still
 materialize to Selection Bundles:
@@ -457,10 +459,10 @@ P1 web adds install snippets and selection UI for bundled child pages:
 agentrig install codex agentrig/agentrig.core-committer@0.1.0 --pick skill:codex-analysis
 ```
 
-Plugin/repo scan pages must support multi-select:
+Plugin and registry artifact pages must support multi-select:
 
 ```sh
-agentrig install codex <source> \
+agentrig install codex agentrig/community.typescript@0.1.0 \
   --pick skill:best-practice-coding \
   --pick skill:computer-use-skill
 ```
@@ -527,7 +529,7 @@ P0: discovery only.
   `ArtifactCard`, `ArtifactFilesPanel`, and kind badge.
 - No CLI, Convex, or registry layout changes.
 
-P1: selection-based bundled/repo artifact install.
+P1: selection-based bundled registry artifact install.
 
 - SDK: closure detection and Selection Bundle construction.
 - CLI: `install <provider> <source> --pick kind:name` and kind-specific helper
@@ -535,7 +537,7 @@ P1: selection-based bundled/repo artifact install.
 - Provider adapters: install from a materialized Selection Bundle.
 - Ledger: one selection record with source provenance, selected artifacts,
   target paths, file hashes, and JSON write ownership.
-- Web: bundled/repo artifact multi-select and install snippets.
+- Web: bundled artifact multi-select and install snippets.
 - Registry still plugin-only for standalone signed items.
 
 P2: standalone artifact submission.

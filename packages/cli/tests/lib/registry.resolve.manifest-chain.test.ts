@@ -250,6 +250,35 @@ describe('registry resolution', () => {
     ])
   })
 
+  it('treats legacy registry rows without kind or artifact as plugin rows without changing the signed payload', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const artifacts = buildCanonicalArtifacts()
+    const { signature: _signature, ...registryPayload } = artifacts.registryDocument
+    const { kind: _kind, artifact: _artifact, ...legacyPluginItem } = registryPayload.items[0]
+    const legacyRegistryPayload = {
+      ...registryPayload,
+      items: [legacyPluginItem, registryPayload.items[1]],
+    }
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        ...legacyRegistryPayload,
+        signature: {
+          ...artifacts.registryDocument.signature,
+          signed_digest: digestJson(legacyRegistryPayload),
+        },
+      }))
+      .mockResolvedValueOnce(jsonResponse(artifacts.history))
+      .mockResolvedValueOnce(jsonResponse(artifacts.manifest))
+      .mockResolvedValueOnce(jsonResponse(artifacts.lock))
+      .mockResolvedValueOnce(jsonResponse(artifacts.source))
+      .mockResolvedValueOnce(jsonResponse(artifacts.review))
+
+    const resolved = await resolvePluginFromRegistryRef(registry, pluginId, version)
+
+    expect(resolved.manifest.id).toBe(pluginId)
+    expect(resolved.trustTier).toBe('reviewed')
+  })
+
   it('fails when the signed registry digest does not match the unsigned payload', async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
     const artifacts = buildCanonicalArtifacts()

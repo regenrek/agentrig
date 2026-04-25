@@ -109,4 +109,24 @@ describe('artifact closure', () => {
       requiredPaths: ['skills/review/SKILL.md'],
     })
   })
+
+  it('requires declared dependencies when selected artifacts are not closed over the bundle', async () => {
+    const tree = createMemoryTree({
+      'skills/review/SKILL.md': 'Use the GitHub MCP.',
+    })
+    const [artifact] = extractArtifactsFromPluginLock({
+      plugin: 'agentrig.core',
+      version: '1.0.0',
+      snapshot_digest: 'sha256:snapshot',
+      dependencies: [
+        { required_by: 'skill:review', kind: 'mcp', artifact: 'github' },
+      ],
+      file_digests: [{ path: 'skills/review/SKILL.md', digest: 'sha256:skill' }],
+    })
+
+    await expect(detectArtifactClosure(tree, artifact, { selectedSelectors: ['skill:review'] })).resolves.toMatchObject({
+      status: 'requires-dependencies',
+      requiredSelectors: ['mcp:github'],
+    })
+  })
 })

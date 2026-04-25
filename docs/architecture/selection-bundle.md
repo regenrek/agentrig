@@ -133,6 +133,11 @@ type SelectionBundle = {
 }
 ```
 
+`external-repo-scan` is a reserved provenance shape for SDK and ledger
+validation. The current public CLI selection installer accepts signed registry
+sources only; arbitrary repo URLs continue through `agentrig use` until a
+dedicated repo-selection installer is implemented.
+
 ## Selection ID
 
 `selectionId` is deterministic before install:
@@ -281,7 +286,8 @@ Rules:
 
 - `id` includes provider, scope, and `selectionId`.
 - registry-backed selections require `registry`.
-- external repo selections forbid `registry`.
+- external repo selection records forbid `registry` when that reserved
+  provenance is enabled.
 - ledger records store exact target files and JSON writes.
 - uninstall does not resolve the source again.
 - update is future work and must compare old bundle source digest to the new
@@ -349,14 +355,16 @@ agentrig plugin submit ...
 
 ## Web Contract
 
-Web artifact pages and plugin/repo pages must support:
+Web artifact pages and plugin pages must support:
 
 - listing contained artifacts.
 - selecting multiple artifacts from one source.
 - showing closure status and dependency prompts.
 - showing trust/installability for registry sources.
-- showing external repo provenance for repo scans.
-- generating the exact `agentrig install ... --pick ...` command.
+- showing external repo provenance for repo scans without emitting registry
+  selection install commands for unsigned sources.
+- generating the exact `agentrig install ... --pick ...` command for signed
+  registry sources.
 - linking each selected artifact to its detail page.
 
 Web must call SDK extraction/closure/bundle APIs or consume payloads produced by
@@ -373,7 +381,7 @@ SDK gates:
 CLI gates:
 
 - registry-backed selection refuses blocked/yanked/listed.
-- external repo selection writes no verified registry identity.
+- reserved external repo selection records write no verified registry identity.
 - uninstall preserves modified files and JSON values.
 - duplicate MCP key behavior is deterministic.
 - existing plugin install/uninstall still works.

@@ -23,11 +23,7 @@ import {
   installArtifactSelection,
   uninstallArtifactSelection,
 } from '../lib/artifact-selection-install'
-
-function listArgs(value: unknown) {
-  const values = Array.isArray(value) ? value.map(String) : value == null ? [] : [String(value)]
-  return values.flatMap((item) => item.split(',')).map((item) => item.trim()).filter(Boolean)
-}
+import { listRepeatedOptionValues } from '../lib/repeated-options'
 
 type SubmittableArtifactKind = Extract<SelectableArtifactKind, 'skill' | 'mcp' | 'hook'>
 
@@ -77,9 +73,9 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
         default: false,
       },
     },
-    async run({ args }) {
+    async run({ args, rawArgs }) {
       if (args.help) return showUsage(install)
-      const picks = listArgs(args.pick)
+      const picks = listRepeatedOptionValues(args.pick, rawArgs, 'pick')
       if (picks.length === 0) {
         throw new Error(`${kind} install requires at least one --pick value.`)
       }
@@ -227,9 +223,9 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
         default: false,
       },
     },
-    async run({ args }) {
+    async run({ args, rawArgs }) {
       if (args.help) return showUsage(uninstall)
-      const picks = listArgs(args.pick)
+      const picks = listRepeatedOptionValues(args.pick, rawArgs, 'pick')
       if (picks.length === 0) {
         throw new Error(`${kind} uninstall requires at least one --pick value.`)
       }

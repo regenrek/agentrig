@@ -48,7 +48,7 @@ agentrig hook install claude agentrig/acme.workflow@1.0.0 --pick pre-submit
 ```
 
 Selection installs are closure-checked by `@agentrig/sdk`. The CLI does not
-install a partial artifact when SDK closure reports missing dependencies or
+install a selected artifact when SDK closure reports missing dependencies or
 files outside the selected artifact root. MCP and hook JSON writes are
 hash-owned; uninstall removes only AgentRig-written values that still match the
 ledger.
@@ -108,6 +108,13 @@ agentrig rig apply codex my-rig --scope workspace
 - `registry` - a source of installable plugin versions
 - `directory` - a discovery surface
 - `external-repo` - local provenance for scanned repo reuse, not registry trust
+
+## Build warnings
+
+SDK builds may emit a `[PLUGIN_TIMINGS] Warning` from the Vite+/plugin timing
+instrumentation layer. It is diagnostic build telemetry, not artifact catalog
+policy, scan digest, materialization, or runtime behavior. Treat new warning
+classes as review findings unless they are traced and documented here.
 - `provider` - where the plugin gets installed
 - `rig` - a named setup that applies multiple plugins together
 

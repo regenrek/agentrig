@@ -22,6 +22,10 @@ import {
   normalizePluginInstallSpecIdentity,
 } from './plugin-install-spec'
 import {
+  createProviderJsonWrite,
+  formatKeptModifiedJsonWrite,
+} from './plugin-providers/json-ownership'
+import {
   listSelectionInstallRecords,
   loadPluginInstallLedgers,
   removeSelectionInstallRecords,
@@ -226,13 +230,13 @@ async function installSelectionJson(
       await ensureDir(path.dirname(targetPath))
       await writeJsonFile(targetPath, next)
     }
-    writes.push({
+    writes.push(createProviderJsonWrite({
       path: targetPath,
       keyPath: write.keyPath,
-      writtenValueSha256: digestJson(value),
-      ...(previousValue === undefined ? {} : { previousValueSha256: digestJson(previousValue) }),
+      writtenValueDigest: digestJson(value),
+      ...(previousValue === undefined ? {} : { previousValueDigest: digestJson(previousValue) }),
       keys: Object.keys(toRecord(value) ?? {}).sort(),
-    })
+    }))
   }
   return writes
 }
@@ -248,7 +252,7 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
       sameSelectors(record.selectedSelectors, selectedSelectors)
   )
   if (records.length === 0) {
-    throw new Error(`No AgentRig-managed selection installs were found for ${input.provider} ${input.source}.`)
+    return { removed: [], kept: [], missing: [], clearedRecordIds: [] }
   }
 
   const removed: string[] = []
@@ -366,13 +370,13 @@ async function removeJsonWrite(write: PluginJsonWrite, dryRun: boolean) {
   if (!(await pathExists(write.path))) return { removed: [], kept: [], missing: [write.path] }
   const raw = await readJsonFile<unknown>(write.path)
   const record = toRecord(raw)
-  if (!record) return { removed: [], kept: [write.path], missing: [] }
+  if (!record) return { removed: [], kept: [formatKeptModifiedJsonWrite(write.path, write.keyPath)], missing: [] }
   const keys = write.keys ?? []
   const target = write.keyPath === '$' ? record : toRecord(record[write.keyPath])
   if (!target) return { removed: [], kept: [], missing: [write.path] }
   const ownedSubset = Object.fromEntries(keys.filter((key) => key in target).map((key) => [key, target[key]]))
   if (digestJson(ownedSubset) !== write.writtenValueSha256) {
-    return { removed: [], kept: [write.path], missing: [] }
+    return { removed: [], kept: [formatKeptModifiedJsonWrite(write.path, write.keyPath)], missing: [] }
   }
   if (!dryRun) {
     for (const key of keys) delete target[key]
