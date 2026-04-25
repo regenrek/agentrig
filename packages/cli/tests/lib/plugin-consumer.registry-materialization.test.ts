@@ -65,6 +65,8 @@ describe('plugin consumer registry materialization', () => {
         items: [],
       },
       history: {
+        kind: 'plugin',
+        artifact: 'community.typescript',
         plugin: 'community.typescript',
         namespace: 'community',
         name: 'TypeScript skill',

@@ -79,6 +79,8 @@ function buildCanonicalArtifacts() {
   } as const
   const history = {
     $schema: 'https://agentrig.ai/schema/plugin-history.json',
+    kind: 'plugin',
+    artifact: pluginId,
     plugin: pluginId,
     namespace: 'community',
     name: 'TypeScript skill',
@@ -98,6 +100,8 @@ function buildCanonicalArtifacts() {
     generated_at: '2026-04-16T11:00:00Z',
     items: [
       {
+        kind: 'plugin',
+        artifact: pluginId,
         plugin: pluginId,
         name: 'TypeScript skill',
         description: 'TypeScript patterns and guardrails.',

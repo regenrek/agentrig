@@ -2,6 +2,7 @@ import process from 'node:process'
 import { sha256Hex } from './hash'
 import { validatePluginManifest } from './plugin-validation'
 import { INSTALLABILITY_STATES, REGISTRY_TRUST_TIERS } from './registry-contract'
+import type { ArtifactKind } from '@agentrig/sdk'
 import type {
   PluginManifest,
   RegistryIndex,
@@ -30,6 +31,7 @@ const DIGEST_EXCLUDED_RELATIVE_PATHS = new Set([
   'AGENTRIG_REVIEW.json',
   'AGENTRIG_SOURCE.json',
 ])
+const REGISTRY_ARTIFACT_KINDS = ['plugin', 'skill', 'mcp', 'hook'] as const
 
 export const LOCAL_PLUGIN_POLICY: PluginUploadPolicySnapshot = {
   maxZipBytes: 10 * 1024 * 1024,
@@ -256,6 +258,12 @@ function splitPluginId(pluginId: string) {
   return { namespace, pluginName }
 }
 
+function expectArtifactKind(value: unknown, where: string): ArtifactKind {
+  const kind = expectString(value, where) as ArtifactKind
+  assert((REGISTRY_ARTIFACT_KINDS as readonly string[]).includes(kind), `Invalid ${where}: ${kind}`)
+  return kind
+}
+
 function expectedVersionRoot(pluginId: string, version: string) {
   const { namespace, pluginName } = splitPluginId(pluginId)
   return `plugins/${namespace}/${pluginName}/versions/${version}/`
@@ -327,6 +335,10 @@ function validateVersionRecord(
 function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items'][number] {
   const item = expectRecord(raw, where)
   const pluginId = expectString(item.plugin, `${where}.plugin`)
+  const kind = expectArtifactKind(item.kind, `${where}.kind`)
+  assert(kind === 'plugin', `Invalid ${where}.kind: CLI plugin resolver only accepts plugin rows`)
+  const artifact = expectString(item.artifact, `${where}.artifact`)
+  assert(artifact === pluginId, `Invalid ${where}.artifact: expected "${pluginId}"`)
   const { namespace, pluginName } = splitPluginId(pluginId)
   const latestVersion = expectString(item.latest_version, `${where}.latest_version`)
   assert(VERSION_PATTERN.test(latestVersion), `Invalid ${where}.latest_version: expected exact semver`)
@@ -357,6 +369,8 @@ function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items
     `Invalid ${where}.active_version.installability: expected "${installability}"`
   )
   return {
+    kind,
+    artifact,
     plugin: pluginId,
     name: expectString(item.name, `${where}.name`),
     description: expectString(item.description, `${where}.description`),
@@ -462,8 +476,13 @@ function validateHistoryDocument(
     `Invalid ${expectedHistoryPath}.installability: expected "${mapInstallability(trustTier)}"`
   )
   const latestVersion = expectString(history.latest_version, `${expectedHistoryPath}.latest_version`)
+  const kind = expectArtifactKind(history.kind, `${expectedHistoryPath}.kind`)
+  assert(kind === 'plugin', `Invalid ${expectedHistoryPath}.kind: CLI plugin resolver only accepts plugin histories`)
+  const artifact = expectString(history.artifact, `${expectedHistoryPath}.artifact`)
   const normalized: RegistryHistory = {
     $schema: typeof history.$schema === 'string' ? history.$schema : undefined,
+    kind,
+    artifact,
     plugin: expectString(history.plugin, `${expectedHistoryPath}.plugin`),
     namespace: expectString(history.namespace, `${expectedHistoryPath}.namespace`),
     name: expectString(history.name, `${expectedHistoryPath}.name`),
@@ -476,6 +495,7 @@ function validateHistoryDocument(
     advisories: history.advisories == null ? undefined : expectStringArray(history.advisories, `${expectedHistoryPath}.advisories`),
     versions,
   }
+  assert(normalized.artifact === pluginId, `Invalid ${expectedHistoryPath}.artifact: expected "${pluginId}"`)
   assert(normalized.plugin === pluginId, `Invalid ${expectedHistoryPath}.plugin: expected "${pluginId}"`)
   assert(
     `${normalized.namespace}.${splitPluginId(pluginId).pluginName}` === pluginId,
@@ -592,7 +612,7 @@ function validateSourceArtifact(
     `Invalid ${where}.snapshot_tree_digest: expected "${expectedSnapshotDigest}".`
   )
   assert(
-    isCanonicalRelativePath(normalized.plugin_path),
+    normalized.plugin_path != null && isCanonicalRelativePath(normalized.plugin_path),
     `Invalid ${where}.plugin_path: expected a canonical relative path`
   )
   return normalized
