@@ -32,6 +32,14 @@ agentrig plugin install codex georg/georg.ts-master-plugin@1.2.0
 
 Registry aliases are for static signed registries only. Direct URLs, local files, ZIP uploads, and author repos are outside the public install contract.
 
+`agentrig inspect <repo>` and `agentrig use <repo>` are separate external-repo workflows.
+They can scan and reuse selected files, but they must not be added as registry aliases and
+must not be described as public registry installs.
+
+AI does not change this boundary. CLI enrichment is local BYOK only, and web-hosted
+enrichment produces draft fields that require admin acceptance before they can enter
+a submitted manifest.
+
 ## Options
 
 - `--cwd <path>` - working directory.

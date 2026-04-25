@@ -12,6 +12,17 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
+    "paths": {
+      "@agentrig/sdk": [
+        "./packages/sdk/src/index.ts"
+      ],
+      "@agentrig/sdk/fs-adapters/local-fs": [
+        "./packages/sdk/src/fs-adapters/local-fs.ts"
+      ],
+      "@agentrig/sdk/fs-adapters/zip-tree": [
+        "./packages/sdk/src/fs-adapters/zip-tree.ts"
+      ]
+    },
     "types": [],
     "noEmit": true
   }

@@ -15,6 +15,16 @@ If you already used the submission flow in AgentRig, the destination is still th
 an approved submission opens or updates a PR into `agentrig-registry`, and the
 version becomes publicly installable only after that PR is merged.
 
+Discovery submissions created from pasted repo URLs or `agentrig inspect` output are
+not installable. They help reviewers find candidate files and metadata, but a registry
+version still needs the canonical source, lock, review, README, license, and plugin
+manifest artifacts below.
+
+AI-enriched text is also discovery-only until accepted by an admin. In v1, hosted AI
+enrichment exists only in the web submit flow and is gated by login, Turnstile, quotas,
+and review. The CLI supports only local BYOK enrichment, where the user's provider key
+is sent directly to their configured provider and never to AgentRig.
+
 ## Add a plugin
 
 1. Create or update `plugins/<namespace>/<plugin>/plugin.json`.
@@ -33,6 +43,7 @@ node scripts/validate-registry.mjs --check
 
 - Do not add compatibility shapes, aliases, or fallback metadata.
 - Do not publish installable artifacts from Convex, ZIP uploads, author repos, or arbitrary URLs.
+- Do not treat external-repo installs, discovery submissions, or AI-enriched draft text as registry trust.
 - The canonical path is:
   - `registry.json -> plugins/<namespace>/<plugin>/plugin.json -> versions/<version>/...`
 - The canonical install ref is:

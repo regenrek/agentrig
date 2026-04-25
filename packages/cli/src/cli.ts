@@ -23,6 +23,8 @@ const main = defineCommand({
     init: () => import('./commands/init').then((m) => m.default),
     view: () => import('./commands/view').then((m) => m.default),
     list: () => import('./commands/list').then((m) => m.default),
+    inspect: () => import('./commands/inspect').then((m) => m.default),
+    use: () => import('./commands/use').then((m) => m.default),
     login: () => import('./commands/login').then((m) => m.default),
     logout: () => import('./commands/logout').then((m) => m.default),
     whoami: () => import('./commands/whoami').then((m) => m.default),

@@ -12,6 +12,14 @@ export default defineConfig({
         command: 'tsc -p tsconfig.json --noEmit',
         cwd: 'packages/cli',
       },
+      'repo:typecheck:sdk': {
+        command: 'tsc -p tsconfig.json --noEmit',
+        cwd: 'packages/sdk',
+      },
+      'repo:build:sdk': {
+        command: 'vp pack',
+        cwd: 'packages/sdk',
+      },
       'repo:build:cli': {
         command: 'vp pack',
         cwd: 'packages/cli',
@@ -46,6 +54,10 @@ export default defineConfig({
         command: 'vp test --run',
         cwd: 'packages/cli',
       },
+      'repo:test:sdk': {
+        command: 'vp test --run',
+        cwd: 'packages/sdk',
+      },
       'repo:test:e2e': {
         command: 'vp pack && vp test --run --config vitest.e2e.config.ts',
         cwd: 'packages/cli',
@@ -58,7 +70,7 @@ export default defineConfig({
       },
       'repo:check': {
         command: 'vp run repo:typecheck:cli',
-        dependsOn: ['repo:test', 'repo:playground:vite-plus:check'],
+        dependsOn: ['repo:typecheck:sdk', 'repo:test', 'repo:test:sdk', 'repo:playground:vite-plus:check'],
       },
     },
   },

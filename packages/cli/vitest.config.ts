@@ -1,6 +1,18 @@
 import { configDefaults, defineConfig } from 'vite-plus/test/config'
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: '@agentrig/sdk/fs-adapters/local-fs',
+        replacement: '../../packages/sdk/src/fs-adapters/local-fs.ts',
+      },
+      {
+        find: '@agentrig/sdk',
+        replacement: '../../packages/sdk/src/index.ts',
+      },
+    ],
+  },
   test: {
     testTimeout: 20_000,
     hookTimeout: 20_000,

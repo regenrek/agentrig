@@ -256,6 +256,19 @@ export type PluginInstallSpecIdentity =
     pluginId: string
     version: string
   }
+  | {
+    kind: 'external-repo'
+    repoUrl?: string
+    owner?: string
+    repo?: string
+    ref?: string
+    commitSha?: string
+    subdir?: string
+    scanDigest: string
+    pickedSignalPaths: string[]
+    pluginId: string
+    version: string
+  }
 
 export type VerifiedRegistryIdentity = {
   registryAlias: string
@@ -275,7 +288,7 @@ type PluginInstallRecordBase = {
   provider: PluginProviderName
   requestedScope: PluginInstallScopeSelectorName
   specIdentity: PluginInstallSpecIdentity
-  registry: VerifiedRegistryIdentity
+  registry?: VerifiedRegistryIdentity
   scope: PluginInstallScopeName
   pluginId: string
   pluginVersion: string

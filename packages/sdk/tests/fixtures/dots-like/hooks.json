@@ -1,0 +1,14 @@
+{
+  "PreToolUse": [
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node scripts/check-command.js"
+        }
+      ]
+    }
+  ]
+}
+

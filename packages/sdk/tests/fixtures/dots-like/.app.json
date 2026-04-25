@@ -1,0 +1,7 @@
+{
+  "entrypoint": "scripts/app-entry.js",
+  "interface": {
+    "name": "dots-like"
+  }
+}
+

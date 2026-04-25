@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "node",
+      "args": ["./scripts/mcp-filesystem.js"]
+    }
+  }
+}
+
