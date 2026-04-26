@@ -3,9 +3,11 @@ import type { Signal } from '../types'
 import { normalizeVirtualPath, virtualBasename, virtualDirname } from '../virtual-tree'
 import {
   createSignal,
+  detectorRoots,
   filesForExact,
   filesForPrefix,
   idFromPath,
+  relativePathFromRoot,
   slugifySignalId,
   titleFromPath,
   type DetectorInput,
@@ -102,11 +104,41 @@ export async function detectSkills(input: DetectorInput): Promise<Signal[]> {
   return signals
 }
 
+export async function detectAgents(input: DetectorInput): Promise<Signal[]> {
+  const signals: Signal[] = []
+  for (const file of input.files) {
+    const path = normalizeVirtualPath(file.path)
+    if (!isAgentDefinitionPath(path)) continue
+
+    const frontmatter = parseFrontmatter(await input.tree.readText(path))
+    if (!frontmatter?.name || !frontmatter.description) continue
+
+    signals.push(
+      createSignal({
+        kind: 'agent',
+        id: slugifySignalId(frontmatter.name),
+        title: frontmatter.name,
+        description: frontmatter.description,
+        sourcePath: path,
+        files: filesForExact(input.files, path),
+        score: 1,
+      })
+    )
+  }
+  return signals
+}
+
 export async function detectCursorRules(input: DetectorInput): Promise<Signal[]> {
   const signals: Signal[] = []
   for (const file of input.files) {
     const path = normalizeVirtualPath(file.path)
-    if (!path.startsWith('.cursor/rules/') || !path.endsWith('.mdc')) continue
+    if (
+      !rootRelativePaths(input, path).some(
+        (relativePath) => relativePath.startsWith('.cursor/rules/') && relativePath.endsWith('.mdc')
+      )
+    ) {
+      continue
+    }
 
     const frontmatter = parseFrontmatter(await input.tree.readText(path))
     if (!frontmatter) continue
@@ -130,7 +162,12 @@ export async function detectTypedCommands(input: DetectorInput): Promise<Signal[
   const commandPrefixes = ['.claude/commands/', '.codex/prompts/', '.cursor/commands/']
   return input.files
     .map((file) => normalizeVirtualPath(file.path))
-    .filter((path) => path.endsWith('.md') && commandPrefixes.some((prefix) => path.startsWith(prefix)))
+    .filter((path) =>
+      path.endsWith('.md') &&
+      rootRelativePaths(input, path).some((relativePath) =>
+        commandPrefixes.some((prefix) => relativePath.startsWith(prefix))
+      )
+    )
     .map((path) =>
       createSignal({
         kind: 'command',
@@ -147,8 +184,10 @@ export function detectTopLevelPrompts(input: DetectorInput): Signal[] {
   return input.files
     .map((file) => normalizeVirtualPath(file.path))
     .filter((path) => {
-      const parts = path.split('/')
-      return parts.length === 2 && (parts[0] === 'prompts' || parts[0] === 'commands') && path.endsWith('.md')
+      return rootRelativePaths(input, path).some((relativePath) => {
+        const parts = relativePath.split('/')
+        return parts.length === 2 && (parts[0] === 'prompts' || parts[0] === 'commands') && relativePath.endsWith('.md')
+      })
     })
     .map((path) =>
       createSignal({
@@ -169,23 +208,35 @@ export async function detectJsonConfigs(input: DetectorInput): Promise<Signal[]>
     const raw = await readJson(input, path)
     if (!raw) continue
 
-    if ((path === '.mcp.json' || path === 'mcp.json') && mcpConfigSchema.safeParse(raw).success) {
+    const relatives = rootRelativePaths(input, path)
+    if (
+      relatives.some((relativePath) => relativePath === '.mcp.json' || relativePath === 'mcp.json') &&
+      mcpConfigSchema.safeParse(raw).success
+    ) {
       signals.push(jsonSignal(input, path, 'mcp', 'MCP Servers', 1))
       continue
     }
-    if ((path === 'hooks.json' || path === 'hooks/hooks.json' || path.endsWith('/hooks.json')) && hooksSchema.safeParse(raw).success) {
+    if (
+      relatives.some(
+        (relativePath) => relativePath === 'hooks.json' || relativePath === 'hooks/hooks.json' || relativePath.endsWith('/hooks.json')
+      ) &&
+      hooksSchema.safeParse(raw).success
+    ) {
       signals.push(jsonSignal(input, path, 'hook', 'Hooks', 1))
       continue
     }
-    if (path === '.lsp.json' && claudeLspSchema.safeParse(raw).success) {
+    if (relatives.some((relativePath) => relativePath === '.lsp.json') && claudeLspSchema.safeParse(raw).success) {
       signals.push(jsonSignal(input, path, 'lsp', 'Claude LSP', 0.9))
       continue
     }
-    if (path === '.app.json' && codexAppSchema.safeParse(raw).success) {
+    if (relatives.some((relativePath) => relativePath === '.app.json') && codexAppSchema.safeParse(raw).success) {
       signals.push(jsonSignal(input, path, 'codex-app', 'Codex App', 1))
       continue
     }
-    if (path === 'settings.json' && providerSettingsSchema.safeParse(raw).success) {
+    if (
+      relatives.some((relativePath) => relativePath === 'settings.json') &&
+      providerSettingsSchema.safeParse(raw).success
+    ) {
       signals.push(jsonSignal(input, path, 'settings', 'Settings', 0.8))
     }
   }
@@ -230,4 +281,22 @@ function parseFrontmatter(text: string | null): Frontmatter | undefined {
     if (value) fields[key] = value
   }
   return Object.keys(fields).length > 0 ? fields : undefined
+}
+
+function isAgentDefinitionPath(path: string) {
+  if (!path.endsWith('.md') && !path.endsWith('.mdx')) return false
+
+  const parts = path.split('/')
+  const agentsIndex = parts.findIndex((part) => part === 'agents')
+  if (agentsIndex === -1) return false
+
+  const afterAgents = parts.slice(agentsIndex + 1)
+  if (parts[agentsIndex - 1] === '.claude') return afterAgents.length === 1
+  return afterAgents.length === 1 || afterAgents.length === 2
+}
+
+function rootRelativePaths(input: DetectorInput, path: string, roots = detectorRoots(input)) {
+  return roots
+    .map((root) => relativePathFromRoot(path, root))
+    .filter((relativePath): relativePath is string => relativePath !== null && relativePath.length > 0)
 }

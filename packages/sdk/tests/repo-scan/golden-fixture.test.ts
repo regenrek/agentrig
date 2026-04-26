@@ -104,7 +104,7 @@ describe('dots-like golden fixture', () => {
         ],
       ]
     `)
-    expect(first.digest).toMatchInlineSnapshot('"50b7fff5962ef8f00e8bcab9fd2ba347067c9540ef34c2e0f51c5ed6cad6af73"')
+    expect(first.digest).toMatchInlineSnapshot('"d5b571d32868b6f5bf9268d6a10da7cbe6d3e43c8d38d0849aa8522beed74755"')
   })
 
   it('keeps enrichment prompt evidence bounded and versioned', async () => {
@@ -205,7 +205,7 @@ describe('dots-like golden fixture', () => {
         ],
         [
           "agent",
-          "agents-research",
+          "research",
           "agents/research.md",
           {
             "claude": "native",
