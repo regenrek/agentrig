@@ -1,11 +1,19 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vite-plus/test'
-import { uninstallArtifactSelection } from '../../src/lib/artifact-selection-install'
-import { ensureDir, writeJsonFile } from '../../src/lib/fs'
+import {
+  installArtifactSelection,
+  uninstallArtifactSelection,
+} from '../../src/lib/artifact-selection-install'
+import { ensureDir, pathExists, writeJsonFile } from '../../src/lib/fs'
 import { sha256Hex } from '../../src/lib/hash'
-import { upsertSelectionInstallRecords } from '../../src/lib/plugin-install-ledger'
+import {
+  listSelectionInstallRecords,
+  loadPluginInstallLedgers,
+  upsertSelectionInstallRecords,
+} from '../../src/lib/plugin-install-ledger'
+import type { ResolvedStandaloneArtifact } from '../../src/lib/registry'
 import type { RegistryRef, SelectionInstallRecord } from '../../src/lib/types'
 
 const tempDirs: string[] = []
@@ -15,7 +23,113 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
+describe('installArtifactSelection', () => {
+  it('builds a standalone registry-artifact selection bundle without --pick', async () => {
+    const cwd = await mkdtemp(path.join(tmpdir(), 'agentrig-selection-test-'))
+    const artifactDir = await mkdtemp(path.join(tmpdir(), 'agentrig-standalone-artifact-'))
+    tempDirs.push(cwd, artifactDir)
+    const skillBody = '# Test skill\n'
+    const manifest = {
+      kind: 'agentrig:skill' as const,
+      id: 'demo.review',
+      name: 'Review',
+      description: 'Review code.',
+      version: '1.0.0',
+      entry: 'SKILL.md',
+    }
+    await ensureDir(path.join(artifactDir, 'skills', 'review', '.skill'))
+    await writeFile(path.join(artifactDir, 'skills', 'review', 'SKILL.md'), skillBody)
+    await writeJsonFile(path.join(artifactDir, 'skills', 'review', '.skill', 'skill.json'), manifest)
+    const resolved = standaloneSkill({
+      skillDigest: sha256Text(skillBody),
+      manifestDigest: sha256Text(JSON.stringify(manifest, null, 2) + '\n'),
+    })
+
+    const result = await installArtifactSelection({
+      sourceKind: 'registry-artifact',
+      cwd,
+      provider: 'codex',
+      requestedScope: 'workspace',
+      scope: 'workspace',
+      registryRef: 'agentrig/demo.review@1.0.0',
+      resolved,
+      pluginDir: artifactDir,
+      dryRun: true,
+    })
+
+    expect(result.bundle.source).toMatchObject({
+      kind: 'registry-artifact',
+      artifactKind: 'skill',
+      artifactId: 'demo.review',
+    })
+    expect(result.record.specIdentity).toMatchObject({
+      kind: 'registry-artifact',
+      artifactKind: 'skill',
+      artifactId: 'demo.review',
+    })
+    expect(result.record.selectedSelectors).toEqual(['skill:review'])
+    expect(result.record.targetPaths).toEqual([
+      path.join(cwd, '.codex', 'skills', 'review', '.skill', 'skill.json'),
+      path.join(cwd, '.codex', 'skills', 'review', 'SKILL.md'),
+    ])
+  })
+})
+
 describe('uninstallArtifactSelection', () => {
+  it('removes standalone registry-artifact skill installs without --pick', async () => {
+    const cwd = await mkdtemp(path.join(tmpdir(), 'agentrig-selection-test-'))
+    const artifactDir = await mkdtemp(path.join(tmpdir(), 'agentrig-standalone-artifact-'))
+    tempDirs.push(cwd, artifactDir)
+    const skillBody = '# Test skill\n'
+    const manifest = {
+      kind: 'agentrig:skill' as const,
+      id: 'demo.review',
+      name: 'Review',
+      description: 'Review code.',
+      version: '1.0.0',
+      entry: 'SKILL.md',
+    }
+    await ensureDir(path.join(artifactDir, 'skills', 'review', '.skill'))
+    await writeFile(path.join(artifactDir, 'skills', 'review', 'SKILL.md'), skillBody)
+    await writeJsonFile(path.join(artifactDir, 'skills', 'review', '.skill', 'skill.json'), manifest)
+    const resolved = standaloneSkill({
+      skillDigest: sha256Text(skillBody),
+      manifestDigest: sha256Text(JSON.stringify(manifest, null, 2) + '\n'),
+    })
+    const installResult = await installArtifactSelection({
+      sourceKind: 'registry-artifact',
+      cwd,
+      provider: 'codex',
+      requestedScope: 'workspace',
+      scope: 'workspace',
+      registryRef: 'agentrig/demo.review@1.0.0',
+      resolved,
+      pluginDir: artifactDir,
+    })
+
+    const result = await uninstallArtifactSelection({
+      sourceKind: 'registry-artifact',
+      cwd,
+      provider: 'codex',
+      source: 'agentrig/demo.review@1.0.0',
+      registries,
+      picks: [],
+      defaultKind: 'skill',
+      scope: 'workspace',
+    })
+
+    expect(result.kept).toEqual([])
+    expect(result.missing).toEqual([])
+    expect(result.clearedRecordIds).toEqual([installResult.record.id])
+    expect(result.removed.slice().sort()).toEqual(installResult.record.targetPaths.slice().sort())
+    await expect(Promise.all(installResult.record.targetPaths.map((targetPath) => pathExists(targetPath)))).resolves.toEqual([
+      false,
+      false,
+    ])
+    const ledgers = await loadPluginInstallLedgers(cwd)
+    expect(listSelectionInstallRecords(ledgers, 'workspace')).toEqual([])
+  })
+
   it('treats an already-cleared selection uninstall as an idempotent no-op', async () => {
     const cwd = await mkdtemp(path.join(tmpdir(), 'agentrig-selection-test-'))
     tempDirs.push(cwd)
@@ -121,6 +235,10 @@ function digestJson(value: unknown) {
   return `sha256:${sha256Hex(new TextEncoder().encode(stableJson(value)))}`
 }
 
+function sha256Text(value: string) {
+  return `sha256:${sha256Hex(new TextEncoder().encode(value))}`
+}
+
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(',')}]`
   if (value != null && typeof value === 'object') {
@@ -130,4 +248,102 @@ function stableJson(value: unknown): string {
       .join(',')}}`
   }
   return JSON.stringify(value)
+}
+
+function standaloneSkill(input: { skillDigest: string; manifestDigest: string }): ResolvedStandaloneArtifact {
+  const fileDigests = [
+    { path: '.skill/skill.json', digest: input.manifestDigest },
+    { path: 'SKILL.md', digest: input.skillDigest },
+  ]
+  const snapshotDigest = digestJson(fileDigests)
+  const versionRecord = {
+    version: '1.0.0',
+    path: 'skills/demo/review/versions/1.0.0/',
+    manifest: 'skills/demo/review/versions/1.0.0/.skill/skill.json',
+    source: 'skills/demo/review/versions/1.0.0/AGENTRIG_SOURCE.json',
+    lock: 'skills/demo/review/versions/1.0.0/AGENTRIG_LOCK.json',
+    review: 'skills/demo/review/versions/1.0.0/AGENTRIG_REVIEW.json',
+    trust_tier: 'reviewed' as const,
+    installability: 'installable' as const,
+    snapshot_digest: snapshotDigest,
+    published_at: '2026-04-25T00:00:00.000Z',
+  }
+  return {
+    artifactKind: 'skill',
+    artifactId: 'demo.review',
+    manifest: {
+      kind: 'agentrig:skill',
+      id: 'demo.review',
+      name: 'Review',
+      description: 'Review code.',
+      version: '1.0.0',
+      entry: 'SKILL.md',
+    },
+    registryDocument: {
+      contract_version: '1',
+      registry_alias: 'agentrig',
+      source_repository: 'https://github.com/agentrig/agentrig-registry',
+      generated_at: '2026-04-25T00:00:00.000Z',
+      signature: {
+        algorithm: 'sha256-json-envelope',
+        key_id: 'agentrig-registry',
+        target: 'registry.json',
+        signed_digest: 'sha256:registry',
+      },
+      items: [],
+    },
+    history: {
+      kind: 'skill',
+      artifact: 'demo.review',
+      namespace: 'demo',
+      name: 'Review',
+      description: 'Review code.',
+      latest_version: '1.0.0',
+      trust_tier: 'reviewed',
+      installability: 'installable',
+      active_version: versionRecord,
+      versions: [versionRecord],
+    },
+    versionRecord,
+    lockArtifact: {
+      artifact_kind: 'skill',
+      artifact_id: 'demo.review',
+      version: '1.0.0',
+      file_digests: fileDigests,
+      capability_set: [],
+      declared_network_domains: [],
+      declared_secrets: [],
+      runtime_requirements: [],
+      dependencies: [],
+      snapshot_digest: snapshotDigest,
+    },
+    sourceArtifact: {
+      upstream_repo: 'https://github.com/acme/review',
+      upstream_tag: 'v1.0.0',
+      upstream_commit: '1111111111111111111111111111111111111111',
+      artifact_kind: 'skill',
+      artifact_path: 'skills/review',
+      submitted_by: 'submission:test',
+      snapshot_created_at: '2026-04-25T00:00:00.000Z',
+      snapshot_tree_digest: snapshotDigest,
+    },
+    reviewArtifact: {
+      review_status: 'approved',
+      reviewer: 'system:test',
+      reviewed_at: '2026-04-25T00:00:00.000Z',
+      scanner_summary: { status: 'pass', findings: [] },
+      policy_decisions: [],
+      trust_tier_basis: {
+        trust_tier: 'reviewed',
+        installability: 'installable',
+        rationale: 'test',
+      },
+    },
+    snapshotDigest,
+    source: { type: 'url', baseUrl: 'https://agentrig.ai/registry/skills/demo/review/versions/1.0.0/' },
+    sourceLabel: 'agentrig/demo.review@1.0.0',
+    trustTier: 'reviewed',
+    installability: 'installable',
+    registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
+  }
 }

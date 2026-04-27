@@ -6,6 +6,7 @@ import {
   buildSelectionBundle,
   detectArtifactClosure,
   extractArtifactsFromPluginLock,
+  formatArtifactSelector,
   normalizeSelectionPick,
   type ExtractedArtifact,
   type SelectableArtifactKind,
@@ -17,10 +18,14 @@ import { ensureDir, pathExists, readJsonFile, writeJsonFile } from './fs'
 import { sha256Hex } from './hash'
 import {
   getResolvedPluginSpecIdentity,
+  getResolvedRegistryArtifactSpecIdentity,
   getResolvedVerifiedRegistryIdentity,
   isSamePluginInstallSpecIdentity,
   normalizePluginInstallSpecIdentity,
+  normalizeRegistryArtifactInstallSpecIdentity,
 } from './plugin-install-spec'
+import type { ParsedRegistryArtifactKind } from './registry-spec'
+import { registryArtifactSourcePath } from './registry'
 import {
   createProviderJsonWrite,
   formatKeptModifiedJsonWrite,
@@ -32,6 +37,7 @@ import {
   upsertSelectionInstallRecords,
 } from './plugin-install-ledger'
 import type { ResolvedPlugin } from './registry'
+import type { ResolvedStandaloneArtifact } from './registry'
 import type {
   PluginInstallScopeName,
   PluginInstallScopeSelectorName,
@@ -41,7 +47,8 @@ import type {
   SelectionInstallRecord,
 } from './types'
 
-export type ArtifactSelectionInstallInput = {
+export type RegistryPluginSelectionInstallInput = {
+  sourceKind?: 'registry-plugin'
   cwd: string
   provider: SelectionProviderId
   requestedScope: PluginInstallScopeSelectorName
@@ -55,6 +62,22 @@ export type ArtifactSelectionInstallInput = {
   dryRun?: boolean
 }
 
+export type RegistryArtifactSelectionInstallInput = {
+  sourceKind: 'registry-artifact'
+  cwd: string
+  provider: SelectionProviderId
+  requestedScope: PluginInstallScopeSelectorName
+  scope: PluginInstallScopeName
+  registryRef: string
+  resolved: ResolvedStandaloneArtifact
+  pluginDir: string
+  picks?: string[]
+  force?: boolean
+  dryRun?: boolean
+}
+
+export type ArtifactSelectionInstallInput = RegistryPluginSelectionInstallInput | RegistryArtifactSelectionInstallInput
+
 export type ArtifactSelectionInstallResult = {
   bundle: SelectionBundle
   record: SelectionInstallRecord
@@ -64,6 +87,7 @@ export type ArtifactSelectionInstallResult = {
 }
 
 export type ArtifactSelectionUninstallInput = {
+  sourceKind?: 'registry-plugin' | 'registry-artifact'
   cwd: string
   provider: SelectionProviderId
   source: string
@@ -82,25 +106,29 @@ export type ArtifactSelectionUninstallResult = {
 }
 
 export async function installArtifactSelection(input: ArtifactSelectionInstallInput): Promise<ArtifactSelectionInstallResult> {
-  if (input.picks.length === 0) {
+  if (input.sourceKind !== 'registry-artifact' && input.picks.length === 0) {
     throw new Error('Selection install requires at least one --pick value.')
   }
+  if (input.sourceKind === 'registry-artifact' && (input.picks?.length ?? 0) > 0) {
+    throw new Error('Standalone registry artifact install does not accept --pick values.')
+  }
 
-  const artifacts = extractArtifactsFromPluginLock(input.resolved.lockArtifact)
-  const selectedSelectors = input.picks.map((pick) => normalizeSelectionPick(pick, input.defaultKind))
-  const selectedArtifacts = await resolveSelectedArtifacts(input.pluginDir, artifacts, selectedSelectors)
+  const artifacts = input.sourceKind === 'registry-artifact'
+    ? [artifactFromStandaloneRegistryArtifact(input.resolved)]
+    : extractArtifactsFromPluginLock(input.resolved.lockArtifact)
+  const selectedSelectors = input.sourceKind === 'registry-artifact'
+    ? artifacts.map((artifact) => artifact.selector)
+    : input.picks.map((pick) => normalizeSelectionPick(pick, input.defaultKind))
+  const selectedArtifacts = input.sourceKind === 'registry-artifact'
+    ? artifacts.map((artifact) => ({
+      ...artifact,
+      closureStatus: 'closed' as const,
+    }))
+    : await resolveSelectedArtifacts(input.pluginDir, artifacts, selectedSelectors)
   const bundle = await buildSelectionBundle({
     provider: input.provider,
     scope: input.scope,
-    source: {
-      kind: 'registry-plugin',
-      registryAlias: input.resolved.registry.name,
-      registryUrl: input.resolved.registry.url,
-      registryRef: input.registryRef,
-      artifactId: input.resolved.manifest.id,
-      version: input.resolved.manifest.version,
-      snapshotDigest: input.resolved.snapshotDigest,
-    },
+    source: selectionSourceForInstall(input),
     selectedArtifacts,
   })
   assertSelectionBundleInstallable(bundle)
@@ -113,10 +141,12 @@ export async function installArtifactSelection(input: ArtifactSelectionInstallIn
     id: `selection:${input.provider}:${input.scope}:${bundle.selectionId}`,
     provider: input.provider,
     requestedScope: input.requestedScope,
-    specIdentity: getResolvedPluginSpecIdentity(input.resolved),
+    specIdentity: input.sourceKind === 'registry-artifact'
+      ? getResolvedRegistryArtifactSpecIdentity(input.resolved)
+      : getResolvedPluginSpecIdentity(input.resolved),
     registry: getResolvedVerifiedRegistryIdentity(input.resolved),
     scope: input.scope,
-    pluginId: input.resolved.manifest.id,
+    pluginId: input.sourceKind === 'registry-artifact' ? input.resolved.artifactId : input.resolved.manifest.id,
     pluginVersion: input.resolved.manifest.version,
     snapshotDigest: input.resolved.snapshotDigest,
     selectionId: bundle.selectionId,
@@ -137,6 +167,54 @@ export async function installArtifactSelection(input: ArtifactSelectionInstallIn
     installedFiles,
     jsonWrites,
     rootDir,
+  }
+}
+
+function selectionSourceForInstall(input: ArtifactSelectionInstallInput) {
+  if (input.sourceKind === 'registry-artifact') {
+    return {
+      kind: 'registry-artifact' as const,
+      registryAlias: input.resolved.registry.name,
+      registryUrl: input.resolved.registry.url,
+      registryRef: input.registryRef,
+      artifactKind: input.resolved.artifactKind,
+      artifactId: input.resolved.artifactId,
+      version: input.resolved.manifest.version,
+      snapshotDigest: input.resolved.snapshotDigest,
+    }
+  }
+  return {
+    kind: 'registry-plugin' as const,
+    registryAlias: input.resolved.registry.name,
+    registryUrl: input.resolved.registry.url,
+    registryRef: input.registryRef,
+    artifactId: input.resolved.manifest.id,
+    version: input.resolved.manifest.version,
+    snapshotDigest: input.resolved.snapshotDigest,
+  }
+}
+
+function artifactFromStandaloneRegistryArtifact(resolved: ResolvedStandaloneArtifact): ExtractedArtifact {
+  const sourcePath = registryArtifactSourcePath(resolved.artifactKind, resolved.artifactId)
+  const name = sourcePath.split('/').pop() ?? resolved.artifactId
+  const selector = formatArtifactSelector(resolved.artifactKind, name)
+  return {
+    kind: resolved.artifactKind,
+    origin: 'standalone',
+    name,
+    artifactId: resolved.artifactId,
+    selector,
+    sourcePath,
+    paths: resolved.lockArtifact.file_digests.map((file) => `${sourcePath}/${file.path}`),
+    fileDigests: resolved.lockArtifact.file_digests.map((file) => ({
+      path: `${sourcePath}/${file.path}`,
+      digest: file.digest,
+    })),
+    dependencies: [],
+    capabilitySet: resolved.lockArtifact.capability_set,
+    declaredNetworkDomains: resolved.lockArtifact.declared_network_domains,
+    declaredSecrets: resolved.lockArtifact.declared_secrets,
+    runtimeRequirements: resolved.lockArtifact.runtime_requirements,
   }
 }
 
@@ -242,14 +320,27 @@ async function installSelectionJson(
 }
 
 export async function uninstallArtifactSelection(input: ArtifactSelectionUninstallInput): Promise<ArtifactSelectionUninstallResult> {
+  if (input.sourceKind === 'registry-artifact' && input.picks.length > 0) {
+    throw new Error('Standalone registry artifact uninstall does not accept --pick values.')
+  }
+  if (input.sourceKind === 'registry-plugin' && input.picks.length === 0) {
+    throw new Error('Selection uninstall requires at least one --pick value.')
+  }
   const selectedSelectors = input.picks.map((pick) => normalizeSelectionPick(pick, input.defaultKind)).sort()
-  const specIdentity = normalizePluginInstallSpecIdentity(input.source, input.cwd, input.registries)
+  const specIdentity = input.sourceKind === 'registry-artifact'
+    ? normalizeRegistryArtifactInstallSpecIdentity(
+      input.source,
+      requireStandaloneRegistryArtifactKind(input.defaultKind),
+      input.cwd,
+      input.registries,
+    )
+    : normalizePluginInstallSpecIdentity(input.source, input.cwd, input.registries)
   const ledgers = await loadPluginInstallLedgers(input.cwd)
   const records = listSelectionInstallRecords(ledgers, input.scope).filter(
     (record) =>
       record.provider === input.provider &&
       isSamePluginInstallSpecIdentity(record.specIdentity, specIdentity) &&
-      sameSelectors(record.selectedSelectors, selectedSelectors)
+      (specIdentity.kind === 'registry-artifact' || sameSelectors(record.selectedSelectors, selectedSelectors))
   )
   if (records.length === 0) {
     return { removed: [], kept: [], missing: [], clearedRecordIds: [] }
@@ -388,6 +479,11 @@ async function removeJsonWrite(write: PluginJsonWrite, dryRun: boolean) {
 
 function sameSelectors(left: string[], right: string[]) {
   return left.slice().sort().join('\n') === right.slice().sort().join('\n')
+}
+
+function requireStandaloneRegistryArtifactKind(kind: SelectableArtifactKind | undefined): ParsedRegistryArtifactKind {
+  if (kind === 'skill' || kind === 'mcp' || kind === 'hook') return kind
+  throw new Error('Standalone registry artifact uninstall requires a standalone artifact kind.')
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {

@@ -70,6 +70,39 @@ describe('Selection Bundle construction', () => {
     expect(() => assertSelectionBundleInstallable(bundle)).toThrow(/not closed/i)
   })
 
+  it('includes registry artifact kind in deterministic source identity', async () => {
+    const baseSource = {
+      registryAlias: 'agentrig',
+      registryUrl: 'https://agentrig.ai/registry',
+      registryRef: 'agentrig/community.review@1.0.0',
+      artifactId: 'community.review',
+      version: '1.0.0',
+      snapshotDigest: 'sha256:snapshot',
+    }
+    const skill = await buildSelectionBundle({
+      provider: 'codex',
+      scope: 'workspace',
+      source: {
+        kind: 'registry-artifact',
+        artifactKind: 'skill',
+        ...baseSource,
+      },
+      selectedArtifacts: [skillArtifact],
+    })
+    const plugin = await buildSelectionBundle({
+      provider: 'codex',
+      scope: 'workspace',
+      source: {
+        kind: 'registry-plugin',
+        ...baseSource,
+      },
+      selectedArtifacts: [skillArtifact],
+    })
+
+    expect(skill.selectionId).not.toBe(plugin.selectionId)
+    expect(skill.source).toMatchObject({ kind: 'registry-artifact', artifactKind: 'skill' })
+  })
+
   it('normalizes kind-specific helper picks', () => {
     expect(normalizeSelectionPick('Review', 'skill')).toBe('skill:review')
     expect(() => normalizeSelectionPick('Review')).toThrow(/kind prefix/i)

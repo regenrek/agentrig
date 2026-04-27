@@ -10,6 +10,7 @@ import {
 import { loadConfig } from '../lib/config'
 import {
   cleanupMaterializedPlugin,
+  materializeResolvedStandaloneArtifact,
   materializeResolvedPluginGraph,
   resolvePluginGraph,
 } from '../lib/plugin-consumer'
@@ -19,6 +20,8 @@ import {
   resolveInstallScope,
 } from '../lib/plugin-providers'
 import { assertInstallableTrust } from '../lib/trust'
+import { parseRegistryArtifactSpec } from '../lib/registry-spec'
+import { resolveStandaloneArtifact } from '../lib/registry'
 import {
   installArtifactSelection,
   uninstallArtifactSelection,
@@ -76,7 +79,7 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
     async run({ args, rawArgs }) {
       if (args.help) return showUsage(install)
       const picks = listRepeatedOptionValues(args.pick, rawArgs, 'pick')
-      if (picks.length === 0) {
+      if (picks.length === 0 && kind !== 'skill') {
         throw new Error(`${kind} install requires at least one --pick value.`)
       }
 
@@ -90,6 +93,45 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
         : 'auto'
       const scope = resolveInstallScope(provider, requestedScope)
       const cfg = await loadConfig(cwd)
+      if (picks.length === 0) {
+        const spec = parseRegistryArtifactSpec(String(args.source), kind)
+        const resolved = await resolveStandaloneArtifact(
+          spec.registry,
+          spec.artifactKind,
+          spec.artifact,
+          spec.version,
+          cfg.registries
+        )
+        assertInstallableTrust(
+          resolved.artifactId,
+          resolved.manifest.version,
+          resolved.trustTier,
+          resolved.installability
+        )
+        const materialized = await materializeResolvedStandaloneArtifact(resolved)
+        try {
+          const result = await installArtifactSelection({
+            sourceKind: 'registry-artifact',
+            cwd,
+            provider,
+            requestedScope,
+            scope,
+            registryRef: String(args.source),
+            resolved,
+            pluginDir: materialized.artifactDir,
+            force: args.force,
+            dryRun: args.dryRun,
+          })
+          console.log(`${kind} standalone install: ${result.bundle.selectionId}`)
+          for (const selector of result.record.selectedSelectors) console.log(`  - ${selector}`)
+          for (const targetPath of result.record.targetPaths) console.log(`  -> ${targetPath}`)
+          for (const warning of result.bundle.materialization.warnings) console.warn(`Warning: ${warning}`)
+        } finally {
+          await cleanupMaterializedPlugin(materialized.artifactsRoot)
+        }
+        return
+      }
+
       const graph = await resolvePluginGraph(String(args.source), cwd, cfg.registries)
       for (const resolved of graph.resolvedPlugins) {
         assertInstallableTrust(
@@ -239,7 +281,7 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
     async run({ args, rawArgs }) {
       if (args.help) return showUsage(uninstall)
       const picks = listRepeatedOptionValues(args.pick, rawArgs, 'pick')
-      if (picks.length === 0) {
+      if (picks.length === 0 && kind !== 'skill') {
         throw new Error(`${kind} uninstall requires at least one --pick value.`)
       }
       const cwd = args.cwd ? path.resolve(args.cwd) : process.cwd()
@@ -253,6 +295,7 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
       }
       const cfg = await loadConfig(cwd)
       const result = await uninstallArtifactSelection({
+        sourceKind: picks.length === 0 ? 'registry-artifact' : 'registry-plugin',
         cwd,
         provider,
         source: String(args.source),

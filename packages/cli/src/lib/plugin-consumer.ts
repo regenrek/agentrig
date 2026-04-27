@@ -4,9 +4,13 @@ import path from 'node:path'
 import { ensureDir } from './fs'
 import { sha256Hex } from './hash'
 import { resolvePluginSpec } from './plugin-resolver'
-import { readSourceFile, resolvePluginFromRegistryRef } from './registry'
+import {
+  readSourceFile,
+  registryArtifactSourcePath,
+  resolvePluginFromRegistryRef,
+} from './registry'
 import { validatePluginPaths } from './trust'
-import type { ResolvedPlugin } from './registry'
+import type { ResolvedPlugin, ResolvedStandaloneArtifact } from './registry'
 import type { RegistryRef, RegistryVersionDependency } from './types'
 
 function resolvePluginSourcePath(pluginDir: string, relativePath: string) {
@@ -128,6 +132,36 @@ export async function materializeResolvedPluginGraph(graph: ResolvedPluginGraph)
     resolvedPlugins: graph.resolvedPlugins,
     pluginsRoot,
     pluginDir: path.join(pluginsRoot, graph.requestedPlugin.manifest.id),
+  }
+}
+
+export async function materializeResolvedStandaloneArtifact(resolved: ResolvedStandaloneArtifact) {
+  const artifactsRoot = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-artifact-source-'))
+  const artifactDir = path.join(artifactsRoot, resolved.artifactId)
+  await ensureDir(artifactDir)
+  const sourceRoot = registryArtifactSourcePath(resolved.artifactKind, resolved.artifactId)
+
+  for (const file of resolved.lockArtifact.file_digests) {
+    const bytes = await readSourceFile(resolved.source, file.path)
+    const actualDigest = `sha256:${sha256Hex(bytes)}`
+    if (file.digest !== actualDigest) {
+      throw new Error(
+        `Digest mismatch for ${resolved.artifactId}:${file.path}\nExpected: ${file.digest}\nActual:   ${actualDigest}`
+      )
+    }
+
+    const destinationPath = resolvePluginSourcePath(
+      artifactDir,
+      `${sourceRoot}/${file.path}`
+    )
+    await ensureDir(path.dirname(destinationPath))
+    await fs.writeFile(destinationPath, bytes)
+  }
+
+  return {
+    artifactsRoot,
+    artifactDir,
+    sourceRoot,
   }
 }
 

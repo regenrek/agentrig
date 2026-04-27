@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
-import { resolvePluginFromRegistryRef } from '../../src/lib/registry'
+import {
+  resolvePluginFromRegistryRef,
+  resolveStandaloneArtifactFromRegistryRef,
+} from '../../src/lib/registry'
 import type { RegistryRef } from '../../src/lib/types'
 
 const originalFetch = globalThis.fetch
@@ -59,6 +62,20 @@ function buildCanonicalArtifacts() {
     },
   }
   const skillBody = '# TypeScript skill\n'
+  const standaloneSkillManifest = {
+    kind: 'agentrig:skill' as const,
+    id: 'community.review',
+    name: 'Review skill',
+    description: 'Standalone review skill.',
+    version,
+    entry: 'SKILL.md',
+  }
+  const standaloneSkillBody = '# Review skill\n'
+  const standaloneLockFileDigests = [
+    { path: '.skill/skill.json', digest: sha256(JSON.stringify(standaloneSkillManifest)) },
+    { path: 'SKILL.md', digest: sha256(standaloneSkillBody) },
+  ]
+  const standaloneSnapshotDigest = digestJson(standaloneLockFileDigests)
   const lockFileDigests = [
     { path: '.plugin/plugin.json', digest: sha256(JSON.stringify(manifest)) },
     { path: 'skills/typescript/SKILL.md', digest: sha256(skillBody) },
@@ -86,7 +103,7 @@ function buildCanonicalArtifacts() {
     review: `skills/community/review/versions/${version}/AGENTRIG_REVIEW.json`,
     trust_tier: 'reviewed',
     installability: 'installable',
-    snapshot_digest: snapshotDigest,
+    snapshot_digest: standaloneSnapshotDigest,
     published_at: '2026-04-15T18:30:00Z',
   } as const
   const history = {
@@ -103,6 +120,20 @@ function buildCanonicalArtifacts() {
     active_version: versionRecord,
     keywords: ['typescript'],
     versions: [versionRecord],
+  }
+  const standaloneSkillHistory = {
+    $schema: 'https://agentrig.ai/schema/artifact-history.json',
+    kind: 'skill',
+    artifact: 'community.review',
+    namespace: 'community',
+    name: 'Review skill',
+    description: 'Standalone review skill.',
+    latest_version: version,
+    trust_tier: 'reviewed',
+    installability: 'installable',
+    active_version: skillVersionRecord,
+    keywords: ['review'],
+    versions: [skillVersionRecord],
   }
   const registryPayload = {
     $schema: 'https://agentrig.ai/schema/registry.json',
@@ -159,6 +190,19 @@ function buildCanonicalArtifacts() {
     dependencies: [{ plugin: 'agentrig.security-check', version: '0.1.0' }],
     snapshot_digest: snapshotDigest,
   }
+  const standaloneSkillLock = {
+    $schema: 'https://agentrig.ai/schema/agentrig-lock.json',
+    artifact_id: 'community.review',
+    artifact_kind: 'skill',
+    version,
+    file_digests: standaloneLockFileDigests,
+    capability_set: [],
+    declared_network_domains: [],
+    declared_secrets: [],
+    runtime_requirements: [],
+    dependencies: [],
+    snapshot_digest: standaloneSnapshotDigest,
+  }
   const source = {
     $schema: 'https://agentrig.ai/schema/agentrig-source.json',
     upstream_repo: 'https://github.com/community-agents/typescript-skill',
@@ -168,6 +212,17 @@ function buildCanonicalArtifacts() {
     submitted_by: 'community-review@agentrig.ai',
     snapshot_created_at: '2026-04-15T17:45:00Z',
     snapshot_tree_digest: snapshotDigest,
+  }
+  const standaloneSkillSource = {
+    $schema: 'https://agentrig.ai/schema/agentrig-source.json',
+    upstream_repo: 'https://github.com/community-agents/review-skill',
+    upstream_tag: 'v0.1.0',
+    upstream_commit: '4444444444444444444444444444444444444444',
+    artifact_kind: 'skill',
+    artifact_path: 'skills/review',
+    submitted_by: 'community-review@agentrig.ai',
+    snapshot_created_at: '2026-04-15T17:45:00Z',
+    snapshot_tree_digest: standaloneSnapshotDigest,
   }
   const review = {
     $schema: 'https://agentrig.ai/schema/agentrig-review.json',
@@ -182,7 +237,20 @@ function buildCanonicalArtifacts() {
       rationale: 'Approved for reviewed-tier installs.',
     },
   }
-  return { manifest, registryDocument, history, lock, source, review, snapshotDigest }
+  return {
+    manifest,
+    registryDocument,
+    history,
+    lock,
+    source,
+    review,
+    snapshotDigest,
+    standaloneSkillManifest,
+    standaloneSkillHistory,
+    standaloneSkillLock,
+    standaloneSkillSource,
+    standaloneSnapshotDigest,
+  }
 }
 
 describe('registry resolution', () => {
@@ -248,6 +316,78 @@ describe('registry resolution', () => {
     expect(resolved.lockArtifact.dependencies).toEqual([
       { plugin: 'agentrig.security-check', version: '0.1.0' },
     ])
+  })
+
+  it('accepts root plugin paths in source manifests', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const artifacts = buildCanonicalArtifacts()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(artifacts.registryDocument))
+      .mockResolvedValueOnce(jsonResponse(artifacts.history))
+      .mockResolvedValueOnce(jsonResponse(artifacts.manifest))
+      .mockResolvedValueOnce(jsonResponse(artifacts.lock))
+      .mockResolvedValueOnce(jsonResponse({ ...artifacts.source, plugin_path: '.' }))
+      .mockResolvedValueOnce(jsonResponse(artifacts.review))
+
+    const resolved = await resolvePluginFromRegistryRef(registry, pluginId, version)
+
+    expect(resolved.sourceArtifact.plugin_path).toBe('.')
+    expect(resolved.source).toEqual({
+      type: 'url',
+      baseUrl: 'https://agentrig.ai/registry/plugins/community/typescript/versions/0.1.0/',
+    })
+  })
+
+  it('rejects unsafe plugin paths in source manifests', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const unsafePluginPaths = ['', '/plugin', '..', './foo', 'foo/..', 'foo/../bar']
+
+    for (const pluginPath of unsafePluginPaths) {
+      const artifacts = buildCanonicalArtifacts()
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(artifacts.registryDocument))
+        .mockResolvedValueOnce(jsonResponse(artifacts.history))
+        .mockResolvedValueOnce(jsonResponse(artifacts.manifest))
+        .mockResolvedValueOnce(jsonResponse(artifacts.lock))
+        .mockResolvedValueOnce(jsonResponse({ ...artifacts.source, plugin_path: pluginPath }))
+        .mockResolvedValueOnce(jsonResponse(artifacts.review))
+
+      await expect(resolvePluginFromRegistryRef(registry, pluginId, version)).rejects.toThrow(/plugin_path/)
+    }
+  })
+
+  it('resolves standalone skill registry artifacts without plugin aliases', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const artifacts = buildCanonicalArtifacts()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(artifacts.registryDocument))
+      .mockResolvedValueOnce(jsonResponse(artifacts.standaloneSkillHistory))
+      .mockResolvedValueOnce(jsonResponse(artifacts.standaloneSkillManifest))
+      .mockResolvedValueOnce(jsonResponse(artifacts.standaloneSkillLock))
+      .mockResolvedValueOnce(jsonResponse(artifacts.standaloneSkillSource))
+      .mockResolvedValueOnce(jsonResponse(artifacts.review))
+
+    const resolved = await resolveStandaloneArtifactFromRegistryRef(registry, 'skill', 'community.review', version)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://agentrig.ai/registry/skills/community/review/skill.json',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'https://agentrig.ai/registry/skills/community/review/versions/0.1.0/.skill/skill.json',
+      expect.any(Object),
+    )
+    expect(resolved.artifactKind).toBe('skill')
+    expect(resolved.artifactId).toBe('community.review')
+    expect(resolved.source).toEqual({
+      type: 'url',
+      baseUrl: 'https://agentrig.ai/registry/skills/community/review/versions/0.1.0/',
+    })
+    expect(resolved.snapshotDigest).toBe(artifacts.standaloneSnapshotDigest)
+    expect(resolved.lockArtifact.plugin).toBeUndefined()
+    expect(resolved.lockArtifact.artifact_id).toBe('community.review')
   })
 
   it('treats legacy registry rows without kind or artifact as plugin rows without changing the signed payload', async () => {

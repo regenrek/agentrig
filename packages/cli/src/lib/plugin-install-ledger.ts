@@ -34,9 +34,18 @@ const externalRepoPluginInstallSpecIdentitySchema = z.strictObject({
   pluginId: z.string().min(1),
   version: z.string().min(1),
 })
+const registryArtifactInstallSpecIdentitySchema = z.strictObject({
+  kind: z.literal('registry-artifact'),
+  registryAlias: z.string().min(1),
+  registryUrl: z.string().min(1),
+  artifactKind: z.enum(['skill', 'mcp', 'hook']),
+  artifactId: z.string().min(1),
+  version: z.string().min(1),
+})
 const pluginInstallSpecIdentitySchema = z.discriminatedUnion('kind', [
   registryPluginInstallSpecIdentitySchema,
   externalRepoPluginInstallSpecIdentitySchema,
+  registryArtifactInstallSpecIdentitySchema,
 ])
 const verifiedRegistryIdentitySchema = z.strictObject({
   registryAlias: z.string().min(1),

@@ -88,6 +88,9 @@ const command = defineCommand({
     const allRecords = listPluginInstallRecords(ledgers, scope)
     const cfg = await loadConfig(cwd)
     const specIdentity = normalizePluginInstallSpecIdentity(spec, cwd, cfg.registries)
+    if (specIdentity.kind === 'registry-artifact') {
+      throw new Error('`agentrig plugin uninstall` only accepts plugin install refs.')
+    }
     const pluginId = specIdentity.pluginId
     const matchingRecords = allRecords.filter(
       (record) =>

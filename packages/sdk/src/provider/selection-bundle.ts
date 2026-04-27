@@ -262,7 +262,7 @@ function sourceIdentity(source: SelectionSource) {
       scanDigest: source.scanDigest,
     }
   }
-  return {
+  const registryIdentity = {
     kind: source.kind,
     registryAlias: source.registryAlias,
     registryUrl: source.registryUrl,
@@ -271,6 +271,13 @@ function sourceIdentity(source: SelectionSource) {
     version: source.version,
     snapshotDigest: source.snapshotDigest,
   }
+  if (source.kind === 'registry-artifact') {
+    return {
+      ...registryIdentity,
+      artifactKind: source.artifactKind,
+    }
+  }
+  return registryIdentity
 }
 
 async function sha256Hex(bytes: Uint8Array) {

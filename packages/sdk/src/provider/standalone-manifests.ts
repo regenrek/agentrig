@@ -5,6 +5,7 @@ const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 const ARTIFACT_ID_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 
 const baseManifest = z.object({
+  $schema: z.string().trim().min(1).optional(),
   id: z.string().trim().max(64).regex(ARTIFACT_ID_RE),
   name: z.string().trim().min(1),
   description: z.string().trim().min(1),

@@ -286,6 +286,14 @@ export type PluginInstallSpecIdentity =
     pluginId: string
     version: string
   }
+  | {
+    kind: 'registry-artifact'
+    registryAlias: string
+    registryUrl: string
+    artifactKind: Extract<ArtifactKind, 'skill' | 'mcp' | 'hook'>
+    artifactId: string
+    version: string
+  }
 
 export type VerifiedRegistryIdentity = {
   registryAlias: string

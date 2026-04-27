@@ -2,14 +2,20 @@ import {
   normalizeRegistryUrl,
   resolveConfiguredRegistry,
 } from './registry'
-import { parseRegistryPluginSpec } from './registry-spec'
-import type { ResolvedPlugin } from './registry'
+import {
+  parseRegistryArtifactSpec,
+  parseRegistryPluginSpec,
+  type ParsedRegistryArtifactKind,
+} from './registry-spec'
+import type { ResolvedPlugin, ResolvedStandaloneArtifact } from './registry'
 import type {
   PluginInstallSpecIdentity,
   RegistryRef,
   VerifiedRegistryIdentity,
 } from './types'
 import type { ResolvedPluginInstallMetadata } from './plugin-providers/shared'
+
+type RegistryArtifactInstallSpecIdentity = Extract<PluginInstallSpecIdentity, { kind: 'registry-artifact' }>
 
 export function normalizePluginInstallSpecIdentity(
   spec: string,
@@ -37,7 +43,36 @@ export function getResolvedPluginSpecIdentity(resolved: ResolvedPlugin): PluginI
   }
 }
 
-export function getResolvedVerifiedRegistryIdentity(resolved: ResolvedPlugin): VerifiedRegistryIdentity {
+export function normalizeRegistryArtifactInstallSpecIdentity(
+  spec: string,
+  artifactKind: ParsedRegistryArtifactKind,
+  _cwd: string,
+  registries: RegistryRef[]
+): RegistryArtifactInstallSpecIdentity {
+  const parsed = parseRegistryArtifactSpec(spec.trim(), artifactKind)
+  const registry = resolveConfiguredRegistry(parsed.registry, registries)
+  return {
+    kind: 'registry-artifact',
+    registryAlias: registry.name,
+    registryUrl: normalizeRegistryUrl(registry.url),
+    artifactKind: parsed.artifactKind,
+    artifactId: parsed.artifact,
+    version: parsed.version,
+  }
+}
+
+export function getResolvedRegistryArtifactSpecIdentity(resolved: ResolvedStandaloneArtifact): RegistryArtifactInstallSpecIdentity {
+  return {
+    kind: 'registry-artifact',
+    registryAlias: resolved.registry.name,
+    registryUrl: normalizeRegistryUrl(resolved.registry.url),
+    artifactKind: resolved.artifactKind,
+    artifactId: resolved.artifactId,
+    version: resolved.manifest.version,
+  }
+}
+
+export function getResolvedVerifiedRegistryIdentity(resolved: ResolvedPlugin | ResolvedStandaloneArtifact): VerifiedRegistryIdentity {
   return {
     registryAlias: resolved.registryDocument.registry_alias,
     registryUrl: normalizeRegistryUrl(resolved.registry.url),
@@ -77,6 +112,9 @@ export function getPluginInstallSpecIdentityKey(identity: PluginInstallSpecIdent
     const revision = identity.commitSha || identity.ref || identity.scanDigest
     const picked = identity.pickedSignalPaths.join(',')
     return `external-repo:${repo}:${revision}:${identity.subdir ?? ''}:${identity.pluginId}@${identity.version}:${picked}`
+  }
+  if (identity.kind === 'registry-artifact') {
+    return `registry-artifact:${identity.registryAlias}:${identity.registryUrl}:${identity.artifactKind}:${identity.artifactId}@${identity.version}`
   }
   return `registry:${identity.registryAlias}:${identity.pluginId}@${identity.version}`
 }
