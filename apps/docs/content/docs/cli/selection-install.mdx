@@ -1,0 +1,77 @@
+---
+title: selection install
+description: Install selected skills, MCPs, or hooks from an AgentRig plugin.
+icon: ListChecks
+---
+
+# Selection install
+
+Selection install lets you install only the artifacts you want from an
+installable registry plugin.
+
+Plugins remain AgentRig's primary distribution unit. A plugin can contain many
+skills, MCP servers, hooks, commands, and supporting files. Selection install is
+the selective path for users who only need part of that bundle.
+
+## Install selected artifacts
+
+Use top-level `install` with repeated `--pick` flags:
+
+```bash
+agentrig install codex agentrig/agentrig.core-committer@0.1.0 \
+  --pick skill:codex-analysis \
+  --pick skill:gitwhat
+```
+
+Each pick uses `<kind>:<name>`. Supported selection kinds are:
+
+- `skill`
+- `mcp`
+- `hook`
+
+If every pick has the same kind, you can use the kind-specific helper:
+
+```bash
+agentrig skill install codex agentrig/agentrig.core-committer@0.1.0 \
+  --pick codex-analysis \
+  --pick gitwhat
+```
+
+## Uninstall a selection
+
+Pass the same source and picks to remove the AgentRig-managed Selection Bundle:
+
+```bash
+agentrig skill uninstall codex agentrig/agentrig.core-committer@0.1.0 \
+  --pick codex-analysis \
+  --pick gitwhat
+```
+
+Uninstall is hash-owned:
+
+- files are removed only if they still match the recorded digest.
+- MCP and hook JSON keys are removed only if their current value still matches
+  the value AgentRig wrote.
+- modified user files or JSON entries are kept and reported as modified.
+
+## Closure checks
+
+Selection installs are checked by `@agentrig/sdk` before files are written.
+
+An artifact can be installed when it is closed over its required files:
+
+- required files live under the selected artifact root, or
+- required dependencies are explicitly declared and selected.
+
+If a skill depends on undeclared shared files outside its root, AgentRig refuses
+the selection install. Install the full plugin or choose the required declared
+dependencies instead.
+
+## Trust model
+
+Selection install is registry-backed. The source plugin must be installable in a
+signed registry. `blocked`, `yanked`, and `listed` entries do not become
+installable just because an artifact directory exists.
+
+For arbitrary author repos, use `agentrig inspect` and `agentrig use`; those
+commands create external-repo provenance, not registry trust.

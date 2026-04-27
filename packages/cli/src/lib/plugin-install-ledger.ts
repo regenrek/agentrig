@@ -8,6 +8,7 @@ import type {
   PluginInstallRecord,
   PluginInstallScopeName,
   PluginInstallScopeSelectorName,
+  SelectionInstallRecord,
 } from './types'
 
 const pluginProviderSchema = z.enum(['claude', 'codex', 'cursor'])
@@ -33,9 +34,18 @@ const externalRepoPluginInstallSpecIdentitySchema = z.strictObject({
   pluginId: z.string().min(1),
   version: z.string().min(1),
 })
+const registryArtifactInstallSpecIdentitySchema = z.strictObject({
+  kind: z.literal('registry-artifact'),
+  registryAlias: z.string().min(1),
+  registryUrl: z.string().min(1),
+  artifactKind: z.enum(['skill', 'mcp', 'hook']),
+  artifactId: z.string().min(1),
+  version: z.string().min(1),
+})
 const pluginInstallSpecIdentitySchema = z.discriminatedUnion('kind', [
   registryPluginInstallSpecIdentitySchema,
   externalRepoPluginInstallSpecIdentitySchema,
+  registryArtifactInstallSpecIdentitySchema,
 ])
 const verifiedRegistryIdentitySchema = z.strictObject({
   registryAlias: z.string().min(1),
@@ -52,6 +62,13 @@ const verifiedRegistryIdentitySchema = z.strictObject({
 const pluginInstalledFileSchema = z.strictObject({
   path: z.string().min(1),
   sha256: z.string().min(1),
+})
+const pluginJsonWriteSchema = z.strictObject({
+  path: z.string().min(1),
+  keyPath: z.string().min(1),
+  writtenValueSha256: z.string().min(1),
+  previousValueSha256: z.string().min(1).optional(),
+  keys: z.array(z.string().min(1)).optional(),
 })
 const pluginInstallRecordBaseSchema = z.strictObject({
   id: z.string().min(1),
@@ -114,9 +131,42 @@ const pluginInstallRecordSchema = z.discriminatedUnion('provider', [
     })
   }
 })
+const selectionInstallRecordSchema = z.strictObject({
+  id: z.string().min(1),
+  provider: pluginProviderSchema,
+  requestedScope: pluginInstallScopeSelectorSchema,
+  specIdentity: pluginInstallSpecIdentitySchema,
+  registry: verifiedRegistryIdentitySchema.optional(),
+  scope: pluginInstallScopeSchema,
+  pluginId: z.string().min(1),
+  pluginVersion: z.string().min(1),
+  snapshotDigest: z.string().min(1),
+  selectionId: z.string().min(1),
+  selectedSelectors: z.array(z.string().min(1)),
+  targetPaths: z.array(z.string().min(1)),
+  installedAt: z.string().min(1),
+  files: z.array(pluginInstalledFileSchema),
+  jsonWrites: z.array(pluginJsonWriteSchema),
+}).superRefine((record, ctx) => {
+  if (record.specIdentity.kind === 'registry' && !record.registry) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Registry selection records require verified registry metadata',
+      path: ['registry'],
+    })
+  }
+  if (record.specIdentity.kind === 'external-repo' && record.registry) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'External repo selection records must not include registry metadata',
+      path: ['registry'],
+    })
+  }
+})
 const pluginInstallLedgerSchema = z.strictObject({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   installs: z.record(z.string(), pluginInstallRecordSchema),
+  selections: z.record(z.string(), selectionInstallRecordSchema),
 })
 
 function getLegacyPluginInstallLedgerBackupPath(ledgerPath: string) {
@@ -132,8 +182,9 @@ async function cutOverLegacyPluginInstallLedger(
 ): Promise<PluginInstallLedger> {
   const backupPath = getLegacyPluginInstallLedgerBackupPath(ledgerPath)
   const emptyLedger: PluginInstallLedger = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     installs: {},
+    selections: {},
   }
 
   await ensureDir(path.dirname(ledgerPath))
@@ -168,8 +219,9 @@ export async function loadPluginInstallLedger(
   const raw = await readJsonFile<unknown>(ledgerPath)
   if (!raw) {
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       installs: {},
+      selections: {},
     }
   }
 
@@ -180,6 +232,23 @@ export async function loadPluginInstallLedger(
     (raw as { schemaVersion?: unknown }).schemaVersion === 1
   ) {
     return cutOverLegacyPluginInstallLedger(cwd, scope, ledgerPath, raw)
+  }
+
+  if (
+    typeof raw === 'object' &&
+    raw != null &&
+    'schemaVersion' in raw &&
+    (raw as { schemaVersion?: unknown }).schemaVersion === 2
+  ) {
+    const v2 = z.strictObject({
+      schemaVersion: z.literal(2),
+      installs: z.record(z.string(), pluginInstallRecordSchema),
+    }).parse(raw)
+    return {
+      schemaVersion: 3,
+      installs: v2.installs as Record<string, PluginInstallRecord>,
+      selections: {},
+    }
   }
 
   const parsed = pluginInstallLedgerSchema.safeParse(raw)
@@ -223,6 +292,44 @@ export async function removePluginInstallRecords(
     delete ledger.installs[id]
   }
   await savePluginInstallLedger(cwd, scope, ledger)
+}
+
+export async function upsertSelectionInstallRecords(
+  cwd: string,
+  scope: PluginInstallScopeName,
+  records: SelectionInstallRecord[]
+) {
+  const ledger = await loadPluginInstallLedger(cwd, scope)
+  for (const record of records) {
+    ledger.selections[record.id] = record
+  }
+  await savePluginInstallLedger(cwd, scope, ledger)
+}
+
+export async function removeSelectionInstallRecords(
+  cwd: string,
+  scope: PluginInstallScopeName,
+  ids: string[]
+) {
+  const ledger = await loadPluginInstallLedger(cwd, scope)
+  for (const id of ids) {
+    delete ledger.selections[id]
+  }
+  await savePluginInstallLedger(cwd, scope, ledger)
+}
+
+export function listSelectionInstallRecords(
+  ledgers: Awaited<ReturnType<typeof loadPluginInstallLedgers>>,
+  scopeSelector?: PluginInstallScopeSelectorName
+) {
+  const records: SelectionInstallRecord[] = []
+  if (!scopeSelector || scopeSelector === 'auto' || scopeSelector === 'personal') {
+    records.push(...Object.values(ledgers.personal.selections))
+  }
+  if (!scopeSelector || scopeSelector === 'auto' || scopeSelector === 'workspace') {
+    records.push(...Object.values(ledgers.workspace.selections))
+  }
+  return records
 }
 
 export async function loadPluginInstallLedgers(cwd: string) {

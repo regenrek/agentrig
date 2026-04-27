@@ -1,3 +1,4 @@
+import type { ArtifactKind } from '@agentrig/sdk'
 import type {
   CanonicalTrustTier,
   InstallabilityState,
@@ -10,7 +11,7 @@ export type RegistryRef = {
 
 export type RigDefinition = {
   extends?: string[]
-  /** Canonical public install refs: <registryAlias>/<namespace.plugin>@<version> */
+  /** Canonical public install refs: <registryAlias>/<namespace.plugin>; append @<version> to pin. */
   plugins?: string[]
 }
 
@@ -75,7 +76,9 @@ export type RegistryVersionRecord = {
 
 export type RegistryHistory = {
   $schema?: string
-  plugin: string
+  kind: ArtifactKind
+  artifact: string
+  plugin?: string
   namespace: string
   name: string
   description: string
@@ -89,7 +92,9 @@ export type RegistryHistory = {
 }
 
 export type RegistryIndexItem = {
-  plugin: string
+  kind: ArtifactKind
+  artifact: string
+  plugin?: string
   name: string
   description: string
   latest_version: string
@@ -113,7 +118,9 @@ export type RegistryIndex = {
 
 export type RegistryLock = {
   $schema?: string
-  plugin: string
+  plugin?: string
+  artifact_kind?: ArtifactKind
+  artifact_id?: string
   version: string
   file_digests: PluginFile[]
   capability_set: string[]
@@ -129,7 +136,9 @@ export type RegistrySource = {
   upstream_repo: string
   upstream_tag: string
   upstream_commit: string
-  plugin_path: string
+  plugin_path?: string
+  artifact_kind?: ArtifactKind
+  artifact_path?: string
   submitted_by: string
   snapshot_created_at: string
   snapshot_tree_digest: string
@@ -231,6 +240,14 @@ export type PluginInstalledFile = {
   sha256: string
 }
 
+export type PluginJsonWrite = {
+  path: string
+  keyPath: string
+  writtenValueSha256: string
+  previousValueSha256?: string
+  keys?: string[]
+}
+
 export type CodexMarketplacePluginSource = {
   source: 'local'
   path: string
@@ -267,6 +284,14 @@ export type PluginInstallSpecIdentity =
     scanDigest: string
     pickedSignalPaths: string[]
     pluginId: string
+    version: string
+  }
+  | {
+    kind: 'registry-artifact'
+    registryAlias: string
+    registryUrl: string
+    artifactKind: Extract<ArtifactKind, 'skill' | 'mcp' | 'hook'>
+    artifactId: string
     version: string
   }
 
@@ -333,9 +358,28 @@ export type PluginInstallRecord =
   | CodexPluginInstallRecord
   | CursorPluginInstallRecord
 
+export type SelectionInstallRecord = {
+  id: string
+  provider: PluginProviderName
+  requestedScope: PluginInstallScopeSelectorName
+  specIdentity: PluginInstallSpecIdentity
+  registry?: VerifiedRegistryIdentity
+  scope: PluginInstallScopeName
+  pluginId: string
+  pluginVersion: string
+  snapshotDigest: string
+  selectionId: string
+  selectedSelectors: string[]
+  targetPaths: string[]
+  installedAt: string
+  files: PluginInstalledFile[]
+  jsonWrites: PluginJsonWrite[]
+}
+
 export type PluginInstallLedger = {
-  schemaVersion: 2
+  schemaVersion: 3
   installs: Record<string, PluginInstallRecord>
+  selections: Record<string, SelectionInstallRecord>
 }
 
 export type CliAuthIdentity = {

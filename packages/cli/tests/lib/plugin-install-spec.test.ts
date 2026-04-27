@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vite-plus/test'
 import {
   getPluginInstallSpecIdentityKey,
   isSamePluginInstallSpecIdentity,
+  normalizeRegistryArtifactInstallSpecIdentity,
 } from '../../src/lib/plugin-install-spec'
 import type { PluginInstallSpecIdentity } from '../../src/lib/types'
 
@@ -49,5 +50,31 @@ describe('plugin install spec identity', () => {
     }
 
     expect(isSamePluginInstallSpecIdentity(base, otherPick)).toBe(false)
+  })
+
+  it('normalizes standalone registry artifact identities with registry URL and kind', () => {
+    const identity = normalizeRegistryArtifactInstallSpecIdentity(
+      'agentrig/community.review@0.1.0',
+      'skill',
+      '/repo',
+      [{ name: 'agentrig', url: 'https://agentrig.ai/registry/' }],
+    )
+    const otherKind: PluginInstallSpecIdentity = {
+      ...identity,
+      artifactKind: 'mcp',
+    }
+
+    expect(identity).toEqual({
+      kind: 'registry-artifact',
+      registryAlias: 'agentrig',
+      registryUrl: 'https://agentrig.ai/registry',
+      artifactKind: 'skill',
+      artifactId: 'community.review',
+      version: '0.1.0',
+    })
+    expect(getPluginInstallSpecIdentityKey(identity)).toBe(
+      'registry-artifact:agentrig:https://agentrig.ai/registry:skill:community.review@0.1.0'
+    )
+    expect(isSamePluginInstallSpecIdentity(identity, otherKind)).toBe(false)
   })
 })

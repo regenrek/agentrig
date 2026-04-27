@@ -3,9 +3,20 @@ import type { Signal, SignalFile, SignalKind } from '../types'
 import type { VirtualTree, VirtualTreeFile } from '../virtual-tree'
 import { normalizeVirtualPath, virtualBasename } from '../virtual-tree'
 
+export type PluginProviderId = 'agentrig' | 'claude' | 'codex' | 'cursor'
+
+export type PluginCandidate = {
+  provider: PluginProviderId
+  manifestPath: string
+  rootPath: string
+  sourcePath?: string
+}
+
 export type DetectorInput = {
   tree: VirtualTree
   files: VirtualTreeFile[]
+  pluginCandidates: readonly PluginCandidate[]
+  roots: readonly string[]
 }
 
 export type SignalDetector = (input: DetectorInput) => Promise<Signal[]> | Signal[]
@@ -37,6 +48,20 @@ export function titleFromPath(path: string) {
 
 export function idFromPath(path: string) {
   return slugifySignalId(path.replace(/\.[^.]+$/, ''))
+}
+
+export function detectorRoots(input: DetectorInput) {
+  return input.roots.length ? input.roots : ['']
+}
+
+export function relativePathFromRoot(path: string, root: string) {
+  const normalizedPath = normalizeVirtualPath(path)
+  if (!root) return normalizedPath
+
+  const normalizedRoot = normalizeVirtualPath(root)
+  if (normalizedPath === normalizedRoot) return ''
+  if (!normalizedPath.startsWith(`${normalizedRoot}/`)) return null
+  return normalizedPath.slice(normalizedRoot.length + 1)
 }
 
 export function filesForExact(files: readonly VirtualTreeFile[], path: string) {

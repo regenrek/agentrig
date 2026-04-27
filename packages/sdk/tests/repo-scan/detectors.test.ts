@@ -43,12 +43,12 @@ describe('tier 1 detectors', () => {
     })
   })
 
-  it('detects prompt, agent, script, asset, and doc path heuristics without duplicating structured files', async () => {
+  it('detects prompt, agent, script, asset, and doc signals without duplicating structured files', async () => {
     const signals = await runTier1Detectors(
       createMemoryTree({
         'prompts/explain.md': '# Explain',
         'commands/rewrite.md': '# Rewrite',
-        'agents/reviewer.md': '# Reviewer',
+        'agents/reviewer.md': '---\nname: Reviewer\ndescription: Reviews implementation plans.\n---\nBody',
         'scripts/bootstrap.sh': 'echo boot',
         'assets/icon.svg': '<svg />',
         'README.md': '# Repo',
@@ -69,10 +69,47 @@ describe('tier 1 detectors', () => {
     ])
   })
 
+  it('uses plugin manifests and marketplace sources as roots for path-based detectors', async () => {
+    const signals = await runTier1Detectors(
+      createMemoryTree({
+        '.claude-plugin/marketplace.json': JSON.stringify({
+          plugins: [{ name: 'compound', source: './plugins/compound' }],
+        }),
+        'plugins/compound/.claude-plugin/plugin.json': JSON.stringify({ name: 'compound', version: '1.0.0' }),
+        'plugins/compound/.claude/commands/triage.md': '# Triage',
+        'plugins/compound/agents/research/reviewer.md': '---\nname: Research Reviewer\ndescription: Reviews research.\n---\nBody',
+        'plugins/compound/agents/research/no-frontmatter.md': '# Not an agent',
+        'plugins/compound/commands/audit.md': '# Audit',
+        'plugins/compound/prompts/explain.md': '# Explain',
+        'plugins/compound/docs/usage.md': '# Usage',
+        'agents/root.md': '---\nname: Root Agent\ndescription: Root-level agent.\n---\nBody',
+        'skills/root/SKILL.md': '---\nname: Root Skill\ndescription: Root-level skill.\n---\nBody',
+        'packages/random/prompts/loose.md': '# Loose',
+      })
+    )
+
+    expect(signals.map((signal) => [signal.kind, signal.sourcePath])).toEqual([
+      ['agent', 'agents/root.md'],
+      ['command', 'plugins/compound/.claude/commands/triage.md'],
+      ['agent', 'plugins/compound/agents/research/reviewer.md'],
+      ['prompt', 'plugins/compound/commands/audit.md'],
+      ['doc', 'plugins/compound/docs/usage.md'],
+      ['prompt', 'plugins/compound/prompts/explain.md'],
+      ['skill', 'skills/root'],
+    ])
+    expect(signals.find((signal) => signal.sourcePath === 'plugins/compound/.claude/commands/triage.md')?.providerCompat).toMatchObject({
+      claude: 'native',
+      codex: 'port',
+      cursor: 'port',
+    })
+  })
+
   it('ignores malformed deterministic inputs', async () => {
     const signals = await runTier1Detectors(
       createMemoryTree({
         'skills/bad/SKILL.md': '# Missing frontmatter',
+        'agents/no-frontmatter.md': '# Missing frontmatter',
+        'packages/random/prompts/loose.md': '# Loose',
         '.mcp.json': JSON.stringify({ nope: true }),
         'hooks/hooks.json': JSON.stringify({ PreToolUse: [] }),
         '.lsp.json': JSON.stringify({ servers: {} }),

@@ -15,6 +15,12 @@ const RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504])
 type JsonPrimitive = boolean | number | string | null
 type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
 
+export type PublishShape =
+  | { kind: 'plugin_all' }
+  | { kind: 'plugin_selected'; selectors: string[] }
+  | { kind: 'standalone_artifacts'; selectors: string[] }
+  | { kind: 'discovery_only'; selectors?: string[] }
+
 export class CommunityApiError extends Error {
   readonly status: number
 
@@ -186,6 +192,25 @@ export async function createPluginSubmission(
     maxRetries: 0,
   })
   return result
+}
+
+export async function mintPublishToken(
+  baseUrl: string,
+  payload: {
+    artifactKind: 'plugin' | 'skill' | 'mcp' | 'hook'
+    artifactId: string
+    version?: string
+    publishShape: PublishShape
+    scanDigest?: string
+    commitSha?: string
+    githubOidcToken: string
+  }
+) {
+  return await request<{ token: string; expiresAt: number }>(baseUrl, '/api/cli/publish-token/mint', {
+    method: 'POST',
+    body: payload,
+    maxRetries: 0,
+  })
 }
 
 export async function getPluginSubmissionStatus(

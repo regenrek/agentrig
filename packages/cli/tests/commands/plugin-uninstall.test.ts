@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   loadPluginInstallLedgers: vi.fn(),
   listPluginInstallRecords: vi.fn(),
-  normalizePluginInstallSpecIdentity: vi.fn(),
+  resolvePluginInstallSpecIdentity: vi.fn(),
   isSamePluginInstallSpecIdentity: vi.fn(),
   parsePluginProviderSelector: vi.fn(),
   parsePluginInstallScopeSelector: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock('../../src/lib/plugin-install-ledger', () => ({
 }))
 
 vi.mock('../../src/lib/plugin-install-spec', () => ({
-  normalizePluginInstallSpecIdentity: mocks.normalizePluginInstallSpecIdentity,
+  resolvePluginInstallSpecIdentity: mocks.resolvePluginInstallSpecIdentity,
   isSamePluginInstallSpecIdentity: mocks.isSamePluginInstallSpecIdentity,
 }))
 
@@ -42,7 +42,7 @@ describe('command:plugin uninstall', () => {
     mocks.parsePluginProviderSelector.mockReturnValue('cursor')
     mocks.loadPluginInstallLedgers.mockResolvedValue({})
     mocks.loadConfig.mockResolvedValue({ registries: [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }] })
-    mocks.normalizePluginInstallSpecIdentity.mockReturnValue({
+    mocks.resolvePluginInstallSpecIdentity.mockResolvedValue({
       kind: 'registry',
       registryAlias: 'agentrig',
       registryUrl: 'https://agentrig.ai/registry',
@@ -80,11 +80,11 @@ describe('command:plugin uninstall', () => {
     ])
   })
 
-  it('matches uninstall records by canonical registry install ref', async () => {
+  it('matches uninstall records by canonical latest-first registry install ref', async () => {
     await run({
       args: {
         provider: 'cursor',
-        spec: 'agentrig/demo-plugin@1.2.3',
+        spec: 'agentrig/demo-plugin',
         cwd: '/repo',
         scope: undefined,
         dryRun: false,
@@ -92,8 +92,8 @@ describe('command:plugin uninstall', () => {
       },
     })
 
-    expect(mocks.normalizePluginInstallSpecIdentity).toHaveBeenCalledWith(
-      'agentrig/demo-plugin@1.2.3',
+    expect(mocks.resolvePluginInstallSpecIdentity).toHaveBeenCalledWith(
+      'agentrig/demo-plugin',
       '/repo',
       [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
     )

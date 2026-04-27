@@ -30,9 +30,15 @@ function signalCompat(kind: SignalKind, sourcePath: string): Partial<Record<Prov
   if (kind === 'skill') return { claude: 'native', codex: 'native', cursor: 'native' }
   if (kind === 'agent') return { claude: 'native', cursor: 'native' }
   if (kind === 'command') {
-    if (hasPathPrefix(sourcePath, '.claude/commands')) return { claude: 'native', codex: 'port', cursor: 'port' }
-    if (hasPathPrefix(sourcePath, '.codex/prompts')) return { codex: 'native', claude: 'port', cursor: 'port' }
-    if (hasPathPrefix(sourcePath, '.cursor/commands')) return { cursor: 'native', claude: 'port', codex: 'port' }
+    if (hasPathPrefix(sourcePath, '.claude/commands') || hasPathSegmentPrefix(sourcePath, '.claude/commands')) {
+      return { claude: 'native', codex: 'port', cursor: 'port' }
+    }
+    if (hasPathPrefix(sourcePath, '.codex/prompts') || hasPathSegmentPrefix(sourcePath, '.codex/prompts')) {
+      return { codex: 'native', claude: 'port', cursor: 'port' }
+    }
+    if (hasPathPrefix(sourcePath, '.cursor/commands') || hasPathSegmentPrefix(sourcePath, '.cursor/commands')) {
+      return { cursor: 'native', claude: 'port', codex: 'port' }
+    }
     return { claude: 'port', cursor: 'port', codex: 'port' }
   }
   if (kind === 'settings') return { claude: 'native', cursor: 'native' }
@@ -45,4 +51,9 @@ function signalCompat(kind: SignalKind, sourcePath: string): Partial<Record<Prov
 function hasPathPrefix(path: string, prefix: string) {
   const normalizedPrefix = normalizeVirtualPath(prefix)
   return path === normalizedPrefix || path.startsWith(`${normalizedPrefix}/`)
+}
+
+function hasPathSegmentPrefix(path: string, prefix: string) {
+  const normalizedPrefix = normalizeVirtualPath(prefix)
+  return path.includes(`/${normalizedPrefix}/`)
 }

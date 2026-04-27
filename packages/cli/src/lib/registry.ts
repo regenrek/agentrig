@@ -2,6 +2,12 @@ import process from 'node:process'
 import { sha256Hex } from './hash'
 import { validatePluginManifest } from './plugin-validation'
 import { INSTALLABILITY_STATES, REGISTRY_TRUST_TIERS } from './registry-contract'
+import {
+  artifactKindFromStandaloneManifest,
+  parseStandaloneArtifactManifest,
+  type ArtifactKind,
+  type StandaloneArtifactManifest,
+} from '@agentrig/sdk'
 import type {
   PluginManifest,
   RegistryIndex,
@@ -30,6 +36,7 @@ const DIGEST_EXCLUDED_RELATIVE_PATHS = new Set([
   'AGENTRIG_REVIEW.json',
   'AGENTRIG_SOURCE.json',
 ])
+const REGISTRY_ARTIFACT_KINDS = ['plugin', 'skill', 'mcp', 'hook'] as const
 
 export const LOCAL_PLUGIN_POLICY: PluginUploadPolicySnapshot = {
   maxZipBytes: 10 * 1024 * 1024,
@@ -114,6 +121,26 @@ export type ResolvedPlugin = {
   registry: RegistryRef
 }
 
+export type StandaloneRegistryArtifactKind = Extract<ArtifactKind, 'skill' | 'mcp' | 'hook'>
+
+export type ResolvedStandaloneArtifact = {
+  artifactKind: StandaloneRegistryArtifactKind
+  artifactId: string
+  manifest: StandaloneArtifactManifest
+  registryDocument: RegistryIndex
+  history: RegistryHistory
+  versionRecord: RegistryVersionRecord
+  lockArtifact: RegistryLock
+  sourceArtifact: RegistrySource
+  reviewArtifact: RegistryReview
+  snapshotDigest: string
+  source: SourceBase
+  sourceLabel: string
+  trustTier: TrustTier
+  installability: RegistryInstallability
+  registry: RegistryRef
+}
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
@@ -168,11 +195,12 @@ export function normalizeRegistryUrl(url: string) {
   return url.replace(/\/+$/, '')
 }
 
-function isCanonicalRelativePath(value: string) {
+function isCanonicalRelativePath(value: string, options: { allowRoot?: boolean } = {}) {
   if (!value || value.startsWith('/') || value.startsWith('\\')) return false
   if (value.includes('\0')) return false
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value)) return false
   const normalized = value.replace(/\\/g, '/')
+  if (options.allowRoot && normalized === '.') return true
   if (normalized.includes('//')) return false
   if (normalized.split('/').some((segment) => !segment || segment === '.' || segment === '..')) {
     return false
@@ -256,9 +284,41 @@ function splitPluginId(pluginId: string) {
   return { namespace, pluginName }
 }
 
-function expectedVersionRoot(pluginId: string, version: string) {
-  const { namespace, pluginName } = splitPluginId(pluginId)
-  return `plugins/${namespace}/${pluginName}/versions/${version}/`
+function splitArtifactId(artifactId: string) {
+  const [namespace, artifactName, extra] = artifactId.split('.')
+  assert(namespace && artifactName && !extra, `Invalid artifact id: ${artifactId}`)
+  return { namespace, artifactName }
+}
+
+function expectArtifactKind(value: unknown, where: string): ArtifactKind {
+  const kind = expectString(value, where) as ArtifactKind
+  assert((REGISTRY_ARTIFACT_KINDS as readonly string[]).includes(kind), `Invalid ${where}: ${kind}`)
+  return kind
+}
+
+function artifactLayout(kind: ArtifactKind) {
+  if (kind === 'plugin') return { root: 'plugins', historyFile: 'plugin.json', manifestDir: '.plugin', manifestFile: 'plugin.json' }
+  if (kind === 'skill') return { root: 'skills', historyFile: 'skill.json', manifestDir: '.skill', manifestFile: 'skill.json' }
+  if (kind === 'mcp') return { root: 'mcps', historyFile: 'mcp.json', manifestDir: '.mcp', manifestFile: 'mcp.json' }
+  if (kind === 'hook') return { root: 'hooks', historyFile: 'hook.json', manifestDir: '.hook', manifestFile: 'hook.json' }
+  throw new Error(`Unsupported registry artifact kind: ${kind}`)
+}
+
+export function registryArtifactSourcePath(kind: StandaloneRegistryArtifactKind, artifactId: string) {
+  const { artifactName } = splitArtifactId(artifactId)
+  return `${artifactLayout(kind).root}/${artifactName}`
+}
+
+function expectedVersionRoot(kind: ArtifactKind, artifactId: string, version: string) {
+  const { namespace, artifactName } = splitArtifactId(artifactId)
+  const layout = artifactLayout(kind)
+  return `${layout.root}/${namespace}/${artifactName}/versions/${version}/`
+}
+
+function expectedHistoryPath(kind: ArtifactKind, artifactId: string) {
+  const { namespace, artifactName } = splitArtifactId(artifactId)
+  const layout = artifactLayout(kind)
+  return `${layout.root}/${namespace}/${artifactName}/${layout.historyFile}`
 }
 
 function mapInstallability(trustTier: TrustTier): RegistryInstallability {
@@ -277,13 +337,15 @@ function mapInstallability(trustTier: TrustTier): RegistryInstallability {
 
 function validateVersionRecord(
   raw: unknown,
-  pluginId: string,
+  kind: ArtifactKind,
+  artifactId: string,
   where: string
 ): RegistryVersionRecord {
   const record = expectRecord(raw, where)
   const version = expectString(record.version, `${where}.version`)
   assert(VERSION_PATTERN.test(version), `Invalid ${where}.version: expected exact semver`)
-  const root = expectedVersionRoot(pluginId, version)
+  const root = expectedVersionRoot(kind, artifactId, version)
+  const layout = artifactLayout(kind)
   const trustTier = expectString(record.trust_tier, `${where}.trust_tier`) as TrustTier
   assert(REGISTRY_TRUST_TIERS.includes(trustTier), `Invalid ${where}.trust_tier: ${trustTier}`)
   const installability = expectString(record.installability, `${where}.installability`) as RegistryInstallability
@@ -306,8 +368,8 @@ function validateVersionRecord(
   }
   assert(normalized.path === root, `Invalid ${where}.path: expected "${root}"`)
   assert(
-    normalized.manifest === `${root}.plugin/plugin.json`,
-    `Invalid ${where}.manifest: expected "${root}.plugin/plugin.json"`
+    normalized.manifest === `${root}${layout.manifestDir}/${layout.manifestFile}`,
+    `Invalid ${where}.manifest: expected "${root}${layout.manifestDir}/${layout.manifestFile}"`
   )
   assert(
     normalized.source === `${root}AGENTRIG_SOURCE.json`,
@@ -326,8 +388,19 @@ function validateVersionRecord(
 
 function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items'][number] {
   const item = expectRecord(raw, where)
-  const pluginId = expectString(item.plugin, `${where}.plugin`)
-  const { namespace, pluginName } = splitPluginId(pluginId)
+  const kind = item.kind == null ? 'plugin' : expectArtifactKind(item.kind, `${where}.kind`)
+  const artifact = item.artifact == null && kind === 'plugin'
+    ? expectString(item.plugin, `${where}.plugin`)
+    : expectString(item.artifact, `${where}.artifact`)
+  splitArtifactId(artifact)
+  const pluginId = item.plugin == null && kind === 'plugin'
+    ? artifact
+    : item.plugin == null ? undefined : expectString(item.plugin, `${where}.plugin`)
+  if (kind === 'plugin') {
+    assert(pluginId === artifact, `Invalid ${where}.plugin: expected "${artifact}"`)
+  } else {
+    assert(pluginId == null, `Invalid ${where}.plugin: standalone artifact rows must not carry plugin aliases`)
+  }
   const latestVersion = expectString(item.latest_version, `${where}.latest_version`)
   assert(VERSION_PATTERN.test(latestVersion), `Invalid ${where}.latest_version: expected exact semver`)
   const trustTier = expectString(item.trust_tier, `${where}.trust_tier`) as TrustTier
@@ -340,10 +413,10 @@ function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items
   )
   const history = expectString(item.history, `${where}.history`)
   assert(
-    history === `plugins/${namespace}/${pluginName}/plugin.json`,
-    `Invalid ${where}.history: expected "plugins/${namespace}/${pluginName}/plugin.json"`
+    history === expectedHistoryPath(kind, artifact),
+    `Invalid ${where}.history: expected "${expectedHistoryPath(kind, artifact)}"`
   )
-  const activeVersion = validateVersionRecord(item.active_version, pluginId, `${where}.active_version`)
+  const activeVersion = validateVersionRecord(item.active_version, kind, artifact, `${where}.active_version`)
   assert(
     activeVersion.version === latestVersion,
     `Invalid ${where}.active_version.version: expected "${latestVersion}"`
@@ -357,6 +430,8 @@ function validateRegistryItem(raw: unknown, where: string): RegistryIndex['items
     `Invalid ${where}.active_version.installability: expected "${installability}"`
   )
   return {
+    kind,
+    artifact,
     plugin: pluginId,
     name: expectString(item.name, `${where}.name`),
     description: expectString(item.description, `${where}.description`),
@@ -418,12 +493,12 @@ function validateRegistryDocument(
     )
   }
   const unsignedPayload = {
-    $schema: normalized.$schema,
-    contract_version: normalized.contract_version,
-    registry_alias: normalized.registry_alias,
-    source_repository: normalized.source_repository,
-    generated_at: normalized.generated_at,
-    items: normalized.items,
+    $schema: typeof document.$schema === 'string' ? document.$schema : undefined,
+    contract_version: document.contract_version,
+    registry_alias: document.registry_alias,
+    source_repository: document.source_repository,
+    generated_at: document.generated_at,
+    items: document.items,
   }
   const actualDigest = digestJsonEnvelope(unsignedPayload)
   assert(
@@ -435,19 +510,21 @@ function validateRegistryDocument(
 
 function validateHistoryDocument(
   raw: unknown,
-  pluginId: string,
+  kind: ArtifactKind,
+  artifactId: string,
   expectedHistoryPath: string
 ): RegistryHistory {
   const history = expectRecord(raw, expectedHistoryPath)
   const versions = Array.isArray(history.versions)
     ? history.versions.map((entry, index) =>
-        validateVersionRecord(entry, pluginId, `${expectedHistoryPath}.versions[${index}]`)
+        validateVersionRecord(entry, kind, artifactId, `${expectedHistoryPath}.versions[${index}]`)
       )
     : (() => { throw new Error(`Invalid ${expectedHistoryPath}.versions: expected an array`) })()
   assert(versions.length > 0, `Invalid ${expectedHistoryPath}.versions: expected at least one version`)
   const activeVersion = validateVersionRecord(
     history.active_version,
-    pluginId,
+    kind,
+    artifactId,
     `${expectedHistoryPath}.active_version`
   )
   const trustTier = expectString(history.trust_tier, `${expectedHistoryPath}.trust_tier`) as TrustTier
@@ -462,9 +539,17 @@ function validateHistoryDocument(
     `Invalid ${expectedHistoryPath}.installability: expected "${mapInstallability(trustTier)}"`
   )
   const latestVersion = expectString(history.latest_version, `${expectedHistoryPath}.latest_version`)
+  const historyKind = history.kind == null ? 'plugin' : expectArtifactKind(history.kind, `${expectedHistoryPath}.kind`)
+  assert(historyKind === kind, `Invalid ${expectedHistoryPath}.kind: expected "${kind}"`)
+  const artifact = history.artifact == null
+    ? expectString(history.plugin, `${expectedHistoryPath}.plugin`)
+    : expectString(history.artifact, `${expectedHistoryPath}.artifact`)
+  const plugin = history.plugin == null ? undefined : expectString(history.plugin, `${expectedHistoryPath}.plugin`)
   const normalized: RegistryHistory = {
     $schema: typeof history.$schema === 'string' ? history.$schema : undefined,
-    plugin: expectString(history.plugin, `${expectedHistoryPath}.plugin`),
+    kind: historyKind,
+    artifact,
+    plugin: kind === 'plugin' ? plugin ?? artifact : plugin,
     namespace: expectString(history.namespace, `${expectedHistoryPath}.namespace`),
     name: expectString(history.name, `${expectedHistoryPath}.name`),
     description: expectString(history.description, `${expectedHistoryPath}.description`),
@@ -476,10 +561,15 @@ function validateHistoryDocument(
     advisories: history.advisories == null ? undefined : expectStringArray(history.advisories, `${expectedHistoryPath}.advisories`),
     versions,
   }
-  assert(normalized.plugin === pluginId, `Invalid ${expectedHistoryPath}.plugin: expected "${pluginId}"`)
+  assert(normalized.artifact === artifactId, `Invalid ${expectedHistoryPath}.artifact: expected "${artifactId}"`)
+  if (kind === 'plugin') {
+    assert(normalized.plugin === artifactId, `Invalid ${expectedHistoryPath}.plugin: expected "${artifactId}"`)
+  } else {
+    assert(normalized.plugin == null, `Invalid ${expectedHistoryPath}.plugin: standalone artifact histories must not carry plugin aliases`)
+  }
   assert(
-    `${normalized.namespace}.${splitPluginId(pluginId).pluginName}` === pluginId,
-    `Invalid ${expectedHistoryPath}.namespace for "${pluginId}".`
+    `${normalized.namespace}.${splitArtifactId(artifactId).artifactName}` === artifactId,
+    `Invalid ${expectedHistoryPath}.namespace for "${artifactId}".`
   )
   assert(
     activeVersion.version === latestVersion,
@@ -522,34 +612,45 @@ function validateFileDigests(raw: unknown, where: string) {
 
 function validateLockArtifact(
   raw: unknown,
-  pluginId: string,
+  kind: ArtifactKind,
+  artifactId: string,
   version: string,
   expectedSnapshotDigest: string,
   where: string
 ): RegistryLock {
   const artifact = expectRecord(raw, where)
   const fileDigests = validateFileDigests(artifact.file_digests, `${where}.file_digests`)
-  const dependencies = Array.isArray(artifact.dependencies)
-    ? artifact.dependencies.map((entry, index) => {
-        const dependency = expectRecord(entry, `${where}.dependencies[${index}]`)
-        const plugin = expectString(dependency.plugin, `${where}.dependencies[${index}].plugin`)
-        const dependencyVersion = expectString(
-          dependency.version,
-          `${where}.dependencies[${index}].version`
-        )
-        assert(VERSION_PATTERN.test(dependencyVersion), `Invalid ${where}.dependencies[${index}].version`)
-        splitPluginId(plugin)
-        return { plugin, version: dependencyVersion }
-      })
+  const rawDependencies = Array.isArray(artifact.dependencies)
+    ? artifact.dependencies
     : (() => { throw new Error(`Invalid ${where}.dependencies: expected an array`) })()
+  const dependencies = kind === 'plugin'
+    ? rawDependencies.map((entry, index) => {
+      const dependency = expectRecord(entry, `${where}.dependencies[${index}]`)
+      const plugin = expectString(dependency.plugin, `${where}.dependencies[${index}].plugin`)
+      const dependencyVersion = expectString(
+        dependency.version,
+        `${where}.dependencies[${index}].version`
+      )
+      assert(VERSION_PATTERN.test(dependencyVersion), `Invalid ${where}.dependencies[${index}].version`)
+      splitPluginId(plugin)
+      return { plugin, version: dependencyVersion }
+    })
+    : (() => {
+      assert(rawDependencies.length === 0, `Invalid ${where}.dependencies: standalone registry artifact dependencies are not supported`)
+      return []
+    })()
   const snapshotDigest = digestJsonEnvelope(fileDigests)
   assert(
     snapshotDigest === expectedSnapshotDigest,
-    `Snapshot digest verification failed for ${pluginId}@${version}: lock file digest set does not match ${expectedSnapshotDigest}.`
+    `Snapshot digest verification failed for ${artifactId}@${version}: lock file digest set does not match ${expectedSnapshotDigest}.`
   )
+  const lockKind = artifact.artifact_kind == null ? 'plugin' : expectArtifactKind(artifact.artifact_kind, `${where}.artifact_kind`)
+  const lockArtifactId = kind === 'plugin'
+    ? expectString(artifact.plugin, `${where}.plugin`)
+    : expectString(artifact.artifact_id, `${where}.artifact_id`)
   const normalized: RegistryLock = {
     $schema: typeof artifact.$schema === 'string' ? artifact.$schema : undefined,
-    plugin: expectString(artifact.plugin, `${where}.plugin`),
+    ...(kind === 'plugin' ? { plugin: lockArtifactId } : { artifact_kind: lockKind, artifact_id: lockArtifactId }),
     version: expectString(artifact.version, `${where}.version`),
     file_digests: fileDigests,
     capability_set: expectStringArray(artifact.capability_set, `${where}.capability_set`),
@@ -559,7 +660,13 @@ function validateLockArtifact(
     dependencies,
     snapshot_digest: expectSha256Digest(artifact.snapshot_digest, `${where}.snapshot_digest`),
   }
-  assert(normalized.plugin === pluginId, `Invalid ${where}.plugin: expected "${pluginId}"`)
+  if (kind === 'plugin') {
+    assert(normalized.plugin === artifactId, `Invalid ${where}.plugin: expected "${artifactId}"`)
+  } else {
+    assert(normalized.artifact_kind === kind, `Invalid ${where}.artifact_kind: expected "${kind}"`)
+    assert(normalized.artifact_id === artifactId, `Invalid ${where}.artifact_id: expected "${artifactId}"`)
+    assert(artifact.plugin == null, `Invalid ${where}.plugin: standalone registry artifact locks must not carry plugin aliases`)
+  }
   assert(normalized.version === version, `Invalid ${where}.version: expected "${version}"`)
   assert(
     normalized.snapshot_digest === expectedSnapshotDigest,
@@ -570,6 +677,7 @@ function validateLockArtifact(
 
 function validateSourceArtifact(
   raw: unknown,
+  kind: ArtifactKind,
   expectedSnapshotDigest: string,
   where: string
 ): RegistrySource {
@@ -579,7 +687,9 @@ function validateSourceArtifact(
     upstream_repo: expectString(artifact.upstream_repo, `${where}.upstream_repo`),
     upstream_tag: expectString(artifact.upstream_tag, `${where}.upstream_tag`),
     upstream_commit: expectString(artifact.upstream_commit, `${where}.upstream_commit`),
-    plugin_path: expectString(artifact.plugin_path, `${where}.plugin_path`),
+    plugin_path: artifact.plugin_path == null ? undefined : expectString(artifact.plugin_path, `${where}.plugin_path`),
+    artifact_kind: artifact.artifact_kind == null ? undefined : expectArtifactKind(artifact.artifact_kind, `${where}.artifact_kind`),
+    artifact_path: artifact.artifact_path == null ? undefined : expectString(artifact.artifact_path, `${where}.artifact_path`),
     submitted_by: expectString(artifact.submitted_by, `${where}.submitted_by`),
     snapshot_created_at: expectDate(artifact.snapshot_created_at, `${where}.snapshot_created_at`),
     snapshot_tree_digest: expectSha256Digest(
@@ -591,10 +701,19 @@ function validateSourceArtifact(
     normalized.snapshot_tree_digest === expectedSnapshotDigest,
     `Invalid ${where}.snapshot_tree_digest: expected "${expectedSnapshotDigest}".`
   )
-  assert(
-    isCanonicalRelativePath(normalized.plugin_path),
-    `Invalid ${where}.plugin_path: expected a canonical relative path`
-  )
+  if (kind === 'plugin') {
+    assert(
+      normalized.plugin_path != null && isCanonicalRelativePath(normalized.plugin_path, { allowRoot: true }),
+      `Invalid ${where}.plugin_path: expected a canonical relative path`
+    )
+  } else {
+    assert(normalized.artifact_kind === kind, `Invalid ${where}.artifact_kind: expected "${kind}"`)
+    assert(
+      normalized.artifact_path != null && isCanonicalRelativePath(normalized.artifact_path),
+      `Invalid ${where}.artifact_path: expected a canonical relative path`
+    )
+    assert(normalized.plugin_path == null, `Invalid ${where}.plugin_path: standalone registry artifact sources must not carry plugin paths`)
+  }
   return normalized
 }
 
@@ -674,27 +793,46 @@ export async function readRegistryIndex(registry: RegistryRef): Promise<Registry
 async function readHistoryDocument(
   registry: RegistryRef,
   registryDocument: RegistryIndex,
-  pluginId: string
+  kind: ArtifactKind,
+  artifactId: string
 ) {
-  const item = registryDocument.items.find((entry) => entry.plugin === pluginId)
+  const item = registryDocument.items.find((entry) => entry.kind === kind && entry.artifact === artifactId)
   if (!item) {
-    throw new Error(`Unknown plugin "${pluginId}" in registry "${registry.name}".`)
+    throw new Error(`Unknown ${kind} "${artifactId}" in registry "${registry.name}".`)
   }
   const raw = await fetchJson<unknown>(joinUrl(registry.url, item.history))
-  const history = validateHistoryDocument(raw, pluginId, item.history)
+  const history = validateHistoryDocument(raw, kind, artifactId, item.history)
   assert(
     history.latest_version === item.latest_version,
-    `Registry history mismatch for "${pluginId}": latest version drift.`
+    `Registry history mismatch for "${artifactId}": latest version drift.`
   )
   assert(
     history.trust_tier === item.trust_tier,
-    `Registry history mismatch for "${pluginId}": trust tier drift.`
+    `Registry history mismatch for "${artifactId}": trust tier drift.`
   )
   assert(
     history.installability === item.installability,
-    `Registry history mismatch for "${pluginId}": installability drift.`
+    `Registry history mismatch for "${artifactId}": installability drift.`
   )
   return history
+}
+
+function selectRegistryVersionRecord(
+  history: RegistryHistory,
+  requestedVersion: string | undefined,
+  artifactKind: ArtifactKind,
+  artifactId: string,
+  registryName: string
+) {
+  const version = requestedVersion ?? history.latest_version
+  const versionRecord = history.versions.find((entry) => entry.version === version)
+    ?? (!requestedVersion && history.active_version.version === version ? history.active_version : undefined)
+  if (!versionRecord) {
+    throw new Error(
+      `Unknown version "${version}" for ${artifactKind} "${artifactId}" in registry "${registryName}".`
+    )
+  }
+  return versionRecord
 }
 
 export async function readSourceFile(source: SourceBase, relPath: string): Promise<Uint8Array> {
@@ -707,20 +845,22 @@ export async function readSourceFile(source: SourceBase, relPath: string): Promi
 export async function resolvePluginFromRegistryRef(
   registry: RegistryRef,
   pluginId: string,
-  version: string
+  version?: string
 ): Promise<ResolvedPlugin> {
   const normalizedRegistry: RegistryRef = {
     name: registry.name,
     url: normalizeRegistryUrl(registry.url),
   }
   const registryDocument = await readRegistryIndex(normalizedRegistry)
-  const history = await readHistoryDocument(normalizedRegistry, registryDocument, pluginId)
-  const versionRecord = history.versions.find((entry) => entry.version === version)
-  if (!versionRecord) {
-    throw new Error(
-      `Unknown version "${version}" for plugin "${pluginId}" in registry "${normalizedRegistry.name}".`
-    )
-  }
+  const history = await readHistoryDocument(normalizedRegistry, registryDocument, 'plugin', pluginId)
+  const versionRecord = selectRegistryVersionRecord(
+    history,
+    version,
+    'plugin',
+    pluginId,
+    normalizedRegistry.name
+  )
+  const resolvedVersion = versionRecord.version
 
   const [manifestRaw, lockRaw, sourceRaw, reviewRaw] = await Promise.all([
     fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.manifest)),
@@ -730,16 +870,18 @@ export async function resolvePluginFromRegistryRef(
   ])
   const manifest = validatePluginManifest(manifestRaw)
   assert(manifest.id === pluginId, `Registry manifest id mismatch for "${pluginId}".`)
-  assert(manifest.version === version, `Registry manifest version mismatch for "${pluginId}@${version}".`)
+  assert(manifest.version === resolvedVersion, `Registry manifest version mismatch for "${pluginId}@${resolvedVersion}".`)
   const lockArtifact = validateLockArtifact(
     lockRaw,
+    'plugin',
     pluginId,
-    version,
+    resolvedVersion,
     versionRecord.snapshot_digest,
     versionRecord.lock
   )
   const sourceArtifact = validateSourceArtifact(
     sourceRaw,
+    'plugin',
     versionRecord.snapshot_digest,
     versionRecord.source
   )
@@ -759,7 +901,80 @@ export async function resolvePluginFromRegistryRef(
     reviewArtifact,
     snapshotDigest: versionRecord.snapshot_digest,
     source: { type: 'url', baseUrl: joinUrl(normalizedRegistry.url, versionRecord.path) },
-    sourceLabel: `${normalizedRegistry.name}/${pluginId}@${version}`,
+    sourceLabel: `${normalizedRegistry.name}/${pluginId}@${resolvedVersion}`,
+    trustTier: versionRecord.trust_tier,
+    installability: versionRecord.installability,
+    registry: normalizedRegistry,
+  }
+}
+
+export async function resolveStandaloneArtifactFromRegistryRef(
+  registry: RegistryRef,
+  artifactKind: StandaloneRegistryArtifactKind,
+  artifactId: string,
+  version?: string
+): Promise<ResolvedStandaloneArtifact> {
+  const normalizedRegistry: RegistryRef = {
+    name: registry.name,
+    url: normalizeRegistryUrl(registry.url),
+  }
+  const registryDocument = await readRegistryIndex(normalizedRegistry)
+  const history = await readHistoryDocument(normalizedRegistry, registryDocument, artifactKind, artifactId)
+  const versionRecord = selectRegistryVersionRecord(
+    history,
+    version,
+    artifactKind,
+    artifactId,
+    normalizedRegistry.name
+  )
+  const resolvedVersion = versionRecord.version
+
+  const [manifestRaw, lockRaw, sourceRaw, reviewRaw] = await Promise.all([
+    fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.manifest)),
+    fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.lock)),
+    fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.source)),
+    fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.review)),
+  ])
+  const manifest = parseStandaloneArtifactManifest(manifestRaw)
+  assert(
+    artifactKindFromStandaloneManifest(manifest) === artifactKind,
+    `Registry manifest kind mismatch for "${artifactId}".`
+  )
+  assert(manifest.id === artifactId, `Registry manifest id mismatch for "${artifactId}".`)
+  assert(manifest.version === resolvedVersion, `Registry manifest version mismatch for "${artifactId}@${resolvedVersion}".`)
+  const lockArtifact = validateLockArtifact(
+    lockRaw,
+    artifactKind,
+    artifactId,
+    resolvedVersion,
+    versionRecord.snapshot_digest,
+    versionRecord.lock
+  )
+  const sourceArtifact = validateSourceArtifact(
+    sourceRaw,
+    artifactKind,
+    versionRecord.snapshot_digest,
+    versionRecord.source
+  )
+  const reviewArtifact = validateReviewArtifact(
+    reviewRaw,
+    versionRecord.trust_tier,
+    versionRecord.installability,
+    versionRecord.review
+  )
+  return {
+    artifactKind,
+    artifactId,
+    manifest,
+    registryDocument,
+    history,
+    versionRecord,
+    lockArtifact,
+    sourceArtifact,
+    reviewArtifact,
+    snapshotDigest: versionRecord.snapshot_digest,
+    source: { type: 'url', baseUrl: joinUrl(normalizedRegistry.url, versionRecord.path) },
+    sourceLabel: `${normalizedRegistry.name}/${artifactId}@${resolvedVersion}`,
     trustTier: versionRecord.trust_tier,
     installability: versionRecord.installability,
     registry: normalizedRegistry,
@@ -769,9 +984,20 @@ export async function resolvePluginFromRegistryRef(
 export async function resolvePluginFromRegistryAlias(
   alias: string,
   pluginId: string,
-  version: string,
+  version: string | undefined,
   registries: RegistryRef[]
 ): Promise<ResolvedPlugin> {
   const registry = resolveConfiguredRegistry(alias, registries)
   return resolvePluginFromRegistryRef(registry, pluginId, version)
+}
+
+export async function resolveStandaloneArtifact(
+  alias: string,
+  artifactKind: StandaloneRegistryArtifactKind,
+  artifactId: string,
+  version: string | undefined,
+  registries: RegistryRef[]
+): Promise<ResolvedStandaloneArtifact> {
+  const registry = resolveConfiguredRegistry(alias, registries)
+  return resolveStandaloneArtifactFromRegistryRef(registry, artifactKind, artifactId, version)
 }

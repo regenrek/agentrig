@@ -2,5 +2,5 @@
   "title": "CLI Reference",
   "description": "Commands and flags",
   "icon": "Terminal",
-  "pages": ["index", "init", "add", "remove", "list", "view", "rig", "registry", "plugin"]
+  "pages": ["index", "init", "add", "remove", "list", "view", "selection-install", "rig", "registry", "plugin"]
 }

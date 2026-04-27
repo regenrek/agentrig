@@ -50,7 +50,7 @@ function printNextSteps() {
   console.log('  agentrig list --available')
   console.log('  agentrig registry add <alias> <baseUrl>')
   console.log(
-    `  agentrig plugin install <provider> ${OFFICIAL_REGISTRY_ALIAS}/${OFFICIAL_REGISTRY_ALIAS}.core-committer@0.1.0`
+    `  agentrig plugin install <provider> ${OFFICIAL_REGISTRY_ALIAS}/${OFFICIAL_REGISTRY_ALIAS}.core-committer`
   )
 }
 

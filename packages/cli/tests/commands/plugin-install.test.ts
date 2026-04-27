@@ -136,11 +136,11 @@ describe('command:plugin install', () => {
     ])
   })
 
-  it('prepares installs from canonical registry install refs and cleans up materialized plugins', async () => {
+  it('prepares installs from canonical latest-first registry install refs and cleans up materialized plugins', async () => {
     await run({
       args: {
         provider: 'codex',
-        spec: 'agentrig/demo-plugin@1.2.3',
+        spec: 'agentrig/demo-plugin',
         cwd: '/repo',
         scope: undefined,
         force: false,
@@ -150,7 +150,7 @@ describe('command:plugin install', () => {
     })
 
     expect(mocks.resolvePluginGraph).toHaveBeenCalledWith(
-      'agentrig/demo-plugin@1.2.3',
+      'agentrig/demo-plugin',
       '/repo',
       [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
     )

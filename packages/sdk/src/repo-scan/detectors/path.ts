@@ -2,8 +2,10 @@ import type { Signal, SignalKind } from '../types'
 import { normalizeVirtualPath } from '../virtual-tree'
 import {
   createSignal,
+  detectorRoots,
   filesForExact,
   idFromPath,
+  relativePathFromRoot,
   titleFromPath,
   type DetectorInput,
 } from './common'
@@ -15,27 +17,38 @@ const SCRIPT_PREFIXES = ['scripts/', 'bin/']
 
 export function detectPathSignals(input: DetectorInput): Signal[] {
   const signals: Signal[] = []
+  const skillRoots = detectSkillRoots(input.files.map((file) => normalizeVirtualPath(file.path)))
   for (const file of input.files) {
     const path = normalizeVirtualPath(file.path)
-    if (isOwnedByStructuredDetector(path)) continue
+    if (isWithinSkillRoot(path, skillRoots)) continue
 
-    if (path.startsWith('agents/') && isMarkdown(path)) {
-      signals.push(pathSignal(input, path, 'agent', 0.7))
-      continue
-    }
-    if (SCRIPT_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-      signals.push(pathSignal(input, path, 'script', 0.55))
-      continue
-    }
-    if (ASSET_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-      signals.push(pathSignal(input, path, 'asset', 0.5))
-      continue
-    }
-    if (isDocPath(path)) {
-      signals.push(pathSignal(input, path, 'doc', 0.45))
+    for (const root of detectorRoots(input)) {
+      const relativePath = relativePathFromRoot(path, root)
+      if (!relativePath || isOwnedByStructuredDetector(relativePath)) continue
+
+      if (SCRIPT_PREFIXES.some((prefix) => relativePath.startsWith(prefix))) {
+        signals.push(pathSignal(input, path, 'script', 0.55))
+        break
+      }
+      if (ASSET_PREFIXES.some((prefix) => relativePath.startsWith(prefix))) {
+        signals.push(pathSignal(input, path, 'asset', 0.5))
+        break
+      }
+      if (isDocPath(relativePath)) {
+        signals.push(pathSignal(input, path, 'doc', 0.45))
+        break
+      }
     }
   }
-  return collapseDirectorySignals(signals)
+  return collapseDirectorySignals(input, signals)
+}
+
+function detectSkillRoots(paths: readonly string[]) {
+  return paths
+    .filter((path) => path.endsWith('/SKILL.md') || path === 'SKILL.md')
+    .map((path) => path.replace(/(^|\/)SKILL\.md$/i, '').replace(/\/+$/g, ''))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
 }
 
 function pathSignal(input: DetectorInput, path: string, kind: SignalKind, score: number) {
@@ -49,9 +62,13 @@ function pathSignal(input: DetectorInput, path: string, kind: SignalKind, score:
   })
 }
 
-function collapseDirectorySignals(signals: Signal[]) {
-  const groupedAssets = collapsePrefix(signals, 'asset', 'assets')
-  const groupedScripts = collapsePrefix(groupedAssets, 'script', 'scripts')
+function collapseDirectorySignals(input: DetectorInput, signals: Signal[]) {
+  let groupedSignals = signals
+  for (const root of detectorRoots(input)) {
+    groupedSignals = collapsePrefix(groupedSignals, 'asset', root ? `${root}/assets` : 'assets')
+    groupedSignals = collapsePrefix(groupedSignals, 'script', root ? `${root}/scripts` : 'scripts')
+  }
+  const groupedScripts = groupedSignals
   return groupedScripts.sort(signalSort)
 }
 
@@ -93,8 +110,13 @@ function isOwnedByStructuredDetector(path: string) {
     path === '.app.json' ||
     path === 'settings.json' ||
     path.startsWith('commands/') ||
-    path.startsWith('prompts/')
+    path.startsWith('prompts/') ||
+    path.startsWith('agents/')
   )
+}
+
+function isWithinSkillRoot(path: string, skillRoots: readonly string[]) {
+  return skillRoots.some((root) => path !== `${root}/SKILL.md` && path.startsWith(`${root}/`))
 }
 
 function isDocPath(path: string) {
@@ -103,6 +125,3 @@ function isDocPath(path: string) {
   return [...DOC_EXTENSIONS].some((extension) => path.endsWith(extension))
 }
 
-function isMarkdown(path: string) {
-  return path.endsWith('.md') || path.endsWith('.mdx')
-}

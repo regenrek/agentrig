@@ -14,7 +14,7 @@ afterEach(async () => {
 })
 
 describe('loadPluginInstallLedger', () => {
-  it('archives schemaVersion 1 ledgers and resets them to the canonical v2 shape', async () => {
+  it('archives schemaVersion 1 ledgers and resets them to the canonical v3 shape', async () => {
     const cwd = await mkdtemp(path.join(tmpdir(), 'agentrig-ledger-test-'))
     tempDirs.push(cwd)
 
@@ -46,8 +46,9 @@ describe('loadPluginInstallLedger', () => {
 
     const ledger = await loadPluginInstallLedger(cwd, 'workspace')
     expect(ledger).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
       installs: {},
+      selections: {},
     })
 
     const backupPath = path.join(cwd, '.agentrig', 'plugin-installs.v1-backup.json')
@@ -59,8 +60,9 @@ describe('loadPluginInstallLedger', () => {
 
     const rewritten = JSON.parse(await readFile(ledgerPath, 'utf8'))
     expect(rewritten).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
       installs: {},
+      selections: {},
     })
   })
 
@@ -104,6 +106,8 @@ describe('loadPluginInstallLedger', () => {
     })
 
     const ledger = await loadPluginInstallLedger(cwd, 'workspace')
+    expect(ledger.schemaVersion).toBe(3)
+    expect(ledger.selections).toEqual({})
     const record = ledger.installs['cursor:workspace:agentrig-community.review']
     expect(record.registry).toBeUndefined()
     expect(record.specIdentity).toMatchObject({
