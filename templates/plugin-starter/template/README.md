@@ -15,11 +15,11 @@ cd ..
 agentrig plugin export --agent claude --pluginsDir ./__PLUGIN_ID__ --out dist/claude-marketplace
 ```
 
-After publishing, install it with the canonical registry ref:
+After publishing, install it with the canonical latest-first registry ref:
 
 ```bash
 agentrig registry add your-registry https://example.com/agentrig
-agentrig plugin install codex your-registry/__PLUGIN_ID__@0.1.0
+agentrig plugin install codex your-registry/__PLUGIN_ID__
 ```
 
 ## Usage

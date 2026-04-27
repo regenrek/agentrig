@@ -318,6 +318,25 @@ describe('registry resolution', () => {
     ])
   })
 
+  it('resolves unversioned plugin refs to the registry latest version', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const artifacts = buildCanonicalArtifacts()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(artifacts.registryDocument))
+      .mockResolvedValueOnce(jsonResponse(artifacts.history))
+      .mockResolvedValueOnce(jsonResponse(artifacts.manifest))
+      .mockResolvedValueOnce(jsonResponse(artifacts.lock))
+      .mockResolvedValueOnce(jsonResponse(artifacts.source))
+      .mockResolvedValueOnce(jsonResponse(artifacts.review))
+
+    const resolved = await resolvePluginFromRegistryRef(registry, pluginId)
+
+    expect(resolved.manifest.version).toBe(version)
+    expect(resolved.versionRecord.version).toBe(version)
+    expect(resolved.sourceLabel).toBe('agentrig/community.typescript@0.1.0')
+    expect(resolved.snapshotDigest).toBe(artifacts.snapshotDigest)
+  })
+
   it('accepts root plugin paths in source manifests', async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
     const artifacts = buildCanonicalArtifacts()
@@ -388,6 +407,27 @@ describe('registry resolution', () => {
     expect(resolved.snapshotDigest).toBe(artifacts.standaloneSnapshotDigest)
     expect(resolved.lockArtifact.plugin).toBeUndefined()
     expect(resolved.lockArtifact.artifact_id).toBe('community.review')
+  })
+
+  it('resolves unversioned standalone skill refs to the registry latest version', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const artifacts = buildCanonicalArtifacts()
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(artifacts.registryDocument))
+      .mockResolvedValueOnce(jsonResponse(artifacts.standaloneSkillHistory))
+      .mockResolvedValueOnce(jsonResponse(artifacts.standaloneSkillManifest))
+      .mockResolvedValueOnce(jsonResponse(artifacts.standaloneSkillLock))
+      .mockResolvedValueOnce(jsonResponse(artifacts.standaloneSkillSource))
+      .mockResolvedValueOnce(jsonResponse(artifacts.review))
+
+    const resolved = await resolveStandaloneArtifactFromRegistryRef(registry, 'skill', 'community.review')
+
+    expect(resolved.artifactKind).toBe('skill')
+    expect(resolved.artifactId).toBe('community.review')
+    expect(resolved.manifest.version).toBe(version)
+    expect(resolved.versionRecord.version).toBe(version)
+    expect(resolved.sourceLabel).toBe('agentrig/community.review@0.1.0')
+    expect(resolved.snapshotDigest).toBe(artifacts.standaloneSnapshotDigest)
   })
 
   it('treats legacy registry rows without kind or artifact as plugin rows without changing the signed payload', async () => {

@@ -51,7 +51,7 @@ describe('installArtifactSelection', () => {
       provider: 'codex',
       requestedScope: 'workspace',
       scope: 'workspace',
-      registryRef: 'agentrig/demo.review@1.0.0',
+      registryRef: 'agentrig/demo.review',
       resolved,
       pluginDir: artifactDir,
       dryRun: true,
@@ -61,12 +61,17 @@ describe('installArtifactSelection', () => {
       kind: 'registry-artifact',
       artifactKind: 'skill',
       artifactId: 'demo.review',
+      registryRef: 'agentrig/demo.review@1.0.0',
+      version: '1.0.0',
     })
     expect(result.record.specIdentity).toMatchObject({
       kind: 'registry-artifact',
       artifactKind: 'skill',
       artifactId: 'demo.review',
+      version: '1.0.0',
     })
+    expect(result.record.pluginVersion).toBe('1.0.0')
+    expect(result.record.snapshotDigest).toBe(resolved.snapshotDigest)
     expect(result.record.selectedSelectors).toEqual(['skill:review'])
     expect(result.record.targetPaths).toEqual([
       path.join(cwd, '.codex', 'skills', 'review', '.skill', 'skill.json'),

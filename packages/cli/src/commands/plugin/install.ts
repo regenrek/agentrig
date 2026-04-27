@@ -45,7 +45,7 @@ const command = defineCommand({
     },
     spec: {
       type: 'positional',
-      description: 'Canonical install ref: <registryAlias>/<namespace.plugin>@<version>',
+      description: 'Canonical install ref: <registryAlias>/<namespace.plugin>; add @<version> for an explicit pin',
       required: true,
     },
     cwd: {

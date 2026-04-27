@@ -11,7 +11,7 @@ export type RegistryRef = {
 
 export type RigDefinition = {
   extends?: string[]
-  /** Canonical public install refs: <registryAlias>/<namespace.plugin>@<version> */
+  /** Canonical public install refs: <registryAlias>/<namespace.plugin>; append @<version> to pin. */
   plugins?: string[]
 }
 

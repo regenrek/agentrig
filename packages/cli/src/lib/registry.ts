@@ -817,6 +817,24 @@ async function readHistoryDocument(
   return history
 }
 
+function selectRegistryVersionRecord(
+  history: RegistryHistory,
+  requestedVersion: string | undefined,
+  artifactKind: ArtifactKind,
+  artifactId: string,
+  registryName: string
+) {
+  const version = requestedVersion ?? history.latest_version
+  const versionRecord = history.versions.find((entry) => entry.version === version)
+    ?? (!requestedVersion && history.active_version.version === version ? history.active_version : undefined)
+  if (!versionRecord) {
+    throw new Error(
+      `Unknown version "${version}" for ${artifactKind} "${artifactId}" in registry "${registryName}".`
+    )
+  }
+  return versionRecord
+}
+
 export async function readSourceFile(source: SourceBase, relPath: string): Promise<Uint8Array> {
   const url = joinUrl(source.baseUrl, relPath)
   const res = await fetchWithTimeout(url, {})
@@ -827,7 +845,7 @@ export async function readSourceFile(source: SourceBase, relPath: string): Promi
 export async function resolvePluginFromRegistryRef(
   registry: RegistryRef,
   pluginId: string,
-  version: string
+  version?: string
 ): Promise<ResolvedPlugin> {
   const normalizedRegistry: RegistryRef = {
     name: registry.name,
@@ -835,12 +853,14 @@ export async function resolvePluginFromRegistryRef(
   }
   const registryDocument = await readRegistryIndex(normalizedRegistry)
   const history = await readHistoryDocument(normalizedRegistry, registryDocument, 'plugin', pluginId)
-  const versionRecord = history.versions.find((entry) => entry.version === version)
-  if (!versionRecord) {
-    throw new Error(
-      `Unknown version "${version}" for plugin "${pluginId}" in registry "${normalizedRegistry.name}".`
-    )
-  }
+  const versionRecord = selectRegistryVersionRecord(
+    history,
+    version,
+    'plugin',
+    pluginId,
+    normalizedRegistry.name
+  )
+  const resolvedVersion = versionRecord.version
 
   const [manifestRaw, lockRaw, sourceRaw, reviewRaw] = await Promise.all([
     fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.manifest)),
@@ -850,12 +870,12 @@ export async function resolvePluginFromRegistryRef(
   ])
   const manifest = validatePluginManifest(manifestRaw)
   assert(manifest.id === pluginId, `Registry manifest id mismatch for "${pluginId}".`)
-  assert(manifest.version === version, `Registry manifest version mismatch for "${pluginId}@${version}".`)
+  assert(manifest.version === resolvedVersion, `Registry manifest version mismatch for "${pluginId}@${resolvedVersion}".`)
   const lockArtifact = validateLockArtifact(
     lockRaw,
     'plugin',
     pluginId,
-    version,
+    resolvedVersion,
     versionRecord.snapshot_digest,
     versionRecord.lock
   )
@@ -881,7 +901,7 @@ export async function resolvePluginFromRegistryRef(
     reviewArtifact,
     snapshotDigest: versionRecord.snapshot_digest,
     source: { type: 'url', baseUrl: joinUrl(normalizedRegistry.url, versionRecord.path) },
-    sourceLabel: `${normalizedRegistry.name}/${pluginId}@${version}`,
+    sourceLabel: `${normalizedRegistry.name}/${pluginId}@${resolvedVersion}`,
     trustTier: versionRecord.trust_tier,
     installability: versionRecord.installability,
     registry: normalizedRegistry,
@@ -892,7 +912,7 @@ export async function resolveStandaloneArtifactFromRegistryRef(
   registry: RegistryRef,
   artifactKind: StandaloneRegistryArtifactKind,
   artifactId: string,
-  version: string
+  version?: string
 ): Promise<ResolvedStandaloneArtifact> {
   const normalizedRegistry: RegistryRef = {
     name: registry.name,
@@ -900,12 +920,14 @@ export async function resolveStandaloneArtifactFromRegistryRef(
   }
   const registryDocument = await readRegistryIndex(normalizedRegistry)
   const history = await readHistoryDocument(normalizedRegistry, registryDocument, artifactKind, artifactId)
-  const versionRecord = history.versions.find((entry) => entry.version === version)
-  if (!versionRecord) {
-    throw new Error(
-      `Unknown version "${version}" for ${artifactKind} "${artifactId}" in registry "${normalizedRegistry.name}".`
-    )
-  }
+  const versionRecord = selectRegistryVersionRecord(
+    history,
+    version,
+    artifactKind,
+    artifactId,
+    normalizedRegistry.name
+  )
+  const resolvedVersion = versionRecord.version
 
   const [manifestRaw, lockRaw, sourceRaw, reviewRaw] = await Promise.all([
     fetchJson<unknown>(joinUrl(normalizedRegistry.url, versionRecord.manifest)),
@@ -919,12 +941,12 @@ export async function resolveStandaloneArtifactFromRegistryRef(
     `Registry manifest kind mismatch for "${artifactId}".`
   )
   assert(manifest.id === artifactId, `Registry manifest id mismatch for "${artifactId}".`)
-  assert(manifest.version === version, `Registry manifest version mismatch for "${artifactId}@${version}".`)
+  assert(manifest.version === resolvedVersion, `Registry manifest version mismatch for "${artifactId}@${resolvedVersion}".`)
   const lockArtifact = validateLockArtifact(
     lockRaw,
     artifactKind,
     artifactId,
-    version,
+    resolvedVersion,
     versionRecord.snapshot_digest,
     versionRecord.lock
   )
@@ -952,7 +974,7 @@ export async function resolveStandaloneArtifactFromRegistryRef(
     reviewArtifact,
     snapshotDigest: versionRecord.snapshot_digest,
     source: { type: 'url', baseUrl: joinUrl(normalizedRegistry.url, versionRecord.path) },
-    sourceLabel: `${normalizedRegistry.name}/${artifactId}@${version}`,
+    sourceLabel: `${normalizedRegistry.name}/${artifactId}@${resolvedVersion}`,
     trustTier: versionRecord.trust_tier,
     installability: versionRecord.installability,
     registry: normalizedRegistry,
@@ -962,7 +984,7 @@ export async function resolveStandaloneArtifactFromRegistryRef(
 export async function resolvePluginFromRegistryAlias(
   alias: string,
   pluginId: string,
-  version: string,
+  version: string | undefined,
   registries: RegistryRef[]
 ): Promise<ResolvedPlugin> {
   const registry = resolveConfiguredRegistry(alias, registries)
@@ -973,7 +995,7 @@ export async function resolveStandaloneArtifact(
   alias: string,
   artifactKind: StandaloneRegistryArtifactKind,
   artifactId: string,
-  version: string,
+  version: string | undefined,
   registries: RegistryRef[]
 ): Promise<ResolvedStandaloneArtifact> {
   const registry = resolveConfiguredRegistry(alias, registries)

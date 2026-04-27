@@ -20,12 +20,12 @@ Docs: [docs.agentrig.ai](https://docs.agentrig.ai/)
 ```bash
 agentrig init
 agentrig list --available
-agentrig view agentrig/agentrig.core-committer@0.1.0
-agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
+agentrig view agentrig/agentrig.core-committer
+agentrig plugin install codex agentrig/agentrig.core-committer
 ```
 
 `agentrig init` adds the official registry to your config.  
-Public install refs use `<registryAlias>/<namespace.plugin>@<version>`.
+Public install refs use `<registryAlias>/<namespace.plugin>` by default and resolve the current version. Append `@<version>` only when you need an explicit pin.
 
 ## Install selected artifacts
 
@@ -34,7 +34,7 @@ skills, MCPs, and hooks as first-class selectable artifacts while keeping the
 local install/uninstall atom as one managed Selection Bundle:
 
 ```bash
-agentrig install codex agentrig/community.typescript@0.1.0 \
+agentrig install codex agentrig/community.typescript \
   --pick skill:best-practice-coding \
   --pick skill:computer-use-skill
 ```
@@ -42,9 +42,9 @@ agentrig install codex agentrig/community.typescript@0.1.0 \
 Kind-specific helpers route to the same selection-bundle install path:
 
 ```bash
-agentrig skill install codex agentrig/community.typescript@0.1.0 --pick best-practice-coding
-agentrig mcp install cursor agentrig/acme.devtools@1.0.0 --pick github
-agentrig hook install claude agentrig/acme.workflow@1.0.0 --pick pre-submit
+agentrig skill install codex agentrig/community.typescript --pick best-practice-coding
+agentrig mcp install cursor agentrig/acme.devtools --pick github
+agentrig hook install claude agentrig/acme.workflow --pick pre-submit
 ```
 
 Selection installs are closure-checked by `@agentrig/sdk`. The CLI does not
@@ -83,7 +83,7 @@ in v1, gated by login, Turnstile, quotas, and admin review.
 ```bash
 agentrig registry add georg https://georg.dev/agentrig
 agentrig list --available --registry georg
-agentrig plugin install cursor georg/georg.ts-master-plugin@1.2.0
+agentrig plugin install cursor georg/georg.ts-master-plugin
 ```
 
 ## Create a plugin

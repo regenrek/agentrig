@@ -29,7 +29,7 @@ const command = defineCommand({
     },
     source: {
       type: 'positional',
-      description: 'Signed registry plugin ref: <registryAlias>/<namespace.plugin>@<version>',
+      description: 'Signed registry plugin ref: <registryAlias>/<namespace.plugin>; add @<version> for an explicit pin',
       required: true,
     },
     pick: {

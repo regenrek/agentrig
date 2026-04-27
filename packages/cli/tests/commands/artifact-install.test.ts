@@ -113,7 +113,7 @@ describe('command:artifact install', () => {
     await run({
       args: {
         provider: 'codex',
-        source: 'agentrig/demo.review@1.0.0',
+        source: 'agentrig/demo.review',
         pick: undefined,
         cwd: '/repo',
         scope: undefined,
@@ -128,13 +128,13 @@ describe('command:artifact install', () => {
       'agentrig',
       'skill',
       'demo.review',
-      '1.0.0',
+      undefined,
       [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
     )
     expect(mocks.resolvePluginGraph).not.toHaveBeenCalled()
     expect(mocks.installArtifactSelection).toHaveBeenCalledWith(expect.objectContaining({
       sourceKind: 'registry-artifact',
-      registryRef: 'agentrig/demo.review@1.0.0',
+      registryRef: 'agentrig/demo.review',
       pluginDir: '/tmp/artifacts/demo.review',
     }))
     expect(mocks.cleanupMaterializedPlugin).toHaveBeenCalledWith('/tmp/artifacts')
@@ -144,7 +144,7 @@ describe('command:artifact install', () => {
     await run({
       args: {
         provider: 'codex',
-        source: 'agentrig/demo.plugin@1.0.0',
+        source: 'agentrig/demo.plugin',
         pick: 'review',
         cwd: '/repo',
         scope: undefined,
@@ -157,13 +157,13 @@ describe('command:artifact install', () => {
 
     expect(mocks.resolveStandaloneArtifact).not.toHaveBeenCalled()
     expect(mocks.resolvePluginGraph).toHaveBeenCalledWith(
-      'agentrig/demo.plugin@1.0.0',
+      'agentrig/demo.plugin',
       '/repo',
       [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
     )
     expect(mocks.materializeResolvedPluginGraph).toHaveBeenCalledTimes(1)
     expect(mocks.installArtifactSelection).toHaveBeenCalledWith(expect.objectContaining({
-      registryRef: 'agentrig/demo.plugin@1.0.0',
+      registryRef: 'agentrig/demo.plugin',
       picks: ['review'],
       defaultKind: 'skill',
       pluginDir: '/tmp/plugins/demo.plugin',
@@ -175,7 +175,7 @@ describe('command:artifact install', () => {
     await runUninstall({
       args: {
         provider: 'codex',
-        source: 'agentrig/demo.review@1.0.0',
+        source: 'agentrig/demo.review',
         pick: undefined,
         cwd: '/repo',
         scope: undefined,
@@ -187,7 +187,7 @@ describe('command:artifact install', () => {
 
     expect(mocks.uninstallArtifactSelection).toHaveBeenCalledWith(expect.objectContaining({
       sourceKind: 'registry-artifact',
-      source: 'agentrig/demo.review@1.0.0',
+      source: 'agentrig/demo.review',
       picks: [],
       defaultKind: 'skill',
       provider: 'codex',
@@ -199,7 +199,7 @@ describe('command:artifact install', () => {
     await runUninstall({
       args: {
         provider: 'codex',
-        source: 'agentrig/demo.plugin@1.0.0',
+        source: 'agentrig/demo.plugin',
         pick: 'review',
         cwd: '/repo',
         scope: undefined,
@@ -211,7 +211,7 @@ describe('command:artifact install', () => {
 
     expect(mocks.uninstallArtifactSelection).toHaveBeenCalledWith(expect.objectContaining({
       sourceKind: 'registry-plugin',
-      source: 'agentrig/demo.plugin@1.0.0',
+      source: 'agentrig/demo.plugin',
       picks: ['review'],
       defaultKind: 'skill',
       provider: 'codex',

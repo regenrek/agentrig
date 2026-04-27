@@ -44,7 +44,7 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
       },
       source: {
         type: 'positional',
-        description: 'Signed registry plugin ref: <registryAlias>/<namespace.plugin>@<version>',
+        description: `Signed registry ${kind} or plugin ref: <registryAlias>/<namespace.${kind}>; add @<version> for an explicit pin`,
         required: true,
       },
       pick: {

@@ -21,8 +21,8 @@ import {
   getResolvedRegistryArtifactSpecIdentity,
   getResolvedVerifiedRegistryIdentity,
   isSamePluginInstallSpecIdentity,
-  normalizePluginInstallSpecIdentity,
-  normalizeRegistryArtifactInstallSpecIdentity,
+  resolvePluginInstallSpecIdentity,
+  resolveRegistryArtifactInstallSpecIdentity,
 } from './plugin-install-spec'
 import type { ParsedRegistryArtifactKind } from './registry-spec'
 import { registryArtifactSourcePath } from './registry'
@@ -176,7 +176,7 @@ function selectionSourceForInstall(input: ArtifactSelectionInstallInput) {
       kind: 'registry-artifact' as const,
       registryAlias: input.resolved.registry.name,
       registryUrl: input.resolved.registry.url,
-      registryRef: input.registryRef,
+      registryRef: `${input.resolved.registry.name}/${input.resolved.artifactId}@${input.resolved.manifest.version}`,
       artifactKind: input.resolved.artifactKind,
       artifactId: input.resolved.artifactId,
       version: input.resolved.manifest.version,
@@ -187,7 +187,7 @@ function selectionSourceForInstall(input: ArtifactSelectionInstallInput) {
     kind: 'registry-plugin' as const,
     registryAlias: input.resolved.registry.name,
     registryUrl: input.resolved.registry.url,
-    registryRef: input.registryRef,
+    registryRef: `${input.resolved.registry.name}/${input.resolved.manifest.id}@${input.resolved.manifest.version}`,
     artifactId: input.resolved.manifest.id,
     version: input.resolved.manifest.version,
     snapshotDigest: input.resolved.snapshotDigest,
@@ -328,13 +328,13 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
   }
   const selectedSelectors = input.picks.map((pick) => normalizeSelectionPick(pick, input.defaultKind)).sort()
   const specIdentity = input.sourceKind === 'registry-artifact'
-    ? normalizeRegistryArtifactInstallSpecIdentity(
+    ? await resolveRegistryArtifactInstallSpecIdentity(
       input.source,
       requireStandaloneRegistryArtifactKind(input.defaultKind),
       input.cwd,
       input.registries,
     )
-    : normalizePluginInstallSpecIdentity(input.source, input.cwd, input.registries)
+    : await resolvePluginInstallSpecIdentity(input.source, input.cwd, input.registries)
   const ledgers = await loadPluginInstallLedgers(input.cwd)
   const records = listSelectionInstallRecords(ledgers, input.scope).filter(
     (record) =>

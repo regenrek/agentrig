@@ -4,7 +4,7 @@ const PLUGIN_ID_PATTERN =
 const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 const INSTALL_REF_PATTERN =
-  /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)@((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$/
+  /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?:@((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?))?$/
 const REGISTRY_ARTIFACT_KINDS = ['skill', 'mcp', 'hook'] as const
 
 export type ParsedRegistryArtifactKind = typeof REGISTRY_ARTIFACT_KINDS[number]
@@ -12,14 +12,14 @@ export type ParsedRegistryArtifactKind = typeof REGISTRY_ARTIFACT_KINDS[number]
 export type ParsedRegistryPluginSpec = {
   registry: string
   plugin: string
-  version: string
+  version?: string
 }
 
 export type ParsedRegistryArtifactSpec = {
   registry: string
   artifactKind: ParsedRegistryArtifactKind
   artifact: string
-  version: string
+  version?: string
 }
 
 export function isValidRegistryAlias(name: string): boolean {
@@ -44,7 +44,7 @@ export function parseRegistryPluginSpec(spec: string): ParsedRegistryPluginSpec 
   if (!match) {
     throw new Error(
       `Invalid install ref: ${spec}\n` +
-        'Use the canonical public install form: <registryAlias>/<namespace.plugin>@<version>.'
+        'Use the canonical public install form: <registryAlias>/<namespace.plugin>. Add @<version> only for an explicit pin.'
     )
   }
 
@@ -64,7 +64,7 @@ export function parseRegistryArtifactSpec(
   if (!match) {
     throw new Error(
       `Invalid ${artifactKind} install ref: ${spec}\n` +
-        `Use the canonical public standalone ${artifactKind} install form: <registryAlias>/<namespace.${artifactKind}>@<version>.`
+        `Use the canonical public standalone ${artifactKind} install form: <registryAlias>/<namespace.${artifactKind}>. Add @<version> only for an explicit pin.`
     )
   }
 

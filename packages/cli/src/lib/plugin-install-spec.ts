@@ -1,6 +1,8 @@
 import {
   normalizeRegistryUrl,
   resolveConfiguredRegistry,
+  resolvePluginFromRegistryRef,
+  resolveStandaloneArtifactFromRegistryRef,
 } from './registry'
 import {
   parseRegistryArtifactSpec,
@@ -23,6 +25,9 @@ export function normalizePluginInstallSpecIdentity(
   registries: RegistryRef[]
 ): PluginInstallSpecIdentity {
   const parsed = parseRegistryPluginSpec(spec.trim())
+  if (!parsed.version) {
+    throw new Error(`Install ref "${spec}" must be resolved before creating a concrete install identity.`)
+  }
   const registry = resolveConfiguredRegistry(parsed.registry, registries)
   return {
     kind: 'registry',
@@ -31,6 +36,18 @@ export function normalizePluginInstallSpecIdentity(
     pluginId: parsed.plugin,
     version: parsed.version,
   }
+}
+
+export async function resolvePluginInstallSpecIdentity(
+  spec: string,
+  _cwd: string,
+  registries: RegistryRef[]
+): Promise<PluginInstallSpecIdentity> {
+  const parsed = parseRegistryPluginSpec(spec.trim())
+  if (parsed.version) return normalizePluginInstallSpecIdentity(spec, _cwd, registries)
+  const registry = resolveConfiguredRegistry(parsed.registry, registries)
+  const resolved = await resolvePluginFromRegistryRef(registry, parsed.plugin)
+  return getResolvedPluginSpecIdentity(resolved)
 }
 
 export function getResolvedPluginSpecIdentity(resolved: ResolvedPlugin): PluginInstallSpecIdentity {
@@ -50,6 +67,9 @@ export function normalizeRegistryArtifactInstallSpecIdentity(
   registries: RegistryRef[]
 ): RegistryArtifactInstallSpecIdentity {
   const parsed = parseRegistryArtifactSpec(spec.trim(), artifactKind)
+  if (!parsed.version) {
+    throw new Error(`Install ref "${spec}" must be resolved before creating a concrete install identity.`)
+  }
   const registry = resolveConfiguredRegistry(parsed.registry, registries)
   return {
     kind: 'registry-artifact',
@@ -59,6 +79,19 @@ export function normalizeRegistryArtifactInstallSpecIdentity(
     artifactId: parsed.artifact,
     version: parsed.version,
   }
+}
+
+export async function resolveRegistryArtifactInstallSpecIdentity(
+  spec: string,
+  artifactKind: ParsedRegistryArtifactKind,
+  _cwd: string,
+  registries: RegistryRef[]
+): Promise<RegistryArtifactInstallSpecIdentity> {
+  const parsed = parseRegistryArtifactSpec(spec.trim(), artifactKind)
+  if (parsed.version) return normalizeRegistryArtifactInstallSpecIdentity(spec, artifactKind, _cwd, registries)
+  const registry = resolveConfiguredRegistry(parsed.registry, registries)
+  const resolved = await resolveStandaloneArtifactFromRegistryRef(registry, parsed.artifactKind, parsed.artifact)
+  return getResolvedRegistryArtifactSpecIdentity(resolved)
 }
 
 export function getResolvedRegistryArtifactSpecIdentity(resolved: ResolvedStandaloneArtifact): RegistryArtifactInstallSpecIdentity {

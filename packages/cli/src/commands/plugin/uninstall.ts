@@ -5,7 +5,7 @@ import { loadConfig } from '../../lib/config'
 import { loadPluginInstallLedgers, listPluginInstallRecords } from '../../lib/plugin-install-ledger'
 import {
   isSamePluginInstallSpecIdentity,
-  normalizePluginInstallSpecIdentity,
+  resolvePluginInstallSpecIdentity,
 } from '../../lib/plugin-install-spec'
 import {
   parsePluginInstallScopeSelector,
@@ -44,7 +44,7 @@ const command = defineCommand({
     },
     spec: {
       type: 'positional',
-      description: 'Canonical install ref: <registryAlias>/<namespace.plugin>@<version>',
+      description: 'Canonical install ref: <registryAlias>/<namespace.plugin>; add @<version> for an explicit pin',
       required: true,
     },
     cwd: {
@@ -87,7 +87,7 @@ const command = defineCommand({
     const ledgers = await loadPluginInstallLedgers(cwd)
     const allRecords = listPluginInstallRecords(ledgers, scope)
     const cfg = await loadConfig(cwd)
-    const specIdentity = normalizePluginInstallSpecIdentity(spec, cwd, cfg.registries)
+    const specIdentity = await resolvePluginInstallSpecIdentity(spec, cwd, cfg.registries)
     if (specIdentity.kind === 'registry-artifact') {
       throw new Error('`agentrig plugin uninstall` only accepts plugin install refs.')
     }
