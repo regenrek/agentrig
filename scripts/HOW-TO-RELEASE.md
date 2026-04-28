@@ -21,7 +21,7 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - `pnpm test:release:local`
   - This runs the CLI coverage suite, the Vite+ consumer-app subprocess E2E suite, the latest Vite+ fixture check, then builds/packs the CLI and smoke-tests the installed `agentrig` bin with `--version` and `--help`.
   - Do not publish if this command fails.
-- **Release bar**: keep overall coverage **> 80%** (raise it if you touch core installer/config paths)
+- **Coverage bar**: `packages/cli/vitest.config.ts` owns the enforced CLI coverage baseline. It currently gates on 52% statements, 42% branches, 54% functions, and 54% lines; raise these thresholds with coverage improvements instead of carrying an aspirational value that release tests do not enforce.
 - CI coverage after this change is split intentionally:
   - Ubuntu on Node 24 runs the full coverage and Vite+ playground E2E jobs.
   - Ubuntu, macOS, and Windows run the packaged CLI smoke check on Node 24.

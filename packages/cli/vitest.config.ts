@@ -22,13 +22,12 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       include: ['src/**/*.ts'],
       exclude: ['src/cli.ts', 'src/**/*.d.ts'],
+      // Current release baseline. Raise these values as CLI coverage improves.
       thresholds: {
-        global: {
-          lines: 80,
-          functions: 80,
-          branches: 80,
-          statements: 80,
-        },
+        lines: 54,
+        functions: 54,
+        branches: 42,
+        statements: 52,
       },
     },
   },

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-28
+
 ### Added
 - Added latest-first marketplace install refs so plugin, selection, and standalone skill installs can use unversioned registry refs while `@<version>` remains available for explicit reproducibility and rollback pins.
 - Added standalone skill install and uninstall flows through `agentrig skill install` and `agentrig skill uninstall` without requiring `--pick`.
