@@ -40,6 +40,8 @@ The canonical registry layout is:
 - `plugins/<namespace>/<plugin>/versions/<version>/AGENTRIG_REVIEW.json`
 - `plugins/<namespace>/<plugin>/versions/<version>/README.md`
 - `plugins/<namespace>/<plugin>/versions/<version>/LICENSE`
+- `skills/<namespace>/<skill>/skill.json` for standalone skill artifacts
+- `skills/<namespace>/<skill>/versions/<version>/`
 - `advisories.json`
 
 Canonical plugin ids use:
@@ -51,14 +53,18 @@ namespace.plugin
 Canonical install refs use:
 
 ```text
-<registryAlias>/<namespace.plugin>@<version>
+<registryAlias>/<namespace.plugin>
 ```
 
 Example:
 
 ```text
-agentrig/agentrig.core-committer@0.1.0
+agentrig/agentrig.core-committer
 ```
+
+The unversioned form installs the latest installable version. Append
+`@<version>` only for an explicit reproducibility or rollback pin. The CLI still
+records the concrete resolved version and snapshot digest in its install ledger.
 
 ## CLI behavior
 

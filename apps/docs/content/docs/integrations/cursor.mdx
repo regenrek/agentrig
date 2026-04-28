@@ -9,15 +9,17 @@ icon: Monitor
 Install a resolved plugin into Cursor:
 
 ```bash
-agentrig plugin install cursor agentrig/agentrig.core-committer@0.1.0 --scope personal
+agentrig plugin install cursor agentrig/agentrig.core-committer --scope personal
 ```
 
 This copies each generated plugin into `~/.cursor/plugins/local/`. Reload Cursor after installing.
+Refs resolve to the latest installable registry version by default; add
+`@<version>` only for an explicit reproducibility or rollback pin.
 
 ## Install project-local Cursor plugins
 
 ```bash
-agentrig plugin install cursor georg/georg.ts-master-plugin@1.2.0 --scope workspace
+agentrig plugin install cursor georg/georg.ts-master-plugin --scope workspace
 ```
 
 This copies each generated plugin into `<cwd>/.cursor/plugins/local/`.
@@ -28,7 +30,7 @@ If you omit `--scope`, `auto` resolves Cursor installs to `personal`.
 ## Uninstall Cursor plugins
 
 ```bash
-agentrig plugin uninstall cursor agentrig/agentrig.core-committer@0.1.0
+agentrig plugin uninstall cursor agentrig/agentrig.core-committer
 ```
 
 Uninstall is safe by default:
@@ -37,6 +39,7 @@ Uninstall is safe by default:
 - modified plugin files are kept instead of being deleted
 - workspace installs are removed from `.cursor/plugins/local/` inside the repo
 - personal installs are removed from `~/.cursor/plugins/local/`
+- install records include the concrete resolved version and registry snapshot digest
 
 ## Example
 
@@ -50,5 +53,5 @@ Uninstall is safe by default:
 ## Best practices
 
 - Keep Cursor-specific files isolated in a plugin.
-- Install third-party plugins through explicit registry aliases such as `georg/georg.ts-master-plugin@1.2.0`.
+- Install third-party plugins through explicit registry aliases such as `georg/georg.ts-master-plugin`.
 - Use `--scope workspace` when you want the Cursor plugin to stay repo-local and easy to remove with the project.

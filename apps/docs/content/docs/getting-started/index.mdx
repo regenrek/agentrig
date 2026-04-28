@@ -45,7 +45,7 @@ AgentRig starts with a simple consumer flow:
     <p>Optional, but useful if you want to review dependencies, files, and trust before installing.</p>
 
     ```bash
-    agentrig view agentrig/agentrig.core-committer@0.1.0
+    agentrig view agentrig/agentrig.core-committer
     ```
   </Step>
   <Step>
@@ -53,7 +53,7 @@ AgentRig starts with a simple consumer flow:
     <p>Choose the provider you actually use in Claude Code, Codex, or Cursor.</p>
 
     ```bash
-    agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
+    agentrig plugin install codex agentrig/agentrig.core-committer
     ```
   </Step>
 </Steps>
@@ -63,12 +63,15 @@ AgentRig starts with a simple consumer flow:
 Third-party registries are explicit.
 Add the registry first, then install plugins from it with the canonical install ref:
 
-`<registryAlias>/<namespace.plugin>@<version>`
+`<registryAlias>/<namespace.plugin>`
+
+The unversioned form installs the latest installable version. Add `@<version>`
+only when you need an exact reproducibility or rollback pin.
 
 ```bash
 agentrig registry add georg https://georg.dev/agentrig
 agentrig list --available --registry georg
-agentrig plugin install cursor georg/georg.ts-master-plugin@1.2.0
+agentrig plugin install cursor georg/georg.ts-master-plugin
 ```
 
 ## What is not installable

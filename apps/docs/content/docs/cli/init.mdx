@@ -37,7 +37,10 @@ After init, the CLI prints the recommended next commands:
 
 ```bash
 agentrig list --available
-agentrig view <registryAlias>/<namespace.plugin>@<version>
+agentrig view <registryAlias>/<namespace.plugin>
 agentrig registry add <alias> <baseUrl>
-agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>
+agentrig plugin install <provider> <registryAlias>/<namespace.plugin>
 ```
+
+Append `@<version>` to a registry ref only when you need an exact
+reproducibility or rollback pin.

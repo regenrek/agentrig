@@ -9,22 +9,25 @@ icon: Sparkles
 Consumers install resolved plugins into Claude with the top-level plugin command:
 
 ```bash
-agentrig plugin install claude agentrig/agentrig.core-committer@0.1.0
-agentrig plugin install claude georg/georg.ts-master-plugin@1.2.0
+agentrig plugin install claude agentrig/agentrig.core-committer
+agentrig plugin install claude georg/georg.ts-master-plugin
 ```
 
 Claude installs use Claude's native marketplace commands under the hood.
+Refs resolve to the latest installable registry version by default; add
+`@<version>` only for an explicit reproducibility or rollback pin.
 
 ## Uninstall from Claude Code
 
 ```bash
-agentrig plugin uninstall claude agentrig/agentrig.core-committer@0.1.0
+agentrig plugin uninstall claude agentrig/agentrig.core-committer
 ```
 
 ## What AgentRig does
 
-After you run `agentrig plugin install` with the canonical registry ref,
-AgentRig materializes the plugin and drives Claude's native CLI:
+After you run `agentrig plugin install` with the canonical registry ref, AgentRig
+resolves a concrete version, records the registry snapshot digest in its install
+ledger, materializes the plugin, and drives Claude's native CLI:
 
 ```text
 claude plugin marketplace add <generated-marketplace-dir>

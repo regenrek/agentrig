@@ -47,7 +47,8 @@ node scripts/validate-registry.mjs --check
 - The canonical path is:
   - `registry.json -> plugins/<namespace>/<plugin>/plugin.json -> versions/<version>/...`
 - The canonical install ref is:
-  - `<registryAlias>/<namespace.plugin>@<version>`
+  - `<registryAlias>/<namespace.plugin>` by default
+  - `<registryAlias>/<namespace.plugin>@<version>` only when an exact pin is needed
 
 ## Add a registry to the directory
 

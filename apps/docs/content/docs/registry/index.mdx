@@ -25,8 +25,11 @@ Public installation is allowed only from static signed registries.
 Canonical install refs use:
 
 ```text
-<registryAlias>/<namespace.plugin>@<version>
+<registryAlias>/<namespace.plugin>
 ```
+
+The unversioned form resolves to the registry's latest installable version.
+Append `@<version>` only when you need an exact reproducibility or rollback pin.
 
 Canonical ids use:
 
@@ -35,6 +38,23 @@ namespace.plugin
 ```
 
 Direct URLs, local files, ZIP uploads, author repos, and Convex-hosted bytes are **not** installable public sources.
+
+## Version and integrity records
+
+Registry histories expose `latest_version`, `active_version`, and immutable
+version records. During install, AgentRig resolves the requested latest or pinned
+version, validates the registry source/lock/review artifacts, and records the
+concrete version plus `snapshot_digest` in the local install ledger.
+
+Plugin artifacts are the normal V1 distribution path. Standalone skill artifacts
+can also be installed directly:
+
+```bash
+agentrig skill install <provider> <registryAlias>/<namespace.skill>
+```
+
+Standalone MCP and hook installs without `--pick` are not a public V1 flow;
+install MCPs and hooks as plugin contents.
 
 ## Discovery contract
 

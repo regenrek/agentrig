@@ -19,7 +19,8 @@ Plugin installs resolve and install dependencies before the requested plugin.
 ## How it works
 
 - Dependencies use canonical plugin ids or canonical install refs.
-- A canonical install ref looks like `<registryAlias>/<namespace.plugin>@<version>`.
+- A canonical install ref looks like `<registryAlias>/<namespace.plugin>`.
+- Add `@<version>` only when you need an exact reproducibility or rollback pin.
 - Dependencies inherit the same registry contract when they resolve inside a configured registry.
 - Direct URLs, local files, and ZIP sources are not part of the public install contract.
 - Dependencies are only installed once per install run.

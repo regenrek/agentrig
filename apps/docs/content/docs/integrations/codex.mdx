@@ -9,17 +9,19 @@ icon: Bot
 Install a resolved plugin into Codex:
 
 ```bash
-agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
-agentrig plugin install codex georg/georg.ts-master-plugin@1.2.0 --scope workspace
+agentrig plugin install codex agentrig/agentrig.core-committer
+agentrig plugin install codex georg/georg.ts-master-plugin --scope workspace
 ```
 
 `--scope auto` is the default selector.
 For Codex, `auto` resolves to `workspace`.
+Refs resolve to the latest installable registry version by default; add
+`@<version>` only for an explicit reproducibility or rollback pin.
 
 ## Install for your user
 
 ```bash
-agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0 --scope personal
+agentrig plugin install codex agentrig/agentrig.core-committer --scope personal
 ```
 
 This copies plugins into `~/.codex/plugins/` and updates `~/.agents/plugins/marketplace.json`.
@@ -27,7 +29,7 @@ This copies plugins into `~/.codex/plugins/` and updates `~/.agents/plugins/mark
 ## Install for the current repo
 
 ```bash
-agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0 --scope workspace
+agentrig plugin install codex agentrig/agentrig.core-committer --scope workspace
 ```
 
 This writes a repo-local marketplace at `.agents/plugins/marketplace.json` and copies plugins into `./plugins/`.
@@ -35,7 +37,7 @@ This writes a repo-local marketplace at `.agents/plugins/marketplace.json` and c
 ## Uninstall Codex plugins
 
 ```bash
-agentrig plugin uninstall codex agentrig/agentrig.core-committer@0.1.0
+agentrig plugin uninstall codex agentrig/agentrig.core-committer
 ```
 
 Uninstall is ledger-backed and hash-guarded:
@@ -44,6 +46,7 @@ Uninstall is ledger-backed and hash-guarded:
 - modified plugin files are kept instead of being deleted
 - unrelated marketplace entries are preserved
 - existing extra metadata in `marketplace.json` is preserved when AgentRig updates its managed entry
+- install records include the concrete resolved version and registry snapshot digest
 
 ## What Codex plugins include
 

@@ -25,15 +25,21 @@ through a large repo.
 When you want the whole bundle, install the plugin:
 
 ```bash
-agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
+agentrig plugin install codex agentrig/agentrig.core-committer
 ```
 
 When you only want specific artifacts, install a Selection Bundle:
 
 ```bash
-agentrig install codex agentrig/agentrig.core-committer@0.1.0 \
+agentrig install codex agentrig/agentrig.core-committer \
   --pick skill:codex-analysis \
   --pick skill:gitwhat
+```
+
+Standalone skills can also be installed directly:
+
+```bash
+agentrig skill install codex agentrig/acme.review
 ```
 
 Selection Bundles are local install records for selected artifacts. They keep
@@ -49,6 +55,11 @@ Registries host plugin metadata and files. Public installation is allowed only f
 - **Submissions and community pages**: discovery and review surfaces, not install sources
 
 The **directory** (`https://agentrig.ai/directory/index.json`) is a curated list of registries for discovery. Directory presence does not imply install trust.
+
+Registry install refs are latest-first by default. Use `agentrig/<namespace.plugin>`
+or `agentrig/<namespace.skill>` for normal installs, and add `@<version>` only
+when you need an exact reproducibility or rollback pin. AgentRig records the
+concrete resolved version and snapshot digest in its install ledger either way.
 
 ## Rigs
 

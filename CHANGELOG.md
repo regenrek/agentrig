@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+- Added latest-first marketplace install refs so plugin, selection, and standalone skill installs can use unversioned registry refs while `@<version>` remains available for explicit reproducibility and rollback pins.
+- Added standalone skill install and uninstall flows through `agentrig skill install` and `agentrig skill uninstall` without requiring `--pick`.
+- Added registry-artifact source and install-ledger support so selected and standalone artifact installs record concrete registry provenance, resolved versions, and snapshot integrity.
+
+### Changed
+- Registry and integration docs now describe unversioned latest installs as the default public UX and reserve `@<version>` examples for advanced pinned installs.
+- Standalone artifact manifests now accept optional `$schema` metadata across supported manifest kinds.
+
+### Fixed
+- Fixed root plugin submissions so `plugin_path: "."` is accepted for plugins whose `.plugin/plugin.json` lives at the upstream repo root.
+
 ## [0.5.2] - 2026-04-22
 
 ### Fixed

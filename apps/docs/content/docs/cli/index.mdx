@@ -14,18 +14,26 @@ Run `agentrig --help` for global help.
 
 - `agentrig init` - create config file.
 - `agentrig list --available` - browse available plugins.
-- `agentrig view <registryAlias>/<namespace.plugin>@<version>` - inspect a plugin before installing.
-- `agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>` - install the full plugin bundle.
-- `agentrig install <provider> <registryAlias>/<namespace.plugin>@<version> --pick skill:<name>` - install selected skills, MCPs, or hooks from a plugin as a Selection Bundle.
-- `agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>@<version>` - remove a provider plugin.
-- `agentrig skill uninstall <provider> <registryAlias>/<namespace.plugin>@<version> --pick <name>` - remove an AgentRig-managed selected-artifact install.
+- `agentrig view <registryAlias>/<namespace.plugin>` - inspect the latest plugin version before installing.
+- `agentrig plugin install <provider> <registryAlias>/<namespace.plugin>` - install the full latest plugin bundle.
+- `agentrig install <provider> <registryAlias>/<namespace.plugin> --pick skill:<name>` - install selected skills, MCPs, or hooks from a plugin as a Selection Bundle.
+- `agentrig skill install <provider> <registryAlias>/<namespace.skill>` - install a standalone skill artifact.
+- `agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>` - remove a provider plugin.
+- `agentrig skill uninstall <provider> <registryAlias>/<namespace.skill>` - remove an AgentRig-managed standalone skill install.
 - `agentrig rig apply <provider> <rig>` - apply an advanced rig.
 - `agentrig registry add` - add a registry.
 - `agentrig plugin init` - scaffold a new plugin.
 
-Public installs use the canonical registry ref
-`<registryAlias>/<namespace.plugin>@<version>`. Plugin install remains the
-primary full-bundle path. Selection install is the selective path for choosing
-specific artifacts from an installable registry plugin.
+Public installs use latest-first registry refs:
+`<registryAlias>/<namespace.plugin>` for plugins and
+`<registryAlias>/<namespace.skill>` for standalone skills. Add `@<version>` only
+when you need an explicit reproducibility or rollback pin. Install ledgers still
+record the concrete resolved version and snapshot digest, even when the command
+uses the unversioned latest ref.
+
+Plugin install remains the primary full-bundle path. Selection install is the
+selective path for choosing specific artifacts from an installable registry
+plugin. In V1, standalone MCP and hook installs without `--pick` are not a
+public flow; install MCPs and hooks as plugin contents with `--pick`.
 
 Use the pages in this section for full options and examples.

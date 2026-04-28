@@ -19,19 +19,22 @@ agentrig plugin install <provider> <plugin-spec>
 ```
 
 For public installs, `<plugin-spec>` must be the canonical registry ref
-`<registryAlias>/<namespace.plugin>@<version>`.
+`<registryAlias>/<namespace.plugin>`. Add `@<version>` only when you need to pin
+an exact version for reproducibility or rollback.
 
 ## Full plugin install
 
 Use `plugin install` when you want the complete bundle:
 
 ```bash
-agentrig plugin install codex agentrig/agentrig.core-committer@0.1.0
-agentrig plugin uninstall codex agentrig/agentrig.core-committer@0.1.0
+agentrig plugin install codex agentrig/agentrig.core-committer
+agentrig plugin uninstall codex agentrig/agentrig.core-committer
 ```
 
 This is not a legacy path. It is the main path for installing an entire
-published plugin.
+published plugin. The install ledger records the resolved concrete version,
+registry identity, and snapshot digest even when you use the unversioned latest
+ref.
 
 ## Selected artifact install
 
@@ -39,7 +42,7 @@ Use top-level `install --pick` when you want only specific artifacts from an
 installable plugin:
 
 ```bash
-agentrig install codex agentrig/agentrig.core-committer@0.1.0 \
+agentrig install codex agentrig/agentrig.core-committer \
   --pick skill:codex-analysis \
   --pick skill:gitwhat
 ```
@@ -47,13 +50,23 @@ agentrig install codex agentrig/agentrig.core-committer@0.1.0 \
 Kind-specific helpers are available when all picks have the same kind:
 
 ```bash
-agentrig skill install codex agentrig/agentrig.core-committer@0.1.0 \
+agentrig skill install codex agentrig/agentrig.core-committer \
   --pick codex-analysis \
   --pick gitwhat
 
-agentrig mcp install claude agentrig/acme.tools@1.0.0 --pick github
-agentrig hook install cursor agentrig/acme.workflow@1.0.0 --pick pre-submit
+agentrig mcp install claude agentrig/acme.tools --pick github
+agentrig hook install cursor agentrig/acme.workflow --pick pre-submit
 ```
+
+Standalone skills can be installed and uninstalled directly without `--pick`:
+
+```bash
+agentrig skill install codex agentrig/acme.review
+agentrig skill uninstall codex agentrig/acme.review
+```
+
+Standalone MCP and hook installs without `--pick` are not a public V1 flow.
+Install MCPs and hooks from plugin bundles with `--pick`.
 
 AgentRig records selected-artifact installs as Selection Bundles. A Selection
 Bundle is one local ledger record with source provenance, selected artifact

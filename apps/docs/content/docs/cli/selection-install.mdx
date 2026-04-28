@@ -18,7 +18,7 @@ the selective path for users who only need part of that bundle.
 Use top-level `install` with repeated `--pick` flags:
 
 ```bash
-agentrig install codex agentrig/agentrig.core-committer@0.1.0 \
+agentrig install codex agentrig/agentrig.core-committer \
   --pick skill:codex-analysis \
   --pick skill:gitwhat
 ```
@@ -32,17 +32,37 @@ Each pick uses `<kind>:<name>`. Supported selection kinds are:
 If every pick has the same kind, you can use the kind-specific helper:
 
 ```bash
-agentrig skill install codex agentrig/agentrig.core-committer@0.1.0 \
+agentrig skill install codex agentrig/agentrig.core-committer \
   --pick codex-analysis \
   --pick gitwhat
 ```
+
+Refs are latest-first by default. Add `@<version>` only when you need to pin an
+exact plugin version for reproducibility or rollback.
+
+## Install a standalone skill
+
+Standalone skill artifacts are installed without `--pick`:
+
+```bash
+agentrig skill install codex agentrig/acme.review
+agentrig skill uninstall codex agentrig/acme.review
+```
+
+The source must be a signed registry skill artifact. AgentRig resolves the latest
+version, installs the skill, and records the concrete resolved version plus
+snapshot digest in the install ledger. You can add `@<version>` to install or
+uninstall a pinned standalone skill.
+
+Standalone MCP and hook installs without `--pick` are not a public V1 flow. MCPs
+and hooks are installed from plugin bundles with `--pick`.
 
 ## Uninstall a selection
 
 Pass the same source and picks to remove the AgentRig-managed Selection Bundle:
 
 ```bash
-agentrig skill uninstall codex agentrig/agentrig.core-committer@0.1.0 \
+agentrig skill uninstall codex agentrig/agentrig.core-committer \
   --pick codex-analysis \
   --pick gitwhat
 ```

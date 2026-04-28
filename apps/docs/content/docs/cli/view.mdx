@@ -9,9 +9,12 @@ icon: Eye
 Inspect a plugin's metadata and install plan without writing files.
 
 ```bash
-agentrig view agentrig/agentrig.core-committer@0.1.0
-agentrig view acme/acme.tauri-rust@1.4.2 --json
+agentrig view agentrig/agentrig.core-committer
+agentrig view acme/acme.tauri-rust --json
 ```
+
+Refs resolve to the latest installable registry version by default. Add
+`@<version>` when you need to inspect an exact pinned version.
 
 ## Options
 

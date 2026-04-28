@@ -16,19 +16,19 @@ Example:
   "rigs": {
     "core": {
       "plugins": [
-        "agentrig/agentrig.core-committer@0.1.0",
-        "agentrig/agentrig.security-check@0.1.0"
+        "agentrig/agentrig.core-committer",
+        "agentrig/agentrig.security-check"
       ]
     },
-    "website": { "extends": ["core"], "plugins": ["agentrig/community.typescript@0.1.0"] }
+    "website": { "extends": ["core"], "plugins": ["agentrig/community.typescript"] }
   }
 }
 ```
 
 When you apply `website`, agentrig installs:
 
-1. `agentrig/agentrig.core-committer@0.1.0`
-2. `agentrig/agentrig.security-check@0.1.0`
-3. `agentrig/community.typescript@0.1.0`
+1. `agentrig/agentrig.core-committer`
+2. `agentrig/agentrig.security-check`
+3. `agentrig/community.typescript`
 
 This keeps shared foundations in one place.

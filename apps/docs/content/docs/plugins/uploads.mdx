@@ -14,10 +14,13 @@ agentrig plugin submit \
   --upstreamRepo https://github.com/owner/repo \
   --upstreamTag v1.2.3 \
   --upstreamCommitSha 1234567890abcdef1234567890abcdef12345678 \
-  --pluginPath plugin
+  --pluginPath .
 ```
 
 `agentrig plugin submit` creates a review submission from a single pinned upstream source.
+Use `--pluginPath .` when `.plugin/plugin.json` lives at the upstream repo root;
+use a relative subdirectory such as `plugin` when the plugin lives below the
+root.
 
 To check review progress later:
 
@@ -69,7 +72,8 @@ Rules:
 - `upstream_repo` must be an allowed canonical repo URL.
 - `upstream_tag` must resolve to `upstream_commit_sha`.
 - `upstream_commit_sha` must be a full 40-character commit SHA.
-- `plugin_path` is relative to the upstream repo root.
+- `plugin_path` is relative to the upstream repo root. `.` is valid for a root
+  plugin.
 - Branch names, `latest`, floating refs, alternate URL shapes, and ZIP uploads are not valid submission inputs.
 
 ## Validation boundary

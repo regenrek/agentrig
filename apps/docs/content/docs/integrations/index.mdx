@@ -15,15 +15,15 @@ AgentRig can take a resolved plugin and install it as a native plugin for:
 ## Consumer flow
 
 ```bash
-agentrig plugin install <provider> <registryAlias>/<namespace.plugin>@<version>
-agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>@<version>
+agentrig plugin install <provider> <registryAlias>/<namespace.plugin>
+agentrig plugin uninstall <provider> <registryAlias>/<namespace.plugin>
 ```
 
 Use `plugin install` for the full bundle. Use selection install when you only
 want specific skills, MCPs, or hooks from that bundle:
 
 ```bash
-agentrig install <provider> <registryAlias>/<namespace.plugin>@<version> \
+agentrig install <provider> <registryAlias>/<namespace.plugin> \
   --pick skill:<name> \
   --pick mcp:<name>
 ```
@@ -31,12 +31,25 @@ agentrig install <provider> <registryAlias>/<namespace.plugin>@<version> \
 Selection install materializes an AgentRig-managed Selection Bundle. The
 provider receives only the selected artifacts that pass SDK closure checks.
 
-Public install refs are exact and registry-only:
+Standalone skills can be installed without `--pick`:
 
-- `agentrig/agentrig.core-committer@0.1.0`
-- `georg/georg.ts-master-plugin@1.2.0`
+```bash
+agentrig skill install <provider> <registryAlias>/<namespace.skill>
+agentrig skill uninstall <provider> <registryAlias>/<namespace.skill>
+```
 
-Direct `.plugin/plugin.json` paths, arbitrary URLs, ZIPs, and author repos are outside the public install contract.
+Standalone MCP and hook installs without `--pick` are not a public V1 flow. MCPs
+and hooks are installed as plugin contents with `--pick`.
+
+Public install refs are registry-only and latest-first by default:
+
+- `agentrig/agentrig.core-committer`
+- `georg/georg.ts-master-plugin`
+
+Add `@<version>` only when you need an exact reproducibility or rollback pin.
+Install ledgers record the concrete resolved version and snapshot digest either
+way. Direct `.plugin/plugin.json` paths, arbitrary URLs, ZIPs, and author repos
+are outside the public install contract.
 
 ## Author flow
 
