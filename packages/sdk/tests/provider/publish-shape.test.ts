@@ -65,6 +65,40 @@ describe('publish shape primitives', () => {
     expect(payload.publishShape.selectedSelectors).toEqual(['mcp:mcp', 'skill:review'])
   })
 
+  it('uses plugin identity lifted from the repo scan report', async () => {
+    const report = await scanRepo({
+      source: { type: 'virtual', label: 'fixture', ref: source.ref, commitSha: source.commitSha },
+      tree: createMemoryTree({
+        '.plugin/plugin.json': JSON.stringify({
+          kind: 'agentrig:plugin',
+          id: 'regenrek.test-submission',
+          name: 'Test Submission',
+          description: 'Reference plugin.',
+          version: '0.2.0',
+          configSchema: {},
+        }),
+        'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+      }),
+    })
+
+    const scan = buildPublishScanResult({
+      source,
+      report,
+      scannerVersion: 'repo-scan-v1',
+    })
+
+    expect(scan.pluginCandidate).toMatchObject({
+      artifactId: 'regenrek.test-submission',
+      version: '0.2.0',
+      sourcePath: '.',
+      manifestPath: '.plugin/plugin.json',
+    })
+    expect(scan.pluginCandidate?.files.map((file) => file.path)).toEqual([
+      '.plugin/plugin.json',
+      'skills/review/SKILL.md',
+    ])
+  })
+
   it('builds deterministic submit payloads for selected standalone artifacts', async () => {
     const scan = buildPublishScanResult({
       source,

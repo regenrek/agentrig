@@ -8,7 +8,7 @@ describe('tier 1 detectors', () => {
       createMemoryTree({
         'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
         '.mcp.json': JSON.stringify({ mcpServers: { fs: { command: 'node', args: ['server.js'] } } }),
-        'hooks/hooks.json': JSON.stringify({ PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo ok' }] }] }),
+        'hooks/hooks.json': JSON.stringify({ hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo ok' }] }] } }),
         '.lsp.json': JSON.stringify({ languageServers: { typescript: { command: 'typescript-language-server', args: ['--stdio'] } } }),
         '.app.json': JSON.stringify({ entrypoint: './app.ts' }),
         'settings.json': JSON.stringify({ permissions: {} }),
@@ -35,6 +35,10 @@ describe('tier 1 detectors', () => {
       id: 'review',
       description: 'Reviews code.',
       providerCompat: { claude: 'native', codex: 'native', cursor: 'native' },
+    })
+    expect(signals.find((signal) => signal.kind === 'hook')).toMatchObject({
+      id: 'hooks',
+      sourcePath: 'hooks/hooks.json',
     })
     expect(signals.find((signal) => signal.kind === 'codex-app')?.providerCompat).toMatchObject({
       claude: 'unsupported',

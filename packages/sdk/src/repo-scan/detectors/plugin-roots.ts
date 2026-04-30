@@ -1,4 +1,4 @@
-import { normalizeVirtualPath } from '../virtual-tree'
+import { normalizeVirtualPath, type VirtualTreeFile } from '../virtual-tree'
 import type { DetectorInput, PluginCandidate, PluginProviderId } from './common'
 
 const PLUGIN_MANIFEST_DIRS: Record<string, PluginProviderId> = {
@@ -13,7 +13,7 @@ export async function discoverPluginCandidates(input: Pick<DetectorInput, 'files
 
   for (const file of input.files) {
     const path = normalizeVirtualPath(file.path)
-    const manifestCandidate = candidateFromPluginManifest(path)
+    const manifestCandidate = await candidateFromPluginManifest(input, path)
     if (manifestCandidate) {
       candidates.push(manifestCandidate)
       continue
@@ -40,7 +40,34 @@ export function rootsFromPluginCandidates(candidates: readonly PluginCandidate[]
   return ['', ...new Set(candidates.map((candidate) => candidate.rootPath).filter(Boolean))].sort()
 }
 
-function candidateFromPluginManifest(path: string): PluginCandidate | undefined {
+export function scanPluginCandidatesFromDetected(candidates: readonly PluginCandidate[]) {
+  return candidates
+    .flatMap((candidate) => candidate.scanCandidate ? [candidate.scanCandidate] : [])
+    .sort((left, right) => `${left.sourcePath}:${left.manifestPath}`.localeCompare(`${right.sourcePath}:${right.manifestPath}`))
+}
+
+function scanPluginCandidateFromManifest(
+  input: Pick<DetectorInput, 'files'>,
+  candidate: Pick<PluginCandidate, 'provider' | 'manifestPath' | 'rootPath'>,
+  manifest: { artifactId: string; version?: string }
+) {
+  if (candidate.provider !== 'agentrig') return undefined
+  const files = filesForPluginRoot(input.files, candidate.rootPath)
+  if (!files.length) return undefined
+  return {
+    artifactId: manifest.artifactId,
+    ...(manifest.version ? { version: manifest.version } : {}),
+    sourcePath: candidate.rootPath || '.',
+    manifestPath: candidate.manifestPath,
+    files: files.map((file) => ({
+      path: normalizeVirtualPath(file.path),
+      digest: file.sha256,
+      bytes: file.bytes,
+    })),
+  }
+}
+
+async function candidateFromPluginManifest(input: Pick<DetectorInput, 'files' | 'tree'>, path: string): Promise<PluginCandidate | undefined> {
   const parts = path.split('/')
   if (parts.at(-1) !== 'plugin.json') return undefined
 
@@ -50,10 +77,16 @@ function candidateFromPluginManifest(path: string): PluginCandidate | undefined 
   const provider = PLUGIN_MANIFEST_DIRS[manifestDir]
   if (!provider) return undefined
 
-  return {
+  const candidate = {
     provider,
     manifestPath: path,
     rootPath: parts.slice(0, -2).join('/'),
+  }
+  const manifest = provider === 'agentrig' ? parseAgentrigPluginManifestCandidate(await readJson(input, path)) : undefined
+  const scanCandidate = manifest ? scanPluginCandidateFromManifest(input, candidate, manifest) : undefined
+  return {
+    ...candidate,
+    ...(scanCandidate ? { scanCandidate } : {}),
   }
 }
 
@@ -97,6 +130,25 @@ function normalizeMarketplaceSource(source: string, rootPath: string) {
   const cleaned = source.trim().replace(/^\.\/+/, '').replace(/\/+$/g, '')
   if (!cleaned || cleaned.startsWith('/') || cleaned.split('/').includes('..')) return undefined
   return rootPath ? normalizeVirtualPath(`${rootPath}/${cleaned}`) : normalizeVirtualPath(cleaned)
+}
+
+function parseAgentrigPluginManifestCandidate(raw: unknown) {
+  if (!isRecord(raw)) return undefined
+  const artifactId = typeof raw.id === 'string' ? raw.id.trim() : ''
+  if (!artifactId) return undefined
+  const version = typeof raw.version === 'string' && raw.version.trim() ? raw.version.trim() : undefined
+  return { artifactId, ...(version ? { version } : {}) }
+}
+
+function filesForPluginRoot(files: readonly VirtualTreeFile[], rootPath: string) {
+  const root = rootPath ? normalizeVirtualPath(rootPath) : ''
+  const prefix = root ? `${root}/` : ''
+  return files
+    .filter((file) => {
+      const path = normalizeVirtualPath(file.path)
+      return !root || path === root || path.startsWith(prefix)
+    })
+    .sort((left, right) => normalizeVirtualPath(left.path).localeCompare(normalizeVirtualPath(right.path)))
 }
 
 function deduplicateCandidates(candidates: readonly PluginCandidate[]) {

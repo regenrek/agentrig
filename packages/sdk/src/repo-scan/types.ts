@@ -52,8 +52,23 @@ export type RepoScanSource = {
   subdir?: string
 }
 
+export type RepoScanPluginCandidateFile = {
+  path: string
+  digest: string
+  bytes?: number
+}
+
+export type RepoScanPluginCandidate = {
+  artifactId: string
+  version?: string
+  sourcePath: string
+  manifestPath: string
+  files: RepoScanPluginCandidateFile[]
+}
+
 export type RepoScanReport = {
   source: RepoScanSource
   signals: Signal[]
+  pluginCandidates: RepoScanPluginCandidate[]
   digest: string
 }

@@ -1,5 +1,5 @@
 import { providerAffinityForSignal, providerCompatForSignal } from '../../provider/affinity'
-import type { Signal, SignalFile, SignalKind } from '../types'
+import type { RepoScanPluginCandidate, Signal, SignalFile, SignalKind } from '../types'
 import type { VirtualTree, VirtualTreeFile } from '../virtual-tree'
 import { normalizeVirtualPath, virtualBasename } from '../virtual-tree'
 
@@ -10,6 +10,7 @@ export type PluginCandidate = {
   manifestPath: string
   rootPath: string
   sourcePath?: string
+  scanCandidate?: RepoScanPluginCandidate
 }
 
 export type DetectorInput = {
@@ -36,8 +37,8 @@ export function slugifySignalId(value: string) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
 }
 
 export function titleFromPath(path: string) {

@@ -19,6 +19,7 @@ describe('artifact selectors', () => {
       selector: 'skill:review',
     })
     expect(formatArtifactSelector('mcp', 'GitHub')).toBe('mcp:github')
+    expect(formatArtifactSelector('skill', 'regenrek.qa-single')).toBe('skill:regenrek.qa-single')
   })
 
   it('rejects ambiguous bare selectors and unsupported kinds', () => {

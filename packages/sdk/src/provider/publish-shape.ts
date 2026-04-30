@@ -1,4 +1,4 @@
-import type { RepoScanReport } from '../repo-scan/types'
+import type { RepoScanPluginCandidate, RepoScanReport } from '../repo-scan/types'
 import type { ArtifactClosure, ArtifactClosureStatus, ArtifactFileDigest, ExtractedArtifact } from './extract-artifacts'
 import { extractArtifactsFromRepoScan } from './extract-artifacts'
 import { formatArtifactSelector, parseArtifactSelector, type ArtifactKind, type SelectableArtifactKind } from './artifact-kinds'
@@ -23,13 +23,7 @@ export type SubmitSource = {
   subdir?: string
 }
 
-export type PublishPluginCandidate = {
-  artifactId: string
-  version?: string
-  sourcePath: string
-  manifestPath: string
-  files: ArtifactFileDigest[]
-}
+export type PublishPluginCandidate = RepoScanPluginCandidate
 
 export type PublishArtifact = Pick<
   ExtractedArtifact,
@@ -115,7 +109,7 @@ export type SubmitPublishPayload = {
 
 export type BuildPublishScanResultInput = {
   source: SubmitSource
-  report: Pick<RepoScanReport, 'signals' | 'digest'>
+  report: Pick<RepoScanReport, 'signals' | 'digest'> & Partial<Pick<RepoScanReport, 'pluginCandidates'>>
   scannerVersion: string
   treeSha?: string
   pluginCandidate?: PublishPluginCandidate
@@ -149,13 +143,14 @@ export function buildPublishScanResult(input: BuildPublishScanResultInput): Publ
   const artifacts = extractArtifactsFromRepoScan(input.report)
     .map((artifact) => publishArtifactFromExtracted(artifact, closures.get(artifact.selector)))
     .sort((left, right) => left.selector.localeCompare(right.selector))
+  const pluginCandidate = input.pluginCandidate ?? pluginCandidateFromReport(input.report)
 
   return {
     scannerVersion: input.scannerVersion,
     scanDigest: input.report.digest,
     ...(input.treeSha ? { treeSha: input.treeSha } : {}),
     source: input.source,
-    ...(input.pluginCandidate ? { pluginCandidate: normalizePluginCandidate(input.pluginCandidate) } : {}),
+    ...(pluginCandidate ? { pluginCandidate: normalizePluginCandidate(pluginCandidate) } : {}),
     artifacts,
     warnings: [...new Set(input.warnings ?? [])].sort(),
     skipped: [...(input.skipped ?? [])].sort((left, right) => left.path.localeCompare(right.path)),
@@ -318,6 +313,11 @@ function normalizePluginCandidate(candidate: PublishPluginCandidate): PublishPlu
     ...candidate,
     files: [...candidate.files].sort((left, right) => left.path.localeCompare(right.path)),
   }
+}
+
+function pluginCandidateFromReport(report: Pick<RepoScanReport, 'signals' | 'digest'> & Partial<Pick<RepoScanReport, 'pluginCandidates'>>) {
+  const candidates = report.pluginCandidates ?? []
+  return candidates.length === 1 ? candidates[0] : undefined
 }
 
 function artifactsBySelector(

@@ -41,4 +41,33 @@ describe('scanRepo', () => {
     expect(skillsOnly[0].kind).toBe('skill')
     expect(report.digest).toMatch(/^[a-f0-9]{64}$/)
   })
+
+  it('lifts root AgentRig plugin identity into scan plugin candidates', async () => {
+    const tree = createMemoryTree({
+      '.plugin/plugin.json': JSON.stringify({
+        kind: 'agentrig:plugin',
+        id: 'regenrek.test-submission',
+        name: 'Test Submission',
+        description: 'Reference plugin.',
+        version: '0.2.0',
+        configSchema: {},
+      }),
+      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+    })
+
+    const report = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
+
+    expect(report.pluginCandidates).toEqual([
+      {
+        artifactId: 'regenrek.test-submission',
+        version: '0.2.0',
+        sourcePath: '.',
+        manifestPath: '.plugin/plugin.json',
+        files: expect.arrayContaining([
+          expect.objectContaining({ path: '.plugin/plugin.json' }),
+          expect.objectContaining({ path: 'skills/review/SKILL.md' }),
+        ]),
+      },
+    ])
+  })
 })

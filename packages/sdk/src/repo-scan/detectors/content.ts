@@ -37,7 +37,14 @@ const hookMatcherSchema = z
     hooks: z.array(hookCommandSchema).min(1),
   })
   .passthrough()
-const hooksSchema = z.record(z.string(), z.array(hookMatcherSchema).min(1)).refine((hooks) => Object.keys(hooks).length > 0)
+const hooksMapSchema = z.record(z.string(), z.array(hookMatcherSchema).min(1)).refine((hooks) => Object.keys(hooks).length > 0)
+const hooksSchema = z.union([
+  hooksMapSchema,
+  z.object({ hooks: hooksMapSchema }).passthrough(),
+])
+const standaloneHookManifestSchema = z.object({
+  kind: z.literal('agentrig:hook'),
+}).passthrough()
 const codexAppSchema = z
   .object({
     interface: z.unknown().optional(),
@@ -225,6 +232,13 @@ export async function detectJsonConfigs(input: DetectorInput): Promise<Signal[]>
       signals.push(jsonSignal(input, path, 'hook', 'Hooks', 1))
       continue
     }
+    if (
+      relatives.some((relativePath) => relativePath === '.hook/hook.json' || relativePath.endsWith('/.hook/hook.json')) &&
+      standaloneHookManifestSchema.safeParse(raw).success
+    ) {
+      signals.push(jsonSignal(input, path, 'hook', 'Hook Manifest', 1))
+      continue
+    }
     if (relatives.some((relativePath) => relativePath === '.lsp.json') && claudeLspSchema.safeParse(raw).success) {
       signals.push(jsonSignal(input, path, 'lsp', 'Claude LSP', 0.9))
       continue
@@ -246,7 +260,7 @@ export async function detectJsonConfigs(input: DetectorInput): Promise<Signal[]>
 function jsonSignal(input: DetectorInput, path: string, kind: Signal['kind'], title: string, score: number) {
   return createSignal({
     kind,
-    id: idFromPath(path),
+    id: kind === 'hook' ? 'hooks' : idFromPath(path),
     title,
     sourcePath: path,
     files: filesForExact(input.files, path),

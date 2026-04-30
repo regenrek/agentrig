@@ -29,6 +29,10 @@ Each pick uses `<kind>:<name>`. Supported selection kinds are:
 - `mcp`
 - `hook`
 
+Selector names are canonicalized to lowercase; dots, hyphens, and underscores in
+manifest names are preserved, so `regenrek.qa-single` becomes
+`skill:regenrek.qa-single`.
+
 If every pick has the same kind, you can use the kind-specific helper:
 
 ```bash

@@ -44,13 +44,27 @@ describe('artifact extraction', () => {
     const tree = createMemoryTree({
       'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
       '.mcp.json': JSON.stringify({ mcpServers: { fs: { command: 'node' } } }),
+      'hooks/hooks.json': JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo ok' }] }] } }),
       'README.md': '# Repo',
     })
     const scan = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
     const artifacts = extractArtifactsFromRepoScan(scan)
 
-    expect(artifacts.map((artifact) => artifact.selector)).toEqual(['mcp:mcp', 'skill:review'])
-    expect(artifacts[0].origin).toBe('standalone')
+    expect(artifacts.map((artifact) => artifact.selector)).toEqual(['hook:hooks', 'mcp:mcp', 'skill:review'])
+    expect(artifacts.find((artifact) => artifact.selector === 'hook:hooks')).toMatchObject({
+      origin: 'standalone',
+      sourcePath: 'hooks/hooks.json',
+    })
+  })
+
+  it('preserves dotted skill names in canonical selectors', async () => {
+    const tree = createMemoryTree({
+      'skills/qa-single/SKILL.md': '---\nname: regenrek.qa-single\ndescription: QA skill.\n---\nBody',
+    })
+    const scan = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
+    const artifacts = extractArtifactsFromRepoScan(scan)
+
+    expect(artifacts.map((artifact) => artifact.selector)).toEqual(['skill:regenrek.qa-single'])
   })
 
   it('attaches only selector-scoped dependencies to bundled artifacts', () => {
@@ -72,6 +86,19 @@ describe('artifact extraction', () => {
       { kind: 'mcp', selector: 'mcp:github' },
     ])
     expect(artifacts.find((artifact) => artifact.selector === 'skill:other')?.dependencies).toEqual([])
+  })
+
+  it('extracts standalone hook manifest groups from plugin locks', () => {
+    const artifacts = extractArtifactsFromPluginLock({
+      plugin: 'agentrig.core',
+      version: '1.0.0',
+      snapshot_digest: 'sha256:snapshot',
+      file_digests: [
+        { path: 'hooks/guard/.hook/hook.json', digest: 'sha256:hook-manifest' },
+      ],
+    })
+
+    expect(artifacts.map((artifact) => artifact.selector)).toEqual(['hook:guard'])
   })
 })
 

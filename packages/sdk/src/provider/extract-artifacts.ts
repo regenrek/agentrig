@@ -242,6 +242,13 @@ function mcpGroup(path: string) {
 
 function hookGroup(path: string) {
   if (path === 'hooks.json') return { kind: 'hook' as const, name: 'hooks', sourcePath: path }
+  const parts = path.split('/')
+  const manifestIndex = parts.findIndex((part) => part === '.hook')
+  if (manifestIndex >= 0 && parts[manifestIndex + 1] === 'hook.json') {
+    const sourcePath = parts.slice(0, manifestIndex).join('/') || '.hook'
+    const name = parts[manifestIndex - 1] ?? 'hook'
+    return { kind: 'hook' as const, name, sourcePath }
+  }
   if (path === 'hooks/hooks.json' || path.startsWith('hooks/')) {
     return { kind: 'hook' as const, name: 'hooks', sourcePath: 'hooks' }
   }
@@ -268,7 +275,9 @@ function addGroupFile(
 function isCompleteLockGroup(group: { kind: SelectableArtifactKind; sourcePath: string; paths: string[] }) {
   if (group.kind === 'skill') return group.paths.includes(`${group.sourcePath}/SKILL.md`)
   if (group.kind === 'mcp') return group.paths.length > 0
-  if (group.kind === 'hook') return group.paths.some((path) => path === 'hooks.json' || path === 'hooks/hooks.json')
+  if (group.kind === 'hook') {
+    return group.paths.some((path) => path === 'hooks.json' || path === 'hooks/hooks.json' || path.endsWith('/.hook/hook.json'))
+  }
   return group.paths.length > 0
 }
 
