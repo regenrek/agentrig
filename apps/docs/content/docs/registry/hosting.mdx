@@ -49,3 +49,14 @@ Start any static server at the registry root and add it as a registry:
 agentrig registry add example https://example.com/registry
 agentrig plugin install codex example/acme.infra-safety@1.4.2
 ```
+
+For Marketplace QA smoke tests, use a separate staging registry alias and repo,
+not the production `agentrig` alias:
+
+```bash
+agentrig registry add agentrig-staging https://raw.githubusercontent.com/agentrig/agentrig-registry-staging/main
+agentrig plugin install codex agentrig-staging/regenrek.test-submission
+```
+
+Test fixture namespaces such as `regenrek.test-*`, `test-*`, and `qa-*` must stay
+out of the production registry.

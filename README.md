@@ -86,6 +86,10 @@ agentrig list --available --registry georg
 agentrig plugin install cursor georg/georg.ts-master-plugin
 ```
 
+Marketplace QA fixtures belong in a separate staging registry alias such as
+`agentrig-staging`; never publish `regenrek.test-*`, `test-*`, or `qa-*`
+fixtures to the production `agentrig` registry.
+
 ## Create a plugin
 
 ```bash

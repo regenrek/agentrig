@@ -46,6 +46,21 @@ AI does not change this boundary. CLI enrichment is local BYOK only, and web-hos
 enrichment produces draft fields that require admin acceptance before they can enter
 a submitted manifest.
 
+## QA and staging registries
+
+Manual smoke tests that install fixture artifacts must use a non-production
+registry alias such as `agentrig-staging` or `agentrig-dev`:
+
+```bash
+agentrig registry add agentrig-staging https://raw.githubusercontent.com/agentrig/agentrig-registry-staging/main
+agentrig list --available --registry agentrig-staging
+agentrig plugin install codex agentrig-staging/regenrek.test-submission
+```
+
+Never publish or install `regenrek.test-*`, `test-*`, or `qa-*` fixtures through
+the production `agentrig` registry alias. Production examples should keep using
+real latest-first refs such as `agentrig/agentrig.core-committer`.
+
 ## Options
 
 - `--cwd <path>` - working directory.
