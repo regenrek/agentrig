@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.8.26",
-    "zod": "^4.3.6"
+    "zod": "^4.4.2"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

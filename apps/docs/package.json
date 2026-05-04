@@ -10,7 +10,7 @@
     "destroy": "alchemy destroy"
   },
   "dependencies": {
-    "@base-ui/react": "^1.4.0",
+    "@base-ui/react": "^1.4.1",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@iconify/react": "latest",
     "@tanstack/react-query": "latest",
@@ -23,7 +23,7 @@
     "fumadocs-core": "latest",
     "fumadocs-mdx": "latest",
     "fumadocs-ui": "latest",
-    "lucide-react": "^1.8.0",
+    "lucide-react": "^1.14.0",
     "motion": "^12.38.0",
     "react": "19.2.5",
     "react-dom": "19.2.5",
