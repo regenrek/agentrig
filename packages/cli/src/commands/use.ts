@@ -1,21 +1,32 @@
-import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { createInterface } from 'node:readline/promises'
 import { pathToFileURL } from 'node:url'
 import { defineCommand, showUsage } from 'citty'
-import { materializePlugin, scanRepo, type RepoScanSource, type Signal } from '@agentrig/sdk'
+import {
+  buildExternalSelectionBundle,
+  materializePlugin,
+  scanRepo,
+  type ExternalRepoSelectionSource,
+  type RepoScanSource,
+  type Signal,
+} from '@agentrig/sdk'
 import { enrichWithLocalAi } from '../lib/enrich/local'
-import { getAgentRigHome } from '../lib/paths'
-import { installPluginProviders, parsePluginInstallScopeSelector, parsePluginProviderSelector } from '../lib/plugin-providers'
+import {
+  parsePluginInstallScopeSelector,
+  parsePluginProviderSelector,
+  resolveInstallScope,
+  resolvePluginProviders,
+} from '../lib/plugin-providers'
+import { installExternalRepoSelection } from '../lib/artifact-selection-install'
 import { resolveRepoSource } from '../lib/repo-source'
 import type { PluginInstallSpecIdentity } from '../lib/types'
 
 const command = defineCommand({
   meta: {
     name: 'use',
-    description: 'Pick repo signals and materialize them as an AgentRig plugin.',
+    description: 'Pick repo artifacts and install them or materialize them as an AgentRig plugin.',
   },
   args: {
     source: {
@@ -75,7 +86,7 @@ const command = defineCommand({
     },
     install: {
       type: 'boolean',
-      description: 'Install picked signals through existing provider installers',
+      description: 'Install picked artifacts through the external-repo Selection Bundle path',
       default: false,
     },
     help: {
@@ -122,6 +133,57 @@ const command = defineCommand({
         })
         : undefined
       const pluginId = asPlugin ? String(asPlugin) : enrichment?.suggestedPluginId ?? deriveInstallPluginId(report.source.label)
+      const installRequested = Boolean(args.install)
+      if (installRequested) {
+        const selectedSourcePaths = pickedSignals.map((signal) => signal.sourcePath)
+        const specIdentity = buildExternalRepoIdentity({
+          pluginId,
+          version: '0.1.0',
+          sourceLabel: report.source.label,
+          ref: report.source.ref,
+          commitSha: report.source.commitSha,
+          subdir: report.source.subdir,
+          scanDigest: report.digest,
+          pickedSignalPaths: selectedSourcePaths,
+        })
+        const requestedScope = parsePluginInstallScopeSelector(String(args.scope ?? 'auto'))
+        const results = []
+        for (const provider of resolvePluginProviders(parsePluginProviderSelector(String(args.provider ?? 'all')))) {
+          const scope = resolveInstallScope(provider, requestedScope)
+          const { bundle } = await buildExternalSelectionBundle({
+            tree: resolved.tree,
+            report,
+            selectedSourcePaths,
+            provider,
+            scope,
+            source: buildExternalSelectionSource(report.source, report.digest),
+          })
+          results.push(await installExternalRepoSelection({
+            sourceKind: 'external-repo-scan',
+            cwd: process.cwd(),
+            provider,
+            requestedScope,
+            scope,
+            tree: resolved.tree,
+            bundle,
+            specIdentity,
+            pluginId,
+            pluginVersion: '0.1.0',
+            snapshotDigest: report.digest,
+            force: Boolean(args.force),
+            dryRun,
+          }))
+        }
+        console.log(`${dryRun ? 'Would install' : 'Installed'} selection: ${pluginId}`)
+        for (const result of results) {
+          const targets = [
+            ...result.installedFiles.map((file) => file.path),
+            ...result.jsonWrites.map((write) => `${write.path}:${write.keyPath}`),
+          ]
+          console.log(`- ${result.record.provider} ${result.record.scope}: ${targets.join(', ') || 'no changes'}`)
+        }
+        return
+      }
       const files = await materializePlugin({
         tree: resolved.tree,
         pickedSignals,
@@ -140,10 +202,7 @@ const command = defineCommand({
           },
         },
       })
-      const installRequested = Boolean(args.install)
-      const outDir = installRequested
-        ? path.join(resolveExternalCacheRoot(report.source.label, report.digest, report.source.commitSha || report.source.ref), 'plugins', pluginId)
-        : path.resolve(args.out ? String(args.out) : path.join(process.cwd(), pluginId))
+      const outDir = path.resolve(args.out ? String(args.out) : path.join(process.cwd(), pluginId))
 
       if (dryRun) {
         console.log(`Plugin: ${pluginId}`)
@@ -153,46 +212,12 @@ const command = defineCommand({
         return
       }
 
-      if (installRequested || args.force) {
+      if (args.force) {
         await fs.rm(outDir, { recursive: true, force: true })
       } else if (await pathExists(outDir)) {
         throw new Error(`Output directory already exists: ${outDir}. Re-run with --force to replace it.`)
       }
       await writeMaterializedFiles(outDir, files)
-      if (installRequested) {
-        const cacheRoot = path.dirname(path.dirname(outDir))
-        const specIdentity = buildExternalRepoIdentity({
-          pluginId,
-          version: '0.1.0',
-          sourceLabel: report.source.label,
-          ref: report.source.ref,
-          commitSha: report.source.commitSha,
-          subdir: report.source.subdir,
-          scanDigest: report.digest,
-          pickedSignalPaths: pickedSignals.map((signal) => signal.sourcePath),
-        })
-        const results = await installPluginProviders({
-          cwd: process.cwd(),
-          agent: parsePluginProviderSelector(String(args.provider ?? 'all')),
-          pluginsDir: path.dirname(outDir),
-          out: path.join(cacheRoot, 'providers'),
-          clean: true,
-          scope: parsePluginInstallScopeSelector(String(args.scope ?? 'auto')),
-          force: Boolean(args.force),
-          dryRun: false,
-          installMetadataByPluginId: {
-            [pluginId]: {
-              specIdentity,
-              snapshotDigest: digestMaterializedFiles(files),
-            },
-          },
-        })
-        console.log(`Installed plugin: ${pluginId}`)
-        for (const result of results) {
-          console.log(`- ${result.provider} ${result.scope}: ${result.installed.join(', ') || 'no changes'}`)
-        }
-        return
-      }
       console.log(`Plugin ready: ${outDir}`)
       console.log(`Signals: ${pickedSignals.length}/${report.signals.length}`)
       console.log(`Digest: ${report.digest}`)
@@ -322,12 +347,19 @@ function sourceReferenceForManifest(source: RepoScanSource) {
   return { repoUrl: source.label }
 }
 
-function resolveExternalCacheRoot(sourceLabel: string, scanDigest: string, revision?: string) {
-  const repo = parseGitHubSource(sourceLabel)
-  const owner = sanitizePathSegment(repo?.owner ?? 'local')
-  const name = sanitizePathSegment(repo?.repo ?? slugFromSource(sourceLabel))
-  const rev = sanitizePathSegment(revision ?? scanDigest)
-  return path.join(getAgentRigHome(), '.agentrig', 'cache', 'external', owner, name, rev)
+function buildExternalSelectionSource(source: RepoScanSource, scanDigest: string): ExternalRepoSelectionSource {
+  const repo = parseGitHubSource(source.label)
+  return {
+    kind: 'external-repo-scan',
+    sourceLabel: source.label,
+    repoUrl: repo?.repoUrl ?? (source.type === 'local' && path.isAbsolute(source.label) ? pathToFileURL(source.label).href : source.label),
+    owner: repo?.owner,
+    repo: repo?.repo,
+    ref: source.ref,
+    commitSha: source.commitSha,
+    subdir: source.subdir,
+    scanDigest,
+  }
 }
 
 function parseGitHubSource(sourceLabel: string) {
@@ -371,17 +403,6 @@ async function pathExists(target: string) {
 
 function stripGitSuffix(repoName: string) {
   return repoName.endsWith('.git') ? repoName.slice(0, -4) : repoName
-}
-
-function digestMaterializedFiles(files: Awaited<ReturnType<typeof materializePlugin>>) {
-  const hash = createHash('sha256')
-  for (const file of [...files].sort((left, right) => left.path.localeCompare(right.path))) {
-    hash.update(file.path)
-    hash.update('\0')
-    hash.update(file.bytes)
-    hash.update('\0')
-  }
-  return hash.digest('hex')
 }
 
 export default command

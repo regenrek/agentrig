@@ -170,18 +170,21 @@ describe('commands: inspect/use', () => {
     })
 
     const ledger = JSON.parse(await fs.readFile(path.join(cwd, '.agentrig', 'plugin-installs.json'), 'utf-8')) as {
-      installs: Record<string, { specIdentity: { kind: string; repoUrl?: string; scanDigest: string; pickedSignalPaths: string[] }; registry?: unknown }>
+      installs: Record<string, unknown>
+      selections: Record<string, { specIdentity: { kind: string; repoUrl?: string; scanDigest: string; pickedSignalPaths: string[] }; registry?: unknown; selectedSelectors: string[] }>
     }
-    const record = ledger.installs['cursor:workspace:agentrig-community.review']
+    expect(ledger.installs).toEqual({})
+    const record = Object.values(ledger.selections)[0]
     expect(record.specIdentity).toMatchObject({
       kind: 'external-repo',
       repoUrl: pathToFileURL(fixture).href,
       pickedSignalPaths: ['skills/review'],
     })
     expect(record.registry).toBeUndefined()
+    expect(record.selectedSelectors).toEqual(['skill:review'])
     expect(record.specIdentity.scanDigest).toMatch(/^[a-f0-9]{64}$/)
     await expect(
-      fs.readFile(path.join(cwd, '.cursor', 'plugins', 'local', 'agentrig-community.review', 'skills', 'review', 'SKILL.md'), 'utf-8')
+      fs.readFile(path.join(cwd, '.cursor', 'skills', 'review', 'SKILL.md'), 'utf-8')
     ).resolves.toContain('Reviews code.')
   })
 
@@ -214,12 +217,11 @@ describe('commands: inspect/use', () => {
     })
 
     await expect(
-      fs.readFile(path.join(agentrigHome, '.cursor', 'plugins', 'local', 'agentrig-external.repo', 'skills', 'review', 'SKILL.md'), 'utf-8')
+      fs.readFile(path.join(agentrigHome, '.cursor', 'skills', 'review', 'SKILL.md'), 'utf-8')
     ).resolves.toContain('Reviews code.')
     await expect(
       fs.readFile(path.join(agentrigHome, '.agentrig', 'plugin-installs.json'), 'utf-8')
     ).resolves.toContain('external.repo')
-    await expect(fs.stat(path.join(agentrigHome, '.agentrig', 'cache', 'external'))).resolves.toBeTruthy()
     await expect(fs.stat(path.join(realHome, '.cursor'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(fs.stat(path.join(realHome, '.agentrig'))).rejects.toMatchObject({ code: 'ENOENT' })
   })

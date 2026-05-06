@@ -265,7 +265,11 @@ function outputsForShape(
       : []
   }
   if (shape === 'plugin_selected') {
-    return [{ kind: 'plugin', artifactId: scan.pluginCandidate?.artifactId, installability: allowed ? 'installable' : 'blocked' }]
+    return [{
+      kind: 'plugin',
+      artifactId: scan.pluginCandidate?.artifactId ?? fallbackPluginArtifactId(scan.source),
+      installability: allowed ? 'installable' : 'blocked',
+    }]
   }
   if (shape === 'standalone_artifacts') {
     return selectedArtifacts.map((artifact) => ({
@@ -334,6 +338,22 @@ function artifactsBySelector(
 
 function defaultSelectedSelectors(scan: PublishScanResult) {
   return scan.artifacts.map((artifact) => formatArtifactSelector(artifact.kind as SelectableArtifactKind, artifact.name))
+}
+
+function fallbackPluginArtifactId(source: SubmitSource) {
+  const owner = safeArtifactIdSegment(source.owner)
+  const repo = safeArtifactIdSegment(source.repo)
+  if (!owner || !repo) throw new Error('Generated plugin publishing requires source owner and repo.')
+  return `${owner}.${repo}`
+}
+
+function safeArtifactIdSegment(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/--+/g, '-')
 }
 
 function assertSubmitSource(source: SubmitSource) {

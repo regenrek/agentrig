@@ -170,13 +170,13 @@ export async function detectArtifactClosure(
     }
   }
 
-  const parentReferences = await findParentPathReferences(tree, artifact.fileDigests.map((file) => file.path))
-  if (parentReferences.length) {
+  const externalReferences = await findExternalPathReferences(tree, artifact.fileDigests.map((file) => file.path))
+  if (externalReferences.length) {
     return {
       selector: artifact.selector,
       status: 'requires-full-source',
       requiredSelectors: [],
-      requiredPaths: parentReferences,
+      requiredPaths: externalReferences,
       reason: 'Selected artifact references paths outside its artifact root.',
     }
   }
@@ -344,12 +344,12 @@ function isWithinSourcePath(path: string, sourcePath: string) {
   return normalizedPath === normalizedSource || normalizedPath.startsWith(`${normalizedSource}/`)
 }
 
-async function findParentPathReferences(tree: VirtualTree, paths: string[]) {
+async function findExternalPathReferences(tree: VirtualTree, paths: string[]) {
   const matches = new Set<string>()
   for (const path of paths) {
     const text = await tree.readText(normalizeVirtualPath(path))
     if (!text) continue
-    if (/(^|["'\s])\.\.\/[A-Za-z0-9_.\-/]+/.test(text)) {
+    if (/(^|["'\s])\.\.\/[A-Za-z0-9_.\-/]+/.test(text) || /\$\{(?:PLUGIN_ROOT|CLAUDE_PLUGIN_ROOT)\}\/[A-Za-z0-9_.\-/]+/.test(text)) {
       matches.add(path)
     }
   }

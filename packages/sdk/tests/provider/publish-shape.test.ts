@@ -157,6 +157,10 @@ describe('publish shape primitives', () => {
       shape: 'plugin_selected',
       selectedSelectors: ['skill:review'],
     })
+    expect(payload.scan.pluginCandidate).toBeUndefined()
+    expect(buildPublishShapeCandidates(scan, ['skill:review']).find((candidate) => candidate.shape === 'plugin_selected')?.produces).toEqual([
+      { kind: 'plugin', artifactId: 'acme.tools', installability: 'installable' },
+    ])
   })
 
   it('rejects duplicate and unknown selected selectors', async () => {

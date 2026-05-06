@@ -89,22 +89,40 @@ export async function detectSkills(input: DetectorInput): Promise<Signal[]> {
   const signals: Signal[] = []
   for (const file of input.files) {
     const path = normalizeVirtualPath(file.path)
-    if (virtualBasename(path) !== 'SKILL.md') continue
+    if (virtualBasename(path) === 'SKILL.md') {
+      const text = await input.tree.readText(path)
+      const frontmatter = parseFrontmatter(text ?? '')
+      const sourcePath = virtualDirname(path)
+      if (!sourcePath) continue
 
-    const text = await input.tree.readText(path)
-    const frontmatter = parseFrontmatter(text)
+      const title = frontmatter?.name ?? titleFromPath(sourcePath)
+      const description = frontmatter?.description ?? markdownDescription(text)
+      signals.push(
+        createSignal({
+          kind: 'skill',
+          id: slugifySignalId(title),
+          title,
+          ...(description ? { description } : {}),
+          sourcePath,
+          files: filesForPrefix(input.files, sourcePath),
+          score: frontmatter?.name && frontmatter.description ? 1 : 0.85,
+        })
+      )
+      continue
+    }
+
+    if (!isStandaloneMarkdownSkillPath(path)) continue
+    const frontmatter = parseFrontmatter(await input.tree.readText(path))
     if (!frontmatter?.name || !frontmatter.description) continue
-
-    const sourcePath = virtualDirname(path)
     signals.push(
       createSignal({
         kind: 'skill',
         id: slugifySignalId(frontmatter.name),
         title: frontmatter.name,
         description: frontmatter.description,
-        sourcePath,
-        files: filesForPrefix(input.files, sourcePath),
-        score: 1,
+        sourcePath: path,
+        files: filesForExact(input.files, path),
+        score: 0.9,
       })
     )
   }
@@ -295,6 +313,34 @@ function parseFrontmatter(text: string | null): Frontmatter | undefined {
     if (value) fields[key] = value
   }
   return Object.keys(fields).length > 0 ? fields : undefined
+}
+
+function isStandaloneMarkdownSkillPath(path: string) {
+  if (!path.endsWith('.md') && !path.endsWith('.mdx')) return false
+  const basename = virtualBasename(path)
+  if (basename === 'README.md' || basename === 'SKILL.md') return false
+  return path.split('/').includes('skills')
+}
+
+function markdownDescription(text: string | null) {
+  const body = stripFrontmatter(text ?? '')
+  const paragraph = body
+    .split(/\n{2,}/)
+    .map((block) => block
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#') && !line.startsWith('```'))
+      .join(' ')
+      .trim())
+    .find(Boolean)
+  return paragraph ? paragraph.replace(/\s+/g, ' ').slice(0, 240) : undefined
+}
+
+function stripFrontmatter(text: string) {
+  const normalizedText = text.replace(/\r\n/g, '\n')
+  if (!normalizedText.startsWith('---\n')) return normalizedText
+  const end = normalizedText.indexOf('\n---', 4)
+  return end === -1 ? normalizedText : normalizedText.slice(end + 4)
 }
 
 function isAgentDefinitionPath(path: string) {
