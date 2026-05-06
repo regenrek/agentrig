@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
-import { homedir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { createInterface } from 'node:readline/promises'
@@ -8,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 import { defineCommand, showUsage } from 'citty'
 import { materializePlugin, scanRepo, type RepoScanSource, type Signal } from '@agentrig/sdk'
 import { enrichWithLocalAi } from '../lib/enrich/local'
+import { getAgentRigHome } from '../lib/paths'
 import { installPluginProviders, parsePluginInstallScopeSelector, parsePluginProviderSelector } from '../lib/plugin-providers'
 import { resolveRepoSource } from '../lib/repo-source'
 import type { PluginInstallSpecIdentity } from '../lib/types'
@@ -327,7 +327,7 @@ function resolveExternalCacheRoot(sourceLabel: string, scanDigest: string, revis
   const owner = sanitizePathSegment(repo?.owner ?? 'local')
   const name = sanitizePathSegment(repo?.repo ?? slugFromSource(sourceLabel))
   const rev = sanitizePathSegment(revision ?? scanDigest)
-  return path.join(homedir(), '.agentrig', 'cache', 'external', owner, name, rev)
+  return path.join(getAgentRigHome(), '.agentrig', 'cache', 'external', owner, name, rev)
 }
 
 function parseGitHubSource(sourceLabel: string) {

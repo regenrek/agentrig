@@ -1,5 +1,4 @@
 import { promises as fs } from 'node:fs'
-import { homedir } from 'node:os'
 import path from 'node:path'
 import {
   assertSelectionBundleInstallable,
@@ -16,6 +15,7 @@ import {
 import { createLocalFsVirtualTree } from '@agentrig/sdk/fs-adapters/local-fs'
 import { ensureDir, pathExists, readJsonFile, writeJsonFile } from './fs'
 import { sha256Hex } from './hash'
+import { getAgentRigHome } from './paths'
 import {
   getResolvedPluginSpecIdentity,
   getResolvedRegistryArtifactSpecIdentity,
@@ -245,12 +245,12 @@ async function resolveSelectedArtifacts(pluginDir: string, artifacts: ExtractedA
 
 function resolveSelectionRoot(cwd: string, provider: SelectionProviderId, scope: PluginInstallScopeName) {
   if (provider === 'claude') {
-    return scope === 'workspace' ? path.join(cwd, '.claude') : path.join(homedir(), '.claude')
+    return scope === 'workspace' ? path.join(cwd, '.claude') : path.join(getAgentRigHome(), '.claude')
   }
   if (provider === 'codex') {
-    return scope === 'workspace' ? path.join(cwd, '.codex') : path.join(homedir(), '.codex')
+    return scope === 'workspace' ? path.join(cwd, '.codex') : path.join(getAgentRigHome(), '.codex')
   }
-  return scope === 'workspace' ? cwd : homedir()
+  return scope === 'workspace' ? cwd : getAgentRigHome()
 }
 
 async function installSelectionFiles(

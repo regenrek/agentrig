@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+- Added a unified submit-source resolver for `agentrig plugin submit` and `agentrig {skill,mcp,hook} submit` that accepts a local plugin path, `owner/repo@tag` shorthand, or GitHub URL plus `--version`/`--path`, replacing the four-flag `--upstreamRepo`/`--upstreamTag`/`--upstreamCommitSha`/`--pluginPath` form on the public CLI.
+- Added `@agentrig/sdk/fs-adapters/tar-tree` plus exported `repo-scan/source-policy` and `repo-scan/version` so consumers can scan tarball-backed sources and apply SDK-owned source-policy and scanner-version metadata.
+- Added `AGENTRIG_HOME` override across CLI install paths (global config, plugin install ledger, Codex/Cursor personal scopes, selection installs, external scan cache, provider command runners) so test runs and isolated installs can redirect home-scoped reads and writes.
+
+### Changed
+- `agentrig plugin uninstall` now accepts AgentRig-managed external plugin ids and names alongside canonical registry refs so consumers can uninstall external plugins by the id printed at install time.
+- Claude marketplace manifests now reference the explicit `<pluginRoot>/<pluginName>` path instead of the bare plugin name so Claude resolves the bundled plugin location reliably.
+- Repo source resolution now downloads via the resolved GitHub commit URL, normalizes explicit subdirs, and exposes injectable `fetch`/`downloadTemplate` seams for testing.
+- Submission and uploads docs now describe the resolved-source CLI flow (`agentrig plugin submit owner/repo@v1.2.3`, `--version`, `--path`) and the matching skill/MCP/hook submit forms.
+
+### Fixed
+- Trusted-publishing submissions in GitHub Actions now derive their source from `GITHUB_REPOSITORY@GITHUB_REF` plus `GITHUB_SHA`, going through the same resolver as interactive submits instead of constructing four separate canonical fields.
+
 ## [0.6.0] - 2026-04-28
 
 ### Added

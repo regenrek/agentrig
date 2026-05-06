@@ -6,21 +6,36 @@ icon: Upload
 
 # Submission contract
 
-Use AgentRig to submit one canonical upstream snapshot for review:
+Use AgentRig to submit one pinned upstream snapshot for review:
 
 ```bash
 agentrig login
-agentrig plugin submit \
-  --upstreamRepo https://github.com/owner/repo \
-  --upstreamTag v1.2.3 \
-  --upstreamCommitSha 1234567890abcdef1234567890abcdef12345678 \
-  --pluginPath .
+agentrig plugin submit owner/repo@v1.2.3
 ```
 
-`agentrig plugin submit` creates a review submission from a single pinned upstream source.
-Use `--pluginPath .` when `.plugin/plugin.json` lives at the upstream repo root;
-use a relative subdirectory such as `plugin` when the plugin lives below the
-root.
+`agentrig plugin submit` creates a review submission from one resolved source.
+The source can be a tagged local checkout, a GitHub shorthand, or a GitHub repo
+URL plus a version tag:
+
+```bash
+agentrig plugin submit . --version v1.2.3
+agentrig plugin submit owner/repo@v1.2.3
+agentrig plugin submit https://github.com/owner/repo --version v1.2.3
+```
+
+If the plugin lives below the repo root, pass its repo-relative path:
+
+```bash
+agentrig plugin submit owner/repo@v1.2.3 --path plugin
+```
+
+Skill, MCP, and hook submissions use the same source shape:
+
+```bash
+agentrig skill submit owner/repo@v1.2.3 --path skills/review
+agentrig mcp submit owner/repo@v1.2.3 --path mcps/github
+agentrig hook submit owner/repo@v1.2.3 --path hooks/pre-submit
+```
 
 To check review progress later:
 
@@ -34,7 +49,7 @@ You can also pass a submission id directly:
 agentrig plugin status <submission-id>
 ```
 
-The web submission UI at `/submit` uses the same canonical backend contract.
+The web submission UI at `/submit` uses the same resolved provenance model.
 
 ## What happens after submission
 
@@ -58,23 +73,18 @@ A submission can support:
 
 It does **not** make author repos, ZIPs, arbitrary URLs, or Convex-hosted payloads installable.
 
-## Canonical input
+## Source rules
 
-Submission accepts exactly these origin fields:
-
-- `upstream_repo`
-- `upstream_tag`
-- `upstream_commit_sha`
-- `plugin_path`
+AgentRig resolves every source to one pinned repo, tag, commit, and repo-relative
+plugin path.
 
 Rules:
 
-- `upstream_repo` must be an allowed canonical repo URL.
-- `upstream_tag` must resolve to `upstream_commit_sha`.
-- `upstream_commit_sha` must be a full 40-character commit SHA.
-- `plugin_path` is relative to the upstream repo root. `.` is valid for a root
+- GitHub sources must resolve through a real Git tag.
+- Branch names, raw commit SHAs, `latest`, floating refs, ZIP uploads, and
+  alternate GitHub URL shapes are not valid submission inputs.
+- `--path` is always relative to the source repo root. `.` is valid for a root
   plugin.
-- Branch names, `latest`, floating refs, alternate URL shapes, and ZIP uploads are not valid submission inputs.
 
 ## Validation boundary
 

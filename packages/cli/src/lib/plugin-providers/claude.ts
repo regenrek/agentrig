@@ -70,7 +70,7 @@ function buildClaudeMarketplaceManifest(
     metadata: cfg.providers.claude.metadata,
     plugins: plugins.map((plugin) => ({
       name: plugin.pluginName,
-      source: plugin.pluginName,
+      source: `${cfg.providers.claude.metadata.pluginRoot}/${plugin.pluginName}`,
       description: plugin.manifest.description,
       version: plugin.manifest.version,
       tags: plugin.manifest.keywords,

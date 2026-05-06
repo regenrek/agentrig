@@ -1,7 +1,7 @@
-import { homedir } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile, writeJsonFile } from './fs'
+import { getAgentRigHome } from './paths'
 import { codexMarketplacePluginSchema } from './plugin-providers/schemas'
 import type {
   PluginInstallLedger,
@@ -199,7 +199,7 @@ async function cutOverLegacyPluginInstallLedger(
 }
 
 export function getPluginInstallLedgerPath(cwd: string, scope: PluginInstallScopeName) {
-  const root = scope === 'workspace' ? cwd : homedir()
+  const root = scope === 'workspace' ? cwd : getAgentRigHome()
   return path.join(root, '.agentrig', 'plugin-installs.json')
 }
 

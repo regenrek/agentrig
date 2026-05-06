@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   loadAuthSession: vi.fn(),
   createPluginSubmission: vi.fn(),
   resolveCommunityBaseUrl: vi.fn(),
+  resolveSubmitSource: vi.fn(),
 }))
 
 vi.mock('../../src/lib/auth', () => ({
@@ -13,6 +14,10 @@ vi.mock('../../src/lib/auth', () => ({
 vi.mock('../../src/lib/community-api', () => ({
   createPluginSubmission: mocks.createPluginSubmission,
   resolveCommunityBaseUrl: mocks.resolveCommunityBaseUrl,
+}))
+
+vi.mock('../../src/lib/submit-source', () => ({
+  resolveSubmitSource: mocks.resolveSubmitSource,
 }))
 
 import { createArtifactKindCommand } from '../../src/commands/artifact-kind-install'
@@ -34,21 +39,31 @@ describe('command:artifact submit', () => {
       submissionId: 'submission-123',
       deduped: false,
     })
+    mocks.resolveSubmitSource.mockResolvedValue({
+      upstream_repo: 'https://github.com/acme/tools',
+      upstream_tag: 'v1.2.3',
+      upstream_commit_sha: '1234567890abcdef1234567890abcdef12345678',
+      plugin_path: 'skills/review',
+    })
   })
 
   it('routes skill submit through canonical plugin submissions', async () => {
     await run({
       args: {
         baseUrl: undefined,
-        upstreamRepo: 'https://github.com/acme/tools',
-        upstreamTag: 'v1.2.3',
-        upstreamCommitSha: '1234567890abcdef1234567890abcdef12345678',
-        artifactPath: 'skills/review',
+        source: 'acme/tools@v1.2.3',
+        version: undefined,
+        path: 'skills/review',
         dryRun: false,
         help: false,
       },
     })
 
+    expect(mocks.resolveSubmitSource).toHaveBeenCalledWith({
+      source: 'acme/tools@v1.2.3',
+      version: undefined,
+      path: 'skills/review',
+    })
     expect(mocks.createPluginSubmission).toHaveBeenCalledWith(
       'https://agentrig.ai',
       'token',
@@ -65,10 +80,9 @@ describe('command:artifact submit', () => {
     await run({
       args: {
         baseUrl: undefined,
-        upstreamRepo: 'https://github.com/acme/tools',
-        upstreamTag: 'v1.2.3',
-        upstreamCommitSha: '1234567890abcdef1234567890abcdef12345678',
-        artifactPath: 'skills/review',
+        source: 'https://github.com/acme/tools',
+        version: '1.2.3',
+        path: 'skills/review',
         dryRun: true,
         help: false,
       },
