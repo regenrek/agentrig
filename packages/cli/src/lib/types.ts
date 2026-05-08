@@ -1,8 +1,4 @@
 import type { ArtifactKind } from '@agentrig/sdk'
-import type {
-  CanonicalTrustTier,
-  InstallabilityState,
-} from './registry-contract'
 
 export type RegistryRef = {
   name: string
@@ -15,150 +11,11 @@ export type RigDefinition = {
   plugins?: string[]
 }
 
-/**
- * Directory entry for a listed registry or discovery catalog.
- */
-export type DirectoryEntry = {
-  name: string
-  homepage?: string
-  url: string
-  description?: string
-  logo?: string
-  /** Identity-only verification signal. Never treat this as install trust. */
-  verified?: boolean
-  /** Directory payloads are discovery-only. */
-  installability: 'discovery_only'
-  tags?: string[]
-  keywords?: string[]
-}
-
-export type TrustTier = CanonicalTrustTier
-export type RegistryInstallability = InstallabilityState
-
 export type AgentRigConfig = {
   $schema?: string
   registries?: RegistryRef[]
   rigs?: Record<string, RigDefinition>
   defaultRig?: string
-}
-
-export type PluginFile = {
-  /** File path in the plugin source */
-  path: string
-  /** sha256 integrity hash with algorithm prefix */
-  digest: string
-}
-
-export type RegistryVersionDependency = {
-  plugin: string
-  version: string
-}
-
-export type RegistrySignatureEnvelope = {
-  algorithm: string
-  key_id: string
-  target: string
-  signed_digest: string
-}
-
-export type RegistryVersionRecord = {
-  version: string
-  path: string
-  manifest: string
-  source: string
-  lock: string
-  review: string
-  trust_tier: TrustTier
-  installability: RegistryInstallability
-  snapshot_digest: string
-  published_at: string
-}
-
-export type RegistryHistory = {
-  $schema?: string
-  kind: ArtifactKind
-  artifact: string
-  plugin?: string
-  namespace: string
-  name: string
-  description: string
-  latest_version: string
-  trust_tier: TrustTier
-  installability: RegistryInstallability
-  active_version: RegistryVersionRecord
-  keywords?: string[]
-  advisories?: string[]
-  versions: RegistryVersionRecord[]
-}
-
-export type RegistryIndexItem = {
-  kind: ArtifactKind
-  artifact: string
-  plugin?: string
-  name: string
-  description: string
-  latest_version: string
-  history: string
-  active_version: RegistryVersionRecord
-  trust_tier: TrustTier
-  installability: RegistryInstallability
-  keywords?: string[]
-  advisories?: string[]
-}
-
-export type RegistryIndex = {
-  $schema?: string
-  contract_version: string
-  registry_alias: string
-  source_repository: string
-  generated_at: string
-  signature: RegistrySignatureEnvelope
-  items: RegistryIndexItem[]
-}
-
-export type RegistryLock = {
-  $schema?: string
-  plugin?: string
-  artifact_kind?: ArtifactKind
-  artifact_id?: string
-  version: string
-  file_digests: PluginFile[]
-  capability_set: string[]
-  declared_network_domains: string[]
-  declared_secrets: string[]
-  runtime_requirements: string[]
-  dependencies: RegistryVersionDependency[]
-  snapshot_digest: string
-}
-
-export type RegistrySource = {
-  $schema?: string
-  upstream_repo: string
-  upstream_tag: string
-  upstream_commit: string
-  plugin_path?: string
-  artifact_kind?: ArtifactKind
-  artifact_path?: string
-  submitted_by: string
-  snapshot_created_at: string
-  snapshot_tree_digest: string
-}
-
-export type RegistryReview = {
-  $schema?: string
-  review_status: string
-  reviewer: string
-  reviewed_at: string
-  scanner_summary: {
-    status: string
-    findings?: string[]
-  }
-  policy_decisions: string[]
-  trust_tier_basis: {
-    trust_tier: TrustTier
-    installability: RegistryInstallability
-    rationale: string
-  }
 }
 
 /**

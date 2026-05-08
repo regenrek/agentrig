@@ -11,7 +11,7 @@ import {
 } from './registry'
 import { validatePluginPaths } from './trust'
 import type { ResolvedPlugin, ResolvedStandaloneArtifact } from './registry'
-import type { RegistryRef, RegistryVersionDependency } from './types'
+import type { RegistryRef, RegistryVersionDependency } from '@agentrig/sdk'
 
 function resolvePluginSourcePath(pluginDir: string, relativePath: string) {
   const normalized = path.normalize(relativePath)

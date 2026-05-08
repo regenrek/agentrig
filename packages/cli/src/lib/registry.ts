@@ -1,25 +1,26 @@
 import process from 'node:process'
 import { sha256Hex } from './hash'
 import { validatePluginManifest } from './plugin-validation'
-import { INSTALLABILITY_STATES, REGISTRY_TRUST_TIERS } from './registry-contract'
 import {
+  INSTALLABILITY_STATES,
+  REGISTRY_TRUST_TIERS,
   artifactKindFromStandaloneManifest,
   parseStandaloneArtifactManifest,
   type ArtifactKind,
+  type RegistryIndex,
+  type RegistryRef,
+  type RegistryHistory,
+  type RegistryInstallability,
+  type RegistryLock,
+  type RegistryReview,
+  type RegistrySource,
+  type RegistryVersionRecord,
   type StandaloneArtifactManifest,
+  type TrustTier,
 } from '@agentrig/sdk'
 import type {
   PluginManifest,
-  RegistryIndex,
-  RegistryRef,
-  RegistryHistory,
-  RegistryInstallability,
-  RegistryLock,
-  RegistryReview,
-  RegistrySource,
-  RegistryVersionRecord,
   PluginUploadPolicySnapshot,
-  TrustTier,
 } from './types'
 
 export const OFFICIAL_REGISTRY_ALIAS = 'agentrig'

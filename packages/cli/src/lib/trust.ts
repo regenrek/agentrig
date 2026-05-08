@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { RegistryInstallability, TrustTier } from './types'
+import type { RegistryInstallability, TrustTier } from '@agentrig/sdk'
 
 export const ALLOWED_TARGET_PREFIXES = [
   '.codex/',

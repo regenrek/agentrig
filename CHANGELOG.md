@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-05-08
+
 ### Added
 - Added a unified submit-source resolver for `agentrig plugin submit` and `agentrig {skill,mcp,hook} submit` that accepts a local plugin path, `owner/repo@tag` shorthand, or GitHub URL plus `--version`/`--path`, replacing the four-flag `--upstreamRepo`/`--upstreamTag`/`--upstreamCommitSha`/`--pluginPath` form on the public CLI.
 - Added `@agentrig/sdk/fs-adapters/tar-tree` plus exported `repo-scan/source-policy` and `repo-scan/version` so consumers can scan tarball-backed sources and apply SDK-owned source-policy and scanner-version metadata.
