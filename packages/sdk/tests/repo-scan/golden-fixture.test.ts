@@ -53,19 +53,9 @@ describe('dots-like golden fixture', () => {
           "Research",
         ],
         [
-          "asset",
-          "assets/logo.txt",
-          "Logo",
-        ],
-        [
           "prompt",
           "commands/summarize.md",
           "Summarize",
-        ],
-        [
-          "doc",
-          "docs/usage.md",
-          "Usage",
         ],
         [
           "hook",
@@ -76,16 +66,6 @@ describe('dots-like golden fixture', () => {
           "prompt",
           "prompts/debug.md",
           "Debug",
-        ],
-        [
-          "doc",
-          "README.md",
-          "README",
-        ],
-        [
-          "script",
-          "scripts/bootstrap.sh",
-          "Bootstrap",
         ],
         [
           "settings",
@@ -104,7 +84,7 @@ describe('dots-like golden fixture', () => {
         ],
       ]
     `)
-    expect(first.digest).toMatchInlineSnapshot('"d5b571d32868b6f5bf9268d6a10da7cbe6d3e43c8d38d0849aa8522beed74755"')
+    expect(first.digest).toMatchInlineSnapshot(`"ba05d2cdec0d7f833f2912aec1a7269f12b4ee288ffdf34b195790527f602e2f"`)
   })
 
   it('keeps enrichment prompt evidence bounded and versioned', async () => {
@@ -214,29 +194,9 @@ describe('dots-like golden fixture', () => {
           },
         ],
         [
-          "asset",
-          "assets-logo",
-          "assets/logo.txt",
-          {
-            "claude": "port",
-            "codex": "port",
-            "cursor": "port",
-          },
-        ],
-        [
           "prompt",
           "commands-summarize",
           "commands/summarize.md",
-          {
-            "claude": "port",
-            "codex": "port",
-            "cursor": "port",
-          },
-        ],
-        [
-          "doc",
-          "docs-usage",
-          "docs/usage.md",
           {
             "claude": "port",
             "codex": "port",
@@ -257,26 +217,6 @@ describe('dots-like golden fixture', () => {
           "prompt",
           "prompts-debug",
           "prompts/debug.md",
-          {
-            "claude": "port",
-            "codex": "port",
-            "cursor": "port",
-          },
-        ],
-        [
-          "doc",
-          "readme",
-          "README.md",
-          {
-            "claude": "port",
-            "codex": "port",
-            "cursor": "port",
-          },
-        ],
-        [
-          "script",
-          "scripts-bootstrap",
-          "scripts/bootstrap.sh",
           {
             "claude": "port",
             "codex": "port",

@@ -1,6 +1,6 @@
-import os from 'node:os'
 import path from 'node:path'
 import { readJsonFile, writeJsonFile, ensureDir } from './fs'
+import { getAgentRigHome } from './paths'
 import type { AgentRigConfig, RegistryRef, RigDefinition } from './types'
 
 export type ResolvedConfig = Pick<AgentRigConfig, '$schema' | 'defaultRig'> & {
@@ -20,7 +20,7 @@ function mergeRegistries(globalRegs: RegistryRef[], projectRegs: RegistryRef[]) 
 }
 
 export function getGlobalAgentRigDir() {
-  return path.join(os.homedir(), '.agentrig')
+  return path.join(getAgentRigHome(), '.agentrig')
 }
 
 export function getGlobalConfigPath() {

@@ -44,7 +44,7 @@ const command = defineCommand({
     },
     spec: {
       type: 'positional',
-      description: 'Canonical install ref: <registryAlias>/<namespace.plugin>; add @<version> for an explicit pin',
+      description: 'Canonical registry ref, or an AgentRig-managed external plugin id/name',
       required: true,
     },
     cwd: {
@@ -86,18 +86,27 @@ const command = defineCommand({
 
     const ledgers = await loadPluginInstallLedgers(cwd)
     const allRecords = listPluginInstallRecords(ledgers, scope)
-    const cfg = await loadConfig(cwd)
-    const specIdentity = await resolvePluginInstallSpecIdentity(spec, cwd, cfg.registries)
-    if (specIdentity.kind === 'registry-artifact') {
-      throw new Error('`agentrig plugin uninstall` only accepts plugin install refs.')
-    }
-    const pluginId = specIdentity.pluginId
-    const matchingRecords = allRecords.filter(
+    const providerRecords = allRecords.filter(
       (record) =>
         record.provider === provider &&
-        isSamePluginInstallSpecIdentity(record.specIdentity, specIdentity) &&
         (!scope || record.scope === scope)
     )
+    const externalRecords = providerRecords.filter(
+      (record) =>
+        record.specIdentity.kind === 'external-repo' &&
+        (record.pluginId === spec || record.pluginName === spec)
+    )
+    const cfg = await loadConfig(cwd)
+    const specIdentity = externalRecords.length > 0
+      ? undefined
+      : await resolvePluginInstallSpecIdentity(spec, cwd, cfg.registries)
+    if (specIdentity?.kind === 'registry-artifact') {
+      throw new Error('`agentrig plugin uninstall` only accepts plugin install refs.')
+    }
+    const pluginId = specIdentity?.pluginId ?? spec
+    const matchingRecords = specIdentity
+      ? providerRecords.filter((record) => isSamePluginInstallSpecIdentity(record.specIdentity, specIdentity))
+      : externalRecords
 
     if (matchingRecords.length === 0) {
       throw new Error(

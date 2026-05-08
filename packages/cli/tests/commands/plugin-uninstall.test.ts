@@ -107,4 +107,49 @@ describe('command:plugin uninstall', () => {
       { cwd: '/repo', dryRun: false },
     )
   })
+
+  it('matches AgentRig-managed external-repo installs by plugin id without registry resolution', async () => {
+    mocks.listPluginInstallRecords.mockReturnValue([
+      {
+        provider: 'cursor',
+        scope: 'personal',
+        pluginId: 'external.skills',
+        pluginName: 'agentrig-external.skills',
+        targetPaths: ['/sandbox/.cursor/plugins/local/agentrig-external.skills'],
+        specIdentity: {
+          kind: 'external-repo',
+          repoUrl: 'https://github.com/anthropics/skills',
+          owner: 'anthropics',
+          repo: 'skills',
+          commitSha: 'd230a6dd6eb1a0dbee9fec55e2f00a96e28dff81',
+          scanDigest: 'abc123',
+          pickedSignalPaths: ['skills/doc-coauthoring'],
+          pluginId: 'external.skills',
+          version: '0.1.0',
+        },
+      },
+    ])
+
+    await run({
+      args: {
+        provider: 'cursor',
+        spec: 'external.skills',
+        cwd: '/sandbox/workspace',
+        scope: undefined,
+        dryRun: false,
+        help: false,
+      },
+    })
+
+    expect(mocks.resolvePluginInstallSpecIdentity).not.toHaveBeenCalled()
+    expect(mocks.uninstallPluginProviders).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          pluginId: 'external.skills',
+          pluginName: 'agentrig-external.skills',
+        }),
+      ],
+      { cwd: '/sandbox/workspace', dryRun: false },
+    )
+  })
 })

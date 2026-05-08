@@ -13,6 +13,7 @@ import {
   hasGitHubActionsOidcEnv,
   requestGitHubActionsOidcToken,
 } from '../../lib/github-actions-oidc'
+import { resolveSubmitSource } from '../../lib/submit-source'
 import type { PluginManifest } from '../../lib/types'
 
 const STATUS_LOOKUP_MAX_ATTEMPTS = 3
@@ -52,15 +53,11 @@ function optionalArg(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
-function defaultGitHubRepo() {
+function defaultTrustedSource() {
   const repository = process.env.GITHUB_REPOSITORY?.trim()
   if (!repository) return undefined
-  const serverUrl = process.env.GITHUB_SERVER_URL?.trim() || 'https://github.com'
-  return `${serverUrl.replace(/\/$/, '')}/${repository}`
-}
-
-function defaultGitHubRef() {
-  return process.env.GITHUB_REF_NAME?.trim() || process.env.GITHUB_REF?.trim() || undefined
+  const ref = process.env.GITHUB_REF_NAME?.trim() || process.env.GITHUB_REF?.trim()
+  return ref ? `${repository}@${ref}` : repository
 }
 
 async function readLocalPluginManifest(pluginPath: string) {
@@ -78,21 +75,17 @@ const command = defineCommand({
       type: 'string',
       description: 'AgentRig web base URL (defaults to stored login, AGENTRIG_BASE_URL, or https://agentrig.ai)',
     },
-    upstreamRepo: {
-      type: 'string',
-      description: 'Canonical upstream_repo, for example https://github.com/owner/repo',
+    source: {
+      type: 'positional',
+      description: 'Local plugin path, GitHub owner/repo@tag, or GitHub URL',
     },
-    upstreamTag: {
+    version: {
       type: 'string',
-      description: 'Canonical upstream_tag, for example v1.2.3',
+      description: 'Plugin version used to resolve v<version> or <version> tags when the source has no tag',
     },
-    upstreamCommitSha: {
+    path: {
       type: 'string',
-      description: 'Canonical upstream_commit_sha (full 40-character commit SHA)',
-    },
-    pluginPath: {
-      type: 'string',
-      description: 'Canonical plugin_path relative to the repo root (defaults to . for trusted publishing)',
+      description: 'Plugin path inside the source repo when it cannot be inferred from the source',
     },
     artifactId: {
       type: 'string',
@@ -127,23 +120,16 @@ const command = defineCommand({
       throw new Error('Trusted publishing requires GitHub Actions OIDC env. Configure permissions: id-token: write.')
     }
 
-    const pluginPath = optionalArg(args.pluginPath) ?? (trustedPublish ? '.' : undefined)
-    const upstreamRepo = optionalArg(args.upstreamRepo) ?? (trustedPublish ? defaultGitHubRepo() : undefined)
-    const upstreamTag = optionalArg(args.upstreamTag) ?? (trustedPublish ? defaultGitHubRef() : undefined)
-    const upstreamCommitSha = optionalArg(args.upstreamCommitSha) ?? (trustedPublish ? process.env.GITHUB_SHA?.trim() : undefined)
-    if (!upstreamRepo || !upstreamTag || !upstreamCommitSha || !pluginPath) {
-      throw new Error(
-        'Canonical submission requires upstream repo, ref, commit SHA, and plugin path. Pass flags or run trusted publishing inside GitHub Actions.'
-      )
-    }
+    const source = optionalArg(args.source) ?? (trustedPublish ? defaultTrustedSource() : undefined)
+    if (!source) throw new Error('Submit source required. Use a local path, owner/repo@tag, or GitHub URL.')
 
     const baseUrl = resolveCommunityBaseUrl(optionalArg(args.baseUrl), session?.baseUrl)
-    const payload = {
-      upstream_repo: upstreamRepo,
-      upstream_tag: upstreamTag,
-      upstream_commit_sha: upstreamCommitSha,
-      plugin_path: pluginPath,
-    }
+    const payload = await resolveSubmitSource({
+      source,
+      version: optionalArg(args.version),
+      path: optionalArg(args.path),
+      expectedCommitSha: trustedPublish ? optionalArg(process.env.GITHUB_SHA) : undefined,
+    })
 
     if (args.dryRun) {
       console.log('Publish shape: plugin_all')
@@ -152,7 +138,7 @@ const command = defineCommand({
       return
     }
 
-    const manifest = trustedPublish ? await readLocalPluginManifest(pluginPath) : null
+    const manifest = trustedPublish ? await readLocalPluginManifest(payload.plugin_path) : null
     const artifactId = optionalArg(args.artifactId) ?? manifest?.id
     if (trustedPublish && !artifactId) {
       throw new Error('Trusted publishing requires --artifactId or a readable .plugin/plugin.json with an id.')
@@ -163,7 +149,7 @@ const command = defineCommand({
           artifactId: artifactId as string,
           version: manifest?.version,
           publishShape: { kind: 'plugin_all' },
-          commitSha: upstreamCommitSha,
+          commitSha: payload.upstream_commit_sha,
           githubOidcToken: await requestGitHubActionsOidcToken(),
         })).token
       : session?.accessToken

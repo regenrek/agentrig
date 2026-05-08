@@ -170,19 +170,60 @@ describe('commands: inspect/use', () => {
     })
 
     const ledger = JSON.parse(await fs.readFile(path.join(cwd, '.agentrig', 'plugin-installs.json'), 'utf-8')) as {
-      installs: Record<string, { specIdentity: { kind: string; repoUrl?: string; scanDigest: string; pickedSignalPaths: string[] }; registry?: unknown }>
+      installs: Record<string, unknown>
+      selections: Record<string, { specIdentity: { kind: string; repoUrl?: string; scanDigest: string; pickedSignalPaths: string[] }; registry?: unknown; selectedSelectors: string[] }>
     }
-    const record = ledger.installs['cursor:workspace:agentrig-community.review']
+    expect(ledger.installs).toEqual({})
+    const record = Object.values(ledger.selections)[0]
     expect(record.specIdentity).toMatchObject({
       kind: 'external-repo',
       repoUrl: pathToFileURL(fixture).href,
       pickedSignalPaths: ['skills/review'],
     })
     expect(record.registry).toBeUndefined()
+    expect(record.selectedSelectors).toEqual(['skill:review'])
     expect(record.specIdentity.scanDigest).toMatch(/^[a-f0-9]{64}$/)
     await expect(
-      fs.readFile(path.join(cwd, '.cursor', 'plugins', 'local', 'agentrig-community.review', 'skills', 'review', 'SKILL.md'), 'utf-8')
+      fs.readFile(path.join(cwd, '.cursor', 'skills', 'review', 'SKILL.md'), 'utf-8')
     ).resolves.toContain('Reviews code.')
+  })
+
+  it('honors AGENTRIG_HOME for personal external-repo install paths', async () => {
+    const cwd = await tempRoot()
+    const realHome = await tempRoot()
+    const agentrigHome = await tempRoot()
+    process.chdir(cwd)
+    process.env.HOME = realHome
+    vi.stubEnv('AGENTRIG_HOME', agentrigHome)
+    const fixture = await createFixture()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await useRun({
+      args: {
+        source: fixture,
+        'as-plugin': 'external.repo',
+        provider: 'cursor',
+        scope: 'personal',
+        force: true,
+        pick: 'skills/review',
+        yes: false,
+        'dry-run': false,
+        install: true,
+        ref: undefined,
+        path: undefined,
+        out: undefined,
+        help: false,
+      },
+    })
+
+    await expect(
+      fs.readFile(path.join(agentrigHome, '.cursor', 'skills', 'review', 'SKILL.md'), 'utf-8')
+    ).resolves.toContain('Reviews code.')
+    await expect(
+      fs.readFile(path.join(agentrigHome, '.agentrig', 'plugin-installs.json'), 'utf-8')
+    ).resolves.toContain('external.repo')
+    await expect(fs.stat(path.join(realHome, '.cursor'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(fs.stat(path.join(realHome, '.agentrig'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('applies local BYOK enrichment to plugin metadata', async () => {

@@ -1,7 +1,6 @@
 import type { Signal } from '../types'
 import { listVirtualFiles, sortVirtualPaths, type VirtualTree } from '../virtual-tree'
 import { detectAgents, detectCursorRules, detectJsonConfigs, detectSkills, detectTopLevelPrompts, detectTypedCommands } from './content'
-import { detectPathSignals } from './path'
 import type { DetectorInput, SignalDetector } from './common'
 import { discoverPluginCandidates, rootsFromPluginCandidates } from './plugin-roots'
 
@@ -12,7 +11,6 @@ export const TIER1_DETECTORS: readonly SignalDetector[] = [
   detectCursorRules,
   detectTypedCommands,
   detectTopLevelPrompts,
-  detectPathSignals,
 ]
 
 export async function runTier1Detectors(tree: VirtualTree, detectors = TIER1_DETECTORS) {

@@ -17,7 +17,8 @@ Installable publication happens through:
 
 ## Submission and review
 
-Submit canonical upstream snapshots to AgentRig via the web UI at `/submit` when you want review and discovery.
+Submit pinned upstream snapshots to AgentRig via the CLI or the web UI at
+`/submit` when you want review and discovery.
 
 Submission is not itself an install source.
 
@@ -72,7 +73,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm dlx agentrig plugin submit --trustedPublish
+      - run: pnpm dlx agentrig plugin submit "$GITHUB_REPOSITORY@$GITHUB_REF_NAME" --trustedPublish
 ```
 
 Setup requirements:

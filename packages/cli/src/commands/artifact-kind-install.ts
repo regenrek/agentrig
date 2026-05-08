@@ -27,6 +27,7 @@ import {
   uninstallArtifactSelection,
 } from '../lib/artifact-selection-install'
 import { listRepeatedOptionValues } from '../lib/repeated-options'
+import { resolveSubmitSource } from '../lib/submit-source'
 
 type SubmittableArtifactKind = Extract<SelectableArtifactKind, 'skill' | 'mcp' | 'hook'>
 
@@ -177,21 +178,17 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
         type: 'string',
         description: 'AgentRig web base URL (defaults to stored login, AGENTRIG_BASE_URL, or https://agentrig.ai)',
       },
-      upstreamRepo: {
-        type: 'string',
-        description: 'Canonical upstream_repo, for example https://github.com/owner/repo',
+      source: {
+        type: 'positional',
+        description: `Local ${kind} path, GitHub owner/repo@tag, or GitHub URL`,
       },
-      upstreamTag: {
+      version: {
         type: 'string',
-        description: 'Canonical upstream_tag, for example v1.2.3',
+        description: 'Artifact version used to resolve v<version> or <version> tags when the source has no tag',
       },
-      upstreamCommitSha: {
+      path: {
         type: 'string',
-        description: 'Canonical upstream_commit_sha (full 40-character commit SHA)',
-      },
-      artifactPath: {
-        type: 'string',
-        description: 'Canonical artifact_path relative to the repo root',
+        description: `${kind} path inside the source repo when it cannot be inferred from the source`,
       },
       dryRun: {
         type: 'boolean',
@@ -211,28 +208,23 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
       if (!session) {
         throw new Error('Not logged in. Run `agentrig login` first.')
       }
-      if (!args.upstreamRepo || !args.upstreamTag || !args.upstreamCommitSha || !args.artifactPath) {
-        throw new Error(
-          `Canonical ${kind} submission requires --upstreamRepo, --upstreamTag, --upstreamCommitSha, and --artifactPath.`
-        )
-      }
+      if (!args.source) throw new Error(`Submit source required. Use a local path, owner/repo@tag, or GitHub URL.`)
       const baseUrl = resolveCommunityBaseUrl(args.baseUrl, session.baseUrl)
-      const payload = {
-        upstream_repo: args.upstreamRepo,
-        upstream_tag: args.upstreamTag,
-        upstream_commit_sha: args.upstreamCommitSha,
-        plugin_path: args.artifactPath,
-      }
+      const payload = await resolveSubmitSource({
+        source: String(args.source),
+        version: typeof args.version === 'string' ? args.version : undefined,
+        path: typeof args.path === 'string' ? args.path : undefined,
+      })
 
       if (args.dryRun) {
-        console.log('Publish shape: plugin_selected')
+        console.log('Submission type: canonical upstream review')
         console.log(JSON.stringify(payload, null, 2))
         return
       }
 
       const created = await createPluginSubmission(baseUrl, session.accessToken, payload)
       console.log(`Submission: ${created.submissionId}`)
-      console.log('Publish shape: plugin_selected')
+      console.log('Submission type: canonical upstream review')
       if (created.deduped) console.log('Result: existing submission reused')
       console.log(`${kind} submission recorded through canonical plugin review`)
     },

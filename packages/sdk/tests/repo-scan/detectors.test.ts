@@ -7,6 +7,7 @@ describe('tier 1 detectors', () => {
     const signals = await runTier1Detectors(
       createMemoryTree({
         'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+        'packages/skills/lint.md': '---\nname: Lint\ndescription: Checks lint issues.\n---\nBody',
         '.mcp.json': JSON.stringify({ mcpServers: { fs: { command: 'node', args: ['server.js'] } } }),
         'hooks/hooks.json': JSON.stringify({ hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo ok' }] }] } }),
         '.lsp.json': JSON.stringify({ languageServers: { typescript: { command: 'typescript-language-server', args: ['--stdio'] } } }),
@@ -28,10 +29,11 @@ describe('tier 1 detectors', () => {
       ['lsp', '.lsp.json'],
       ['mcp', '.mcp.json'],
       ['hook', 'hooks/hooks.json'],
+      ['skill', 'packages/skills/lint.md'],
       ['settings', 'settings.json'],
       ['skill', 'skills/review'],
     ])
-    expect(signals.find((signal) => signal.kind === 'skill')).toMatchObject({
+    expect(signals.find((signal) => signal.kind === 'skill' && signal.sourcePath === 'skills/review')).toMatchObject({
       id: 'review',
       description: 'Reviews code.',
       providerCompat: { claude: 'native', codex: 'native', cursor: 'native' },
@@ -47,7 +49,7 @@ describe('tier 1 detectors', () => {
     })
   })
 
-  it('detects prompt, agent, script, asset, and doc signals without duplicating structured files', async () => {
+  it('detects prompt and agent signals without treating arbitrary repo files as components', async () => {
     const signals = await runTier1Detectors(
       createMemoryTree({
         'prompts/explain.md': '# Explain',
@@ -64,12 +66,8 @@ describe('tier 1 detectors', () => {
     expect(signals.map((signal) => [signal.kind, signal.sourcePath])).toEqual([
       ['command', '.claude/commands/review.md'],
       ['agent', 'agents/reviewer.md'],
-      ['asset', 'assets/icon.svg'],
       ['prompt', 'commands/rewrite.md'],
-      ['doc', 'docs/usage.md'],
       ['prompt', 'prompts/explain.md'],
-      ['doc', 'README.md'],
-      ['script', 'scripts/bootstrap.sh'],
     ])
   })
 
@@ -97,7 +95,6 @@ describe('tier 1 detectors', () => {
       ['command', 'plugins/compound/.claude/commands/triage.md'],
       ['agent', 'plugins/compound/agents/research/reviewer.md'],
       ['prompt', 'plugins/compound/commands/audit.md'],
-      ['doc', 'plugins/compound/docs/usage.md'],
       ['prompt', 'plugins/compound/prompts/explain.md'],
       ['skill', 'skills/root'],
     ])
@@ -108,10 +105,34 @@ describe('tier 1 detectors', () => {
     })
   })
 
-  it('ignores malformed deterministic inputs', async () => {
+  it('uses SKILL.md path shape even when metadata is incomplete', async () => {
     const signals = await runTier1Detectors(
       createMemoryTree({
-        'skills/bad/SKILL.md': '# Missing frontmatter',
+        'skills/bad/SKILL.md': '# Missing frontmatter\n\nStill a usable skill body.',
+        'agents/no-frontmatter.md': '# Missing frontmatter',
+        'packages/random/prompts/loose.md': '# Loose',
+        '.mcp.json': JSON.stringify({ nope: true }),
+        'hooks/hooks.json': JSON.stringify({ PreToolUse: [] }),
+        '.lsp.json': JSON.stringify({ servers: {} }),
+        'settings.json': JSON.stringify({ nope: true }),
+        '.cursor/rules/no-frontmatter.mdc': '# Rule',
+      })
+    )
+
+    expect(signals).toMatchObject([
+      {
+        kind: 'skill',
+        id: 'bad',
+        title: 'Bad',
+        sourcePath: 'skills/bad',
+        description: 'Still a usable skill body.',
+      },
+    ])
+  })
+
+  it('ignores malformed deterministic inputs that have no canonical artifact path', async () => {
+    const signals = await runTier1Detectors(
+      createMemoryTree({
         'agents/no-frontmatter.md': '# Missing frontmatter',
         'packages/random/prompts/loose.md': '# Loose',
         '.mcp.json': JSON.stringify({ nope: true }),

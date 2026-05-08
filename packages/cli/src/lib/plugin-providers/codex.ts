@@ -1,7 +1,7 @@
-import { homedir } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile, writeJsonFile } from '../fs'
+import { getAgentRigHome } from '../paths'
 import { getPluginInstallRecordId, loadPluginInstallLedger } from '../plugin-install-ledger'
 import { isSamePluginInstallSpecIdentity } from '../plugin-install-spec'
 import type { CodexPluginInstallRecord } from '../types'
@@ -98,7 +98,7 @@ function resolveCodexInstallPaths(cwd: string, scope: PluginInstallScope) {
     }
   }
 
-  const home = homedir()
+  const home = getAgentRigHome()
   return {
     pluginRoot: path.join(home, '.codex', 'plugins'),
     marketplacePath: path.join(home, '.agents', 'plugins', 'marketplace.json'),

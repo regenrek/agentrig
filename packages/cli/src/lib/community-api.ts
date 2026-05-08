@@ -17,7 +17,7 @@ type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
 
 export type PublishShape =
   | { kind: 'plugin_all' }
-  | { kind: 'plugin_selected'; selectors: string[] }
+  | { kind: 'generated_plugin'; selectors: string[] }
   | { kind: 'standalone_artifacts'; selectors: string[] }
   | { kind: 'discovery_only'; selectors?: string[] }
 

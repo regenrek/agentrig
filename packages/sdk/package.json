@@ -21,6 +21,10 @@
     "./fs-adapters/zip-tree": {
       "types": "./dist/fs-adapters/zip-tree.d.mts",
       "import": "./dist/fs-adapters/zip-tree.mjs"
+    },
+    "./fs-adapters/tar-tree": {
+      "types": "./dist/fs-adapters/tar-tree.d.mts",
+      "import": "./dist/fs-adapters/tar-tree.mjs"
     }
   },
   "files": [

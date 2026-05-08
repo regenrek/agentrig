@@ -7,6 +7,7 @@ import type { PluginFeatures } from '@agentrig/sdk'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
+import { getAgentRigHome } from '../paths'
 import { isValidPluginId, isValidPluginVersion } from '../plugin-validation'
 import type {
   PluginInstallRecord,
@@ -699,6 +700,7 @@ export async function defaultCommandRunner(command: string, args: string[]) {
   try {
     await execFile(command, args, {
       maxBuffer: 10 * 1024 * 1024,
+      env: getCommandRunnerEnv(),
     })
   } catch (error) {
     const message =
@@ -706,6 +708,16 @@ export async function defaultCommandRunner(command: string, args: string[]) {
         ? String((error as { stderr?: string }).stderr || '').trim()
         : ''
     throw new Error(message || `Command failed: ${command} ${args.join(' ')}`)
+  }
+}
+
+function getCommandRunnerEnv(): NodeJS.ProcessEnv {
+  if (!process.env.AGENTRIG_HOME?.trim()) return process.env
+  const agentrigHome = getAgentRigHome()
+  return {
+    ...process.env,
+    HOME: agentrigHome,
+    USERPROFILE: agentrigHome,
   }
 }
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   loadAuthSession: vi.fn(),
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   resolveCommunityBaseUrl: vi.fn(),
   hasGitHubActionsOidcEnv: vi.fn(),
   requestGitHubActionsOidcToken: vi.fn(),
+  resolveSubmitSource: vi.fn(),
 }))
 
 vi.mock('../../src/lib/auth', () => ({
@@ -26,6 +27,10 @@ vi.mock('../../src/lib/github-actions-oidc', () => ({
   requestGitHubActionsOidcToken: mocks.requestGitHubActionsOidcToken,
 }))
 
+vi.mock('../../src/lib/submit-source', () => ({
+  resolveSubmitSource: mocks.resolveSubmitSource,
+}))
+
 import command from '../../src/commands/plugin/submit'
 
 describe('command:plugin submit', () => {
@@ -34,7 +39,6 @@ describe('command:plugin submit', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     delete process.env.GITHUB_REPOSITORY
-    delete process.env.GITHUB_SERVER_URL
     delete process.env.GITHUB_REF_NAME
     delete process.env.GITHUB_SHA
     vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -55,16 +59,21 @@ describe('command:plugin submit', () => {
     mocks.getPluginSubmissionStatus.mockResolvedValue({ status: 'pending_review' })
     mocks.hasGitHubActionsOidcEnv.mockReturnValue(false)
     mocks.requestGitHubActionsOidcToken.mockResolvedValue('github-oidc-token')
+    mocks.resolveSubmitSource.mockResolvedValue({
+      upstream_repo: 'https://github.com/acme/demo-plugin',
+      upstream_tag: 'v1.2.3',
+      upstream_commit_sha: '1234567890abcdef1234567890abcdef12345678',
+      plugin_path: 'plugin',
+    })
   })
 
-  it('submits the canonical submission payload', async () => {
+  it('resolves the source and submits the canonical submission payload', async () => {
     await run({
       args: {
         baseUrl: undefined,
-        upstreamRepo: 'https://github.com/acme/demo-plugin',
-        upstreamTag: 'v1.2.3',
-        upstreamCommitSha: '1234567890abcdef1234567890abcdef12345678',
-        pluginPath: 'plugin',
+        source: 'acme/demo-plugin@v1.2.3',
+        version: undefined,
+        path: 'plugin',
         artifactId: undefined,
         trustedPublish: false,
         dryRun: false,
@@ -72,6 +81,12 @@ describe('command:plugin submit', () => {
       },
     })
 
+    expect(mocks.resolveSubmitSource).toHaveBeenCalledWith({
+      source: 'acme/demo-plugin@v1.2.3',
+      version: undefined,
+      path: 'plugin',
+      expectedCommitSha: undefined,
+    })
     expect(mocks.createPluginSubmission).toHaveBeenCalledWith(
       'https://agentrig.ai',
       'token',
@@ -88,10 +103,9 @@ describe('command:plugin submit', () => {
     await run({
       args: {
         baseUrl: undefined,
-        upstreamRepo: 'https://github.com/acme/demo-plugin',
-        upstreamTag: 'v1.2.3',
-        upstreamCommitSha: '1234567890abcdef1234567890abcdef12345678',
-        pluginPath: 'plugin',
+        source: 'https://github.com/acme/demo-plugin',
+        version: '1.2.3',
+        path: 'plugin',
         artifactId: undefined,
         trustedPublish: false,
         dryRun: true,
@@ -108,17 +122,21 @@ describe('command:plugin submit', () => {
     mocks.loadAuthSession.mockResolvedValue(null)
     mocks.hasGitHubActionsOidcEnv.mockReturnValue(true)
     process.env.GITHUB_REPOSITORY = 'acme/demo-plugin'
-    process.env.GITHUB_SERVER_URL = 'https://github.com'
     process.env.GITHUB_REF_NAME = 'v1.2.3'
     process.env.GITHUB_SHA = '1234567890abcdef1234567890abcdef12345678'
+    mocks.resolveSubmitSource.mockResolvedValue({
+      upstream_repo: 'https://github.com/acme/demo-plugin',
+      upstream_tag: 'v1.2.3',
+      upstream_commit_sha: '1234567890abcdef1234567890abcdef12345678',
+      plugin_path: '.',
+    })
 
     await run({
       args: {
         baseUrl: undefined,
-        upstreamRepo: undefined,
-        upstreamTag: undefined,
-        upstreamCommitSha: undefined,
-        pluginPath: '.',
+        source: undefined,
+        version: undefined,
+        path: undefined,
         artifactId: 'acme.demo-plugin',
         trustedPublish: false,
         dryRun: false,
@@ -126,6 +144,12 @@ describe('command:plugin submit', () => {
       },
     })
 
+    expect(mocks.resolveSubmitSource).toHaveBeenCalledWith({
+      source: 'acme/demo-plugin@v1.2.3',
+      version: undefined,
+      path: undefined,
+      expectedCommitSha: '1234567890abcdef1234567890abcdef12345678',
+    })
     expect(mocks.mintPublishToken).toHaveBeenCalledWith('https://agentrig.ai', {
       artifactKind: 'plugin',
       artifactId: 'acme.demo-plugin',
@@ -145,5 +169,30 @@ describe('command:plugin submit', () => {
       },
     )
     expect(mocks.getPluginSubmissionStatus).not.toHaveBeenCalled()
+  })
+
+  it('fails trusted publishing before minting when the source does not match GITHUB_SHA', async () => {
+    mocks.loadAuthSession.mockResolvedValue(null)
+    mocks.hasGitHubActionsOidcEnv.mockReturnValue(true)
+    process.env.GITHUB_REPOSITORY = 'acme/demo-plugin'
+    process.env.GITHUB_REF_NAME = 'v1.2.3'
+    process.env.GITHUB_SHA = '1234567890abcdef1234567890abcdef12345678'
+    mocks.resolveSubmitSource.mockRejectedValue(new Error('Resolved submit source commit mismatch'))
+
+    await expect(run({
+      args: {
+        baseUrl: undefined,
+        source: undefined,
+        version: undefined,
+        path: undefined,
+        artifactId: 'acme.demo-plugin',
+        trustedPublish: false,
+        dryRun: false,
+        help: false,
+      },
+    })).rejects.toThrow('commit mismatch')
+
+    expect(mocks.mintPublishToken).not.toHaveBeenCalled()
+    expect(mocks.createPluginSubmission).not.toHaveBeenCalled()
   })
 })

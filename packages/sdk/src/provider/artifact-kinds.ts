@@ -1,4 +1,4 @@
-import type { SignalKind } from '../repo-scan/types'
+import { isPublishableSignalKind, type SignalKind } from '../repo-scan/types'
 
 export const ARTIFACT_KINDS = ['plugin', 'skill', 'mcp', 'hook', 'command', 'agent'] as const
 export const SELECTABLE_ARTIFACT_KINDS = ['skill', 'mcp', 'hook', 'command', 'agent'] as const
@@ -23,6 +23,7 @@ export function isSelectableArtifactKind(value: string): value is SelectableArti
 }
 
 export function artifactKindFromSignalKind(kind: SignalKind): SelectableArtifactKind | null {
+  if (!isPublishableSignalKind(kind)) return null
   if (kind === 'skill' || kind === 'mcp' || kind === 'hook' || kind === 'agent') return kind
   if (kind === 'command' || kind === 'prompt') return 'command'
   return null

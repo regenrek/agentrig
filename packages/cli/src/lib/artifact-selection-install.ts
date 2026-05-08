@@ -1,5 +1,4 @@
 import { promises as fs } from 'node:fs'
-import { homedir } from 'node:os'
 import path from 'node:path'
 import {
   assertSelectionBundleInstallable,
@@ -12,10 +11,13 @@ import {
   type SelectableArtifactKind,
   type SelectionBundle,
   type SelectionProviderId,
+  type SelectedArtifactForBundle,
+  type VirtualTree,
 } from '@agentrig/sdk'
 import { createLocalFsVirtualTree } from '@agentrig/sdk/fs-adapters/local-fs'
 import { ensureDir, pathExists, readJsonFile, writeJsonFile } from './fs'
 import { sha256Hex } from './hash'
+import { getAgentRigHome } from './paths'
 import {
   getResolvedPluginSpecIdentity,
   getResolvedRegistryArtifactSpecIdentity,
@@ -41,6 +43,7 @@ import type { ResolvedStandaloneArtifact } from './registry'
 import type {
   PluginInstallScopeName,
   PluginInstallScopeSelectorName,
+  PluginInstallSpecIdentity,
   PluginInstalledFile,
   PluginJsonWrite,
   RegistryRef,
@@ -84,6 +87,22 @@ export type ArtifactSelectionInstallResult = {
   installedFiles: PluginInstalledFile[]
   jsonWrites: PluginJsonWrite[]
   rootDir: string
+}
+
+export type ExternalRepoSelectionInstallInput = {
+  sourceKind: 'external-repo-scan'
+  cwd: string
+  provider: SelectionProviderId
+  requestedScope: PluginInstallScopeSelectorName
+  scope: PluginInstallScopeName
+  tree: VirtualTree
+  bundle: SelectionBundle
+  specIdentity: PluginInstallSpecIdentity
+  pluginId: string
+  pluginVersion: string
+  snapshotDigest: string
+  force?: boolean
+  dryRun?: boolean
 }
 
 export type ArtifactSelectionUninstallInput = {
@@ -134,8 +153,9 @@ export async function installArtifactSelection(input: ArtifactSelectionInstallIn
   assertSelectionBundleInstallable(bundle)
 
   const rootDir = resolveSelectionRoot(input.cwd, input.provider, input.scope)
-  const installedFiles = await installSelectionFiles(input.pluginDir, rootDir, bundle, Boolean(input.force), Boolean(input.dryRun))
-  const jsonWrites = await installSelectionJson(input.pluginDir, rootDir, bundle, artifacts, Boolean(input.force), Boolean(input.dryRun))
+  const source = { kind: 'local-dir' as const, pluginDir: input.pluginDir }
+  const installedFiles = await installSelectionFiles(source, rootDir, bundle, Boolean(input.force), Boolean(input.dryRun))
+  const jsonWrites = await installSelectionJson(source, rootDir, bundle, bundle.selectedArtifacts, Boolean(input.force), Boolean(input.dryRun))
 
   const record: SelectionInstallRecord = {
     id: `selection:${input.provider}:${input.scope}:${bundle.selectionId}`,
@@ -163,6 +183,48 @@ export async function installArtifactSelection(input: ArtifactSelectionInstallIn
 
   return {
     bundle,
+    record,
+    installedFiles,
+    jsonWrites,
+    rootDir,
+  }
+}
+
+export async function installExternalRepoSelection(
+  input: ExternalRepoSelectionInstallInput
+): Promise<ArtifactSelectionInstallResult> {
+  if (input.bundle.source.kind !== 'external-repo-scan') {
+    throw new Error('External repo selection install requires an external-repo-scan Selection Bundle.')
+  }
+  assertSelectionBundleInstallable(input.bundle)
+
+  const rootDir = resolveSelectionRoot(input.cwd, input.provider, input.scope)
+  const source = { kind: 'tree' as const, tree: input.tree }
+  const installedFiles = await installSelectionFiles(source, rootDir, input.bundle, Boolean(input.force), Boolean(input.dryRun))
+  const jsonWrites = await installSelectionJson(source, rootDir, input.bundle, input.bundle.selectedArtifacts, Boolean(input.force), Boolean(input.dryRun))
+  const record: SelectionInstallRecord = {
+    id: `selection:${input.provider}:${input.scope}:${input.bundle.selectionId}`,
+    provider: input.provider,
+    requestedScope: input.requestedScope,
+    specIdentity: input.specIdentity,
+    scope: input.scope,
+    pluginId: input.pluginId,
+    pluginVersion: input.pluginVersion,
+    snapshotDigest: input.snapshotDigest,
+    selectionId: input.bundle.selectionId,
+    selectedSelectors: input.bundle.selectedArtifacts.map((artifact) => artifact.selector),
+    targetPaths: input.bundle.targetPaths.map((targetPath) => resolveTargetPath(rootDir, targetPath)),
+    installedAt: new Date().toISOString(),
+    files: installedFiles,
+    jsonWrites,
+  }
+
+  if (!input.dryRun) {
+    await upsertSelectionInstallRecords(input.cwd, input.scope, [record])
+  }
+
+  return {
+    bundle: input.bundle,
     record,
     installedFiles,
     jsonWrites,
@@ -245,16 +307,16 @@ async function resolveSelectedArtifacts(pluginDir: string, artifacts: ExtractedA
 
 function resolveSelectionRoot(cwd: string, provider: SelectionProviderId, scope: PluginInstallScopeName) {
   if (provider === 'claude') {
-    return scope === 'workspace' ? path.join(cwd, '.claude') : path.join(homedir(), '.claude')
+    return scope === 'workspace' ? path.join(cwd, '.claude') : path.join(getAgentRigHome(), '.claude')
   }
   if (provider === 'codex') {
-    return scope === 'workspace' ? path.join(cwd, '.codex') : path.join(homedir(), '.codex')
+    return scope === 'workspace' ? path.join(cwd, '.codex') : path.join(getAgentRigHome(), '.codex')
   }
-  return scope === 'workspace' ? cwd : homedir()
+  return scope === 'workspace' ? cwd : getAgentRigHome()
 }
 
 async function installSelectionFiles(
-  pluginDir: string,
+  source: SelectionFileSource,
   rootDir: string,
   bundle: SelectionBundle,
   force: boolean,
@@ -262,11 +324,11 @@ async function installSelectionFiles(
 ) {
   const installedFiles: PluginInstalledFile[] = []
   for (const copy of bundle.materialization.fileCopies) {
-    const sourcePath = resolvePluginPath(pluginDir, copy.sourcePath)
     const targetPath = resolveTargetPath(rootDir, copy.targetPath)
-    const bytes = await fs.readFile(sourcePath)
+    const bytes = await readSourceBytes(source, copy.sourcePath)
     const actualDigest = `sha256:${sha256Hex(bytes)}`
-    if (actualDigest !== copy.digest) {
+    const expectedDigest = normalizeSha256Digest(copy.digest)
+    if (actualDigest !== expectedDigest) {
       throw new Error(`Digest mismatch for selected artifact file ${copy.sourcePath}`)
     }
     if (await pathExists(targetPath)) {
@@ -279,16 +341,16 @@ async function installSelectionFiles(
       await ensureDir(path.dirname(targetPath))
       await fs.writeFile(targetPath, bytes)
     }
-    installedFiles.push({ path: targetPath, sha256: copy.digest })
+    installedFiles.push({ path: targetPath, sha256: expectedDigest })
   }
   return installedFiles
 }
 
 async function installSelectionJson(
-  pluginDir: string,
+  source: SelectionFileSource,
   rootDir: string,
   bundle: SelectionBundle,
-  artifacts: ExtractedArtifact[],
+  artifacts: readonly SelectedArtifactForBundle[],
   force: boolean,
   dryRun: boolean
 ) {
@@ -297,7 +359,7 @@ async function installSelectionJson(
   for (const write of bundle.materialization.jsonWrites) {
     const artifact = bySelector.get(write.artifactSelector)
     if (!artifact) throw new Error(`Missing selected artifact for JSON write: ${write.artifactSelector}`)
-    const sourceJson = await readArtifactJson(pluginDir, artifact)
+    const sourceJson = await readArtifactJson(source, artifact)
     const value = selectJsonWriteValue(sourceJson, write.keyPath)
     const targetPath = resolveTargetPath(rootDir, write.path)
     const existing = (await readJsonFile<unknown>(targetPath)) ?? {}
@@ -390,9 +452,9 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
   return { removed, kept, missing, clearedRecordIds }
 }
 
-function resolvePluginPath(pluginDir: string, relativePath: string) {
-  return resolveContainedPath(pluginDir, relativePath, 'plugin source')
-}
+type SelectionFileSource =
+  | { kind: 'local-dir'; pluginDir: string }
+  | { kind: 'tree'; tree: VirtualTree }
 
 function resolveTargetPath(rootDir: string, relativePath: string) {
   return resolveContainedPath(rootDir, relativePath, 'selection target')
@@ -407,15 +469,36 @@ function resolveContainedPath(rootDir: string, relativePath: string, label: stri
   return targetPath
 }
 
-async function readArtifactJson(pluginDir: string, artifact: ExtractedArtifact) {
+async function readArtifactJson(source: SelectionFileSource, artifact: Pick<SelectedArtifactForBundle, 'fileDigests' | 'selector'>) {
   const jsonFile = artifact.fileDigests
     .map((file) => file.path)
     .find((filePath) => filePath.endsWith('.json'))
   if (!jsonFile) throw new Error(`Selected artifact has no JSON config file: ${artifact.selector}`)
-  const raw = await readJsonFile<unknown>(resolvePluginPath(pluginDir, jsonFile))
+  const raw = JSON.parse(await readSourceText(source, jsonFile)) as unknown
   const record = toRecord(raw)
   if (!record) throw new Error(`Selected artifact JSON must be an object: ${jsonFile}`)
   return record
+}
+
+async function readSourceBytes(source: SelectionFileSource, relativePath: string) {
+  if (source.kind === 'local-dir') {
+    return fs.readFile(resolveContainedPath(source.pluginDir, relativePath, 'plugin source'))
+  }
+  if (!source.tree.readBytes) {
+    throw new Error(`Virtual tree cannot provide bytes for selected artifact file: ${relativePath}`)
+  }
+  const bytes = await source.tree.readBytes(relativePath)
+  if (!bytes) throw new Error(`Selected artifact file not found: ${relativePath}`)
+  return bytes
+}
+
+async function readSourceText(source: SelectionFileSource, relativePath: string) {
+  if (source.kind === 'local-dir') {
+    return fs.readFile(resolveContainedPath(source.pluginDir, relativePath, 'plugin source'), 'utf-8')
+  }
+  const text = await source.tree.readText(relativePath)
+  if (text == null) throw new Error(`Selected artifact file not found: ${relativePath}`)
+  return text
 }
 
 function selectJsonWriteValue(sourceJson: Record<string, unknown>, keyPath: string) {
@@ -494,6 +577,10 @@ function toRecord(value: unknown): Record<string, unknown> | null {
 
 function digestJson(value: unknown) {
   return `sha256:${sha256Hex(new TextEncoder().encode(stableJson(value)))}`
+}
+
+function normalizeSha256Digest(digest: string) {
+  return digest.startsWith('sha256:') ? digest : `sha256:${digest}`
 }
 
 function stableJson(value: unknown): string {

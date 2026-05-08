@@ -1,6 +1,6 @@
-import { homedir } from 'node:os'
 import path from 'node:path'
 import { ensureDir, pathExists, writeJsonFile } from '../fs'
+import { getAgentRigHome } from '../paths'
 import { getPluginInstallRecordId, loadPluginInstallLedger } from '../plugin-install-ledger'
 import { isSamePluginInstallSpecIdentity } from '../plugin-install-spec'
 import type { CursorPluginInstallRecord } from '../types'
@@ -30,7 +30,7 @@ function resolveCursorInstallRoot(cwd: string, scope: 'personal' | 'workspace') 
   if (scope === 'workspace') {
     return path.join(cwd, '.cursor', 'plugins', 'local')
   }
-  return path.join(homedir(), '.cursor', 'plugins', 'local')
+  return path.join(getAgentRigHome(), '.cursor', 'plugins', 'local')
 }
 
 async function copyCursorPlugin(pluginSourceDir: string, pluginDir: string) {

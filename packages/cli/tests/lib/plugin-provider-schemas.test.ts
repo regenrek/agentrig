@@ -52,7 +52,7 @@ describe('plugin provider schemas', () => {
 
   const claudeMarketplacePluginExample = {
     name: 'agentrig-core',
-    source: 'agentrig-core',
+    source: './plugins/agentrig-core',
     description: 'Claude marketplace entry',
     version: '1.0.0',
     tags: ['core'],
