@@ -39,7 +39,6 @@ describe('materializePlugin', () => {
       '.mcp.json',
       '.plugin/plugin.json',
       'commands/review.md',
-      'README.md',
       'rules/typescript.mdc',
       'skills/review/SKILL.md',
     ])
@@ -56,7 +55,7 @@ describe('materializePlugin', () => {
           repo: 'repo',
           commitSha: 'abc123',
           scanDigest: scan.digest,
-          pickedSignalPaths: ['.claude/commands/review.md', '.cursor/rules/typescript.mdc', '.mcp.json', 'README.md', 'skills/review'],
+          pickedSignalPaths: ['.claude/commands/review.md', '.cursor/rules/typescript.mdc', '.mcp.json', 'skills/review'],
         },
       },
     })

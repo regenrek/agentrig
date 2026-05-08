@@ -23,7 +23,6 @@ describe('scanRepo', () => {
     expect(first.digest).toMatch(/^[a-f0-9]{64}$/)
     expect(first.signals.map((signal) => [signal.kind, signal.sourcePath])).toEqual([
       ['prompt', 'prompts/explain.md'],
-      ['doc', 'README.md'],
       ['skill', 'skills/review'],
     ])
   })
