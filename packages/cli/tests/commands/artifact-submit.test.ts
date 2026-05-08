@@ -89,7 +89,7 @@ describe('command:artifact submit', () => {
     })
 
     expect(mocks.createPluginSubmission).not.toHaveBeenCalled()
-    expect(console.log).toHaveBeenCalledWith('Publish shape: plugin_selected')
+    expect(console.log).toHaveBeenCalledWith('Submission type: canonical upstream review')
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"plugin_path": "skills/review"'))
   })
 })

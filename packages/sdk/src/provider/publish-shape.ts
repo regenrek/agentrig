@@ -2,10 +2,11 @@ import type { RepoScanPluginCandidate, RepoScanReport } from '../repo-scan/types
 import type { ArtifactClosure, ArtifactClosureStatus, ArtifactFileDigest, ExtractedArtifact } from './extract-artifacts'
 import { extractArtifactsFromRepoScan } from './extract-artifacts'
 import { formatArtifactSelector, parseArtifactSelector, type ArtifactKind, type SelectableArtifactKind } from './artifact-kinds'
+import { destinationPathForSignalFile } from './materialize'
 
 export const PUBLISH_SHAPE_KINDS = [
   'plugin_all',
-  'plugin_selected',
+  'generated_plugin',
   'standalone_artifacts',
   'discovery_only',
 ] as const
@@ -69,13 +70,34 @@ export type PublishShapeOutput = {
   installability: PublishInstallability
 }
 
+export type GeneratedPluginSkippedArtifact = {
+  selector: string
+  status: ArtifactClosureStatus
+  reason: string
+  requiredSelectors: string[]
+  requiredPaths: string[]
+}
+
+export type GeneratedPluginSetupNote = {
+  selector?: string
+  message: string
+}
+
+export type GeneratedPluginTransformPlan = {
+  requestedSelectors: string[]
+  includedSelectors: string[]
+  skipped: GeneratedPluginSkippedArtifact[]
+  setupNotes: GeneratedPluginSetupNote[]
+}
+
 export type PublishShapeCandidate = {
   shape: PublishShapeKind
   label: string
   defaultSelected: boolean
   allowed: boolean
   blockedReason?: string
-  selectedSelectors: string[]
+  includedSelectors: string[]
+  transformPlan?: GeneratedPluginTransformPlan
   produces: PublishShapeOutput[]
 }
 
@@ -101,8 +123,9 @@ export type SubmitPublishPayload = {
   scan: PublishScanResult
   publishShape: {
     shape: PublishShapeKind
-    selectedSelectors: string[]
+    includedSelectors: string[]
   }
+  transformPlan?: GeneratedPluginTransformPlan
   enrichment?: SubmitEnrichmentDraft
   review: SubmitReviewMetadata
 }
@@ -129,7 +152,7 @@ export type BuildSubmitPublishPayloadInput = {
 
 const PUBLISH_SHAPE_LABELS: Record<PublishShapeKind, string> = {
   plugin_all: 'Publish full plugin',
-  plugin_selected: 'Publish selected artifacts as plugin',
+  generated_plugin: 'Generate plugin from selected artifacts',
   standalone_artifacts: 'Publish selected standalone artifacts',
   discovery_only: 'Discovery only',
 }
@@ -187,8 +210,9 @@ export function buildSubmitPublishPayload(input: BuildSubmitPublishPayloadInput)
     scan: input.scan,
     publishShape: {
       shape,
-      selectedSelectors: candidate.selectedSelectors,
+      includedSelectors: candidate.includedSelectors,
     },
+    ...(candidate.transformPlan ? { transformPlan: candidate.transformPlan } : {}),
     ...(input.enrichment ? { enrichment: normalizeEnrichment(input.enrichment) } : {}),
     review: input.review,
   }
@@ -222,30 +246,38 @@ function candidateForShape(
   shape: PublishShapeKind,
   selectedSelectors: readonly string[]
 ): PublishShapeCandidate {
-  const shapeSelectors = shape === 'plugin_all' ? defaultSelectedSelectors(scan) : [...selectedSelectors]
-  const selectedArtifacts = artifactsBySelector(scan, shapeSelectors)
-  const blockedReason = blockedReasonForShape(scan, shape, selectedArtifacts)
+  const requestedSelectors = shape === 'plugin_all' ? defaultSelectedSelectors(scan) : [...selectedSelectors]
+  const requestedArtifacts = artifactsBySelector(scan, requestedSelectors)
+  const transformPlan = shape === 'generated_plugin' ? generatedPluginTransformPlan(requestedArtifacts) : undefined
+  const includedSelectors = transformPlan?.includedSelectors ?? requestedSelectors
+  const includedArtifacts = artifactsBySelector(scan, includedSelectors)
+  const blockedReason = blockedReasonForShape(scan, shape, requestedArtifacts, transformPlan)
   return {
     shape,
     label: PUBLISH_SHAPE_LABELS[shape],
     defaultSelected: false,
     allowed: !blockedReason,
     ...(blockedReason ? { blockedReason } : {}),
-    selectedSelectors: shapeSelectors,
-    produces: outputsForShape(scan, shape, selectedArtifacts, !blockedReason),
+    includedSelectors,
+    ...(transformPlan ? { transformPlan } : {}),
+    produces: outputsForShape(scan, shape, includedArtifacts, !blockedReason),
   }
 }
 
 function blockedReasonForShape(
   scan: PublishScanResult,
   shape: PublishShapeKind,
-  selectedArtifacts: readonly PublishArtifact[]
+  selectedArtifacts: readonly PublishArtifact[],
+  transformPlan?: GeneratedPluginTransformPlan
 ) {
   if (shape === 'discovery_only') return undefined
   if (shape === 'plugin_all') {
     return scan.pluginCandidate ? undefined : 'plugin_all requires a detected plugin candidate.'
   }
   if (selectedArtifacts.length === 0) return `${shape} requires at least one selected artifact.`
+  if (shape === 'generated_plugin') {
+    return transformPlan?.includedSelectors.length ? undefined : 'generated_plugin requires at least one transformable selected artifact.'
+  }
   const notClosed = selectedArtifacts.filter((artifact) => artifact.closureStatus !== 'closed')
   if (notClosed.length) {
     return `${shape} requires closed artifacts: ${notClosed.map((artifact) => artifact.selector).join(', ')}.`
@@ -264,7 +296,7 @@ function outputsForShape(
       ? [{ kind: 'plugin', artifactId: scan.pluginCandidate.artifactId, installability: allowed ? 'installable' : 'blocked' }]
       : []
   }
-  if (shape === 'plugin_selected') {
+  if (shape === 'generated_plugin') {
     return [{
       kind: 'plugin',
       artifactId: scan.pluginCandidate?.artifactId ?? fallbackPluginArtifactId(scan.source),
@@ -285,6 +317,73 @@ function outputsForShape(
     artifactId: artifact.artifactId,
     installability: 'discovery_only',
   }))
+}
+
+function generatedPluginTransformPlan(selectedArtifacts: readonly PublishArtifact[]): GeneratedPluginTransformPlan {
+  const included: PublishArtifact[] = []
+  const skipped: GeneratedPluginSkippedArtifact[] = []
+  const destinations = new Map<string, { selector: string; digest: string }>()
+
+  for (const artifact of selectedArtifacts) {
+    if (artifact.closureStatus !== 'closed') {
+      skipped.push({
+        selector: artifact.selector,
+        status: artifact.closureStatus,
+        reason: artifact.closureReason ?? `Artifact is not portable: ${artifact.closureStatus}.`,
+        requiredSelectors: [...artifact.requiredSelectors].sort(),
+        requiredPaths: [...artifact.requiredPaths].sort(),
+      })
+      continue
+    }
+
+    const conflict = materializedDestinationConflict(artifact, destinations)
+    if (conflict) {
+      skipped.push({
+        selector: artifact.selector,
+        status: artifact.closureStatus,
+        reason: conflict,
+        requiredSelectors: [],
+        requiredPaths: [],
+      })
+      continue
+    }
+    included.push(artifact)
+  }
+
+  return {
+    requestedSelectors: selectedArtifacts.map((artifact) => artifact.selector).sort(),
+    includedSelectors: included.map((artifact) => artifact.selector).sort(),
+    skipped: skipped.sort((left, right) => left.selector.localeCompare(right.selector)),
+    setupNotes: [],
+  }
+}
+
+function materializedDestinationConflict(artifact: PublishArtifact, destinations: Map<string, { selector: string; digest: string }>) {
+  const ownedDestinations = new Map<string, string>()
+  for (const file of artifact.files) {
+    let destination: string
+    try {
+      destination = destinationPathForSignalFile(artifact.kind as any, artifact.name, artifact.sourcePath, file.path)
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Artifact cannot be materialized into a generated plugin.'
+    }
+    const digest = normalizeFileDigest(file.digest)
+    const localDigest = ownedDestinations.get(destination)
+    if (localDigest && localDigest !== digest) {
+      return `Materialized path conflict inside ${artifact.selector}: ${destination}.`
+    }
+    const owner = destinations.get(destination)
+    if (owner && owner.digest !== digest) {
+      return `Materialized path conflict with ${owner.selector}: ${destination}.`
+    }
+    ownedDestinations.set(destination, digest)
+  }
+  for (const [destination, digest] of ownedDestinations) destinations.set(destination, { selector: artifact.selector, digest })
+  return null
+}
+
+function normalizeFileDigest(digest: string) {
+  return digest.trim().replace(/^sha256:/, '')
 }
 
 function publishArtifactFromExtracted(artifact: ExtractedArtifact, closure?: ArtifactClosure): PublishArtifact {

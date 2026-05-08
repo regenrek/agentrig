@@ -12,6 +12,7 @@
 - Claude marketplace manifests now reference the explicit `<pluginRoot>/<pluginName>` path instead of the bare plugin name so Claude resolves the bundled plugin location reliably.
 - Repo source resolution now downloads via the resolved GitHub commit URL, normalizes explicit subdirs, and exposes injectable `fetch`/`downloadTemplate` seams for testing.
 - Submission and uploads docs now describe the resolved-source CLI flow (`agentrig plugin submit owner/repo@v1.2.3`, `--version`, `--path`) and the matching skill/MCP/hook submit forms.
+- Renamed the SDK `plugin_selected` publish shape to `generated_plugin` with `includedSelectors` plus a new `transformPlan` (requested vs included selectors, skipped non-portable artifacts with reasons, setup notes) so submit clients can preview what materializes into the generated plugin, and aligned the CLI `artifact submit --dry-run` and submission output to print `Submission type: canonical upstream review`.
 
 ### Fixed
 - Trusted-publishing submissions in GitHub Actions now derive their source from `GITHUB_REPOSITORY@GITHUB_REF` plus `GITHUB_SHA`, going through the same resolver as interactive submits instead of constructing four separate canonical fields.

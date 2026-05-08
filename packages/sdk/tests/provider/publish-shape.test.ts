@@ -62,7 +62,7 @@ describe('publish shape primitives', () => {
       selectedSelectors: ['skill:review'],
       review: { provenanceVerified: true, ownershipVerified: true },
     })
-    expect(payload.publishShape.selectedSelectors).toEqual(['mcp:mcp', 'skill:review'])
+    expect(payload.publishShape.includedSelectors).toEqual(['mcp:mcp', 'skill:review'])
   })
 
   it('uses plugin identity lifted from the repo scan report', async () => {
@@ -125,12 +125,12 @@ describe('publish shape primitives', () => {
 
     expect(payload.publishShape).toEqual({
       shape: 'standalone_artifacts',
-      selectedSelectors: ['skill:review'],
+      includedSelectors: ['skill:review'],
     })
     expect(payload.enrichment).toEqual({ keywords: ['code', 'review'] })
   })
 
-  it('builds deterministic submit payloads for selected plugin artifacts', async () => {
+  it('builds deterministic submit payloads for generated plugin artifacts', async () => {
     const scan = buildPublishScanResult({
       source,
       report: await scanFixture(),
@@ -148,17 +148,22 @@ describe('publish shape primitives', () => {
     const payload = buildSubmitPublishPayload({
       source,
       scan,
-      requestedShape: 'plugin_selected',
+      requestedShape: 'generated_plugin',
       selectedSelectors: ['skill:review'],
       review: { provenanceVerified: true, ownershipVerified: true },
     })
 
     expect(payload.publishShape).toEqual({
-      shape: 'plugin_selected',
-      selectedSelectors: ['skill:review'],
+      shape: 'generated_plugin',
+      includedSelectors: ['skill:review'],
+    })
+    expect(payload.transformPlan).toMatchObject({
+      requestedSelectors: ['skill:review'],
+      includedSelectors: ['skill:review'],
+      skipped: [],
     })
     expect(payload.scan.pluginCandidate).toBeUndefined()
-    expect(buildPublishShapeCandidates(scan, ['skill:review']).find((candidate) => candidate.shape === 'plugin_selected')?.produces).toEqual([
+    expect(buildPublishShapeCandidates(scan, ['skill:review']).find((candidate) => candidate.shape === 'generated_plugin')?.produces).toEqual([
       { kind: 'plugin', artifactId: 'acme.tools', installability: 'installable' },
     ])
   })
@@ -174,7 +179,7 @@ describe('publish shape primitives', () => {
     expect(() => normalizePublishSelectors(['skill:missing'], scan.artifacts)).toThrow(/unknown/i)
   })
 
-  it('blocks selected publish shapes when closure requires full source', async () => {
+  it('skips non-portable artifacts when generating a plugin', async () => {
     const report = await scanFixture()
     const scan = buildPublishScanResult({
       source,
@@ -188,14 +193,53 @@ describe('publish shape primitives', () => {
           requiredPaths: ['skills/review/SKILL.md'],
           reason: 'References shared parent paths.',
         },
+        {
+          selector: 'mcp:mcp',
+          status: 'closed',
+          requiredSelectors: [],
+          requiredPaths: [],
+        },
       ],
     })
 
+    const payload = buildSubmitPublishPayload({
+      source,
+      scan,
+      requestedShape: 'generated_plugin',
+      selectedSelectors: ['skill:review', 'mcp:mcp'],
+      review: { provenanceVerified: true, ownershipVerified: true },
+    })
+
+    expect(payload.publishShape).toEqual({
+      shape: 'generated_plugin',
+      includedSelectors: ['mcp:mcp'],
+    })
+    expect(payload.transformPlan).toMatchObject({
+      requestedSelectors: ['mcp:mcp', 'skill:review'],
+      includedSelectors: ['mcp:mcp'],
+      skipped: [{
+        selector: 'skill:review',
+        status: 'requires-full-source',
+        requiredPaths: ['skills/review/SKILL.md'],
+      }],
+    })
+    expect(buildPublishShapeCandidates(scan, ['skill:review']).find((candidate) => candidate.shape === 'generated_plugin')).toMatchObject({
+      allowed: false,
+      transformPlan: {
+        requestedSelectors: ['skill:review'],
+        includedSelectors: [],
+        skipped: [{
+          selector: 'skill:review',
+          status: 'requires-full-source',
+          requiredPaths: ['skills/review/SKILL.md'],
+        }],
+      },
+    })
     expect(() =>
       buildSubmitPublishPayload({
         source,
         scan,
-        requestedShape: 'plugin_selected',
+        requestedShape: 'standalone_artifacts',
         selectedSelectors: ['skill:review'],
         review: { provenanceVerified: true, ownershipVerified: true },
       })
@@ -218,5 +262,106 @@ describe('publish shape primitives', () => {
         review: { provenanceVerified: true, ownershipVerified: true },
       })
     ).toThrow(/requires closed artifacts/i)
+  })
+
+  it('skips generated plugin artifacts that would materialize to the same target path', () => {
+    const scan = buildPublishScanResult({
+      source,
+      report: {
+        digest: 'b'.repeat(64),
+        signals: [
+          {
+            kind: 'mcp',
+            id: 'mcp',
+            title: 'Root MCP',
+            sourcePath: '.mcp.json',
+            files: [{ path: '.mcp.json', sha256: 'a'.repeat(64), bytes: 20 }],
+            providerAffinity: { claude: 1, codex: 1, cursor: 1 },
+            providerCompat: { claude: 'native', codex: 'native', cursor: 'native' },
+            score: 1,
+          },
+          {
+            kind: 'mcp',
+            id: 'github',
+            title: 'GitHub MCP',
+            sourcePath: 'mcps/github',
+            files: [{ path: 'mcps/github/config.json', sha256: 'c'.repeat(64), bytes: 20 }],
+            providerAffinity: { claude: 1, codex: 1, cursor: 1 },
+            providerCompat: { claude: 'native', codex: 'native', cursor: 'native' },
+            score: 1,
+          },
+        ],
+      },
+      scannerVersion: 'repo-scan-v1',
+      closures: [
+        { selector: 'mcp:mcp', status: 'closed', requiredSelectors: [], requiredPaths: [] },
+        { selector: 'mcp:github', status: 'closed', requiredSelectors: [], requiredPaths: [] },
+      ],
+    })
+
+    const candidate = buildPublishShapeCandidates(scan, ['mcp:mcp', 'mcp:github'])
+      .find((item) => item.shape === 'generated_plugin')
+    expect(candidate).toMatchObject({
+      allowed: true,
+      transformPlan: {
+        includedSelectors: ['mcp:github'],
+        skipped: [{
+          selector: 'mcp:mcp',
+          reason: expect.stringContaining('Materialized path conflict'),
+        }],
+      },
+    })
+  })
+
+  it('skips a generated plugin artifact whose own files conflict on one target path', () => {
+    const scan = buildPublishScanResult({
+      source,
+      report: {
+        digest: 'd'.repeat(64),
+        signals: [
+          {
+            kind: 'mcp',
+            id: 'mcp',
+            title: 'MCP Servers',
+            sourcePath: 'mcps',
+            files: [
+              { path: 'mcps/a.json', sha256: 'a'.repeat(64), bytes: 20 },
+              { path: 'mcps/b.json', sha256: 'b'.repeat(64), bytes: 20 },
+            ],
+            providerAffinity: { claude: 1, codex: 1, cursor: 1 },
+            providerCompat: { claude: 'native', codex: 'native', cursor: 'native' },
+            score: 1,
+          },
+          {
+            kind: 'skill',
+            id: 'review',
+            title: 'Review',
+            sourcePath: 'skills/review',
+            files: [{ path: 'skills/review/SKILL.md', sha256: 'c'.repeat(64), bytes: 20 }],
+            providerAffinity: { claude: 1, codex: 1, cursor: 1 },
+            providerCompat: { claude: 'native', codex: 'native', cursor: 'native' },
+            score: 1,
+          },
+        ],
+      },
+      scannerVersion: 'repo-scan-v1',
+      closures: [
+        { selector: 'mcp:mcp', status: 'closed', requiredSelectors: [], requiredPaths: [] },
+        { selector: 'skill:review', status: 'closed', requiredSelectors: [], requiredPaths: [] },
+      ],
+    })
+
+    const candidate = buildPublishShapeCandidates(scan, ['mcp:mcp', 'skill:review'])
+      .find((item) => item.shape === 'generated_plugin')
+    expect(candidate).toMatchObject({
+      allowed: true,
+      transformPlan: {
+        includedSelectors: ['skill:review'],
+        skipped: [{
+          selector: 'mcp:mcp',
+          reason: expect.stringContaining('inside mcp:mcp'),
+        }],
+      },
+    })
   })
 })

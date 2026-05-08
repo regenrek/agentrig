@@ -217,14 +217,14 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
       })
 
       if (args.dryRun) {
-        console.log('Publish shape: plugin_selected')
+        console.log('Submission type: canonical upstream review')
         console.log(JSON.stringify(payload, null, 2))
         return
       }
 
       const created = await createPluginSubmission(baseUrl, session.accessToken, payload)
       console.log(`Submission: ${created.submissionId}`)
-      console.log('Publish shape: plugin_selected')
+      console.log('Submission type: canonical upstream review')
       if (created.deduped) console.log('Result: existing submission reused')
       console.log(`${kind} submission recorded through canonical plugin review`)
     },
