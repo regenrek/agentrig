@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   createPluginSubmission: vi.fn(),
   getPluginSubmissionStatus: vi.fn(),
   mintPublishToken: vi.fn(),
+  resolveAuthenticatedCommunityBaseUrl: vi.fn(),
   resolveCommunityBaseUrl: vi.fn(),
   hasGitHubActionsOidcEnv: vi.fn(),
   requestGitHubActionsOidcToken: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock('../../src/lib/community-api', () => ({
   createPluginSubmission: mocks.createPluginSubmission,
   getPluginSubmissionStatus: mocks.getPluginSubmissionStatus,
   mintPublishToken: mocks.mintPublishToken,
+  resolveAuthenticatedCommunityBaseUrl: mocks.resolveAuthenticatedCommunityBaseUrl,
   resolveCommunityBaseUrl: mocks.resolveCommunityBaseUrl,
 }))
 
@@ -47,6 +49,7 @@ describe('command:plugin submit', () => {
       accessToken: 'token',
       baseUrl: 'https://agentrig.ai',
     })
+    mocks.resolveAuthenticatedCommunityBaseUrl.mockReturnValue('https://agentrig.ai')
     mocks.resolveCommunityBaseUrl.mockReturnValue('https://agentrig.ai')
     mocks.createPluginSubmission.mockResolvedValue({
       submissionId: 'submission-123',

@@ -7,7 +7,7 @@ icon: ListChecks
 # Selection install
 
 Selection install lets you install only the artifacts you want from an
-installable registry plugin.
+installable marketplace plugin.
 
 Plugins remain AgentRig's primary distribution unit. A plugin can contain many
 skills, MCP servers, hooks, commands, and supporting files. Selection install is
@@ -53,10 +53,10 @@ agentrig skill install codex agentrig/acme.review
 agentrig skill uninstall codex agentrig/acme.review
 ```
 
-The source must be a signed registry skill artifact. AgentRig resolves the latest
-version, installs the skill, and records the concrete resolved version plus
-snapshot digest in the install ledger. You can add `@<version>` to install or
-uninstall a pinned standalone skill.
+The source must be an installable marketplace skill artifact. AgentRig resolves
+the latest version through an `InstallBundle`, installs the skill, and records
+the concrete resolved version plus snapshot digest in the install ledger. You
+can add `@<version>` to install or uninstall a pinned standalone skill.
 
 Standalone MCP and hook installs without `--pick` are not a public V1 flow. MCPs
 and hooks are installed from plugin bundles with `--pick`.
@@ -93,9 +93,9 @@ dependencies instead.
 
 ## Trust model
 
-Selection install is registry-backed. The source plugin must be installable in a
-signed registry. `blocked`, `yanked`, and `listed` entries do not become
-installable just because an artifact directory exists.
+Selection install is marketplace-backed. The source plugin must have an
+installable AgentRig listing. `blocked`, `yanked`, and `taken_down` entries do
+not become installable just because an artifact directory exists.
 
 For arbitrary author repos, use `agentrig inspect` and `agentrig use`; those
-commands create external-repo provenance, not registry trust.
+commands create external-repo provenance, not marketplace trust.

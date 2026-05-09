@@ -3,7 +3,7 @@ import { loadAuthSession } from '../../lib/auth'
 import {
   getPluginSubmissionStatus,
   listPluginSubmissions,
-  resolveCommunityBaseUrl,
+  resolveAuthenticatedCommunityBaseUrl,
 } from '../../lib/community-api'
 import { selectOption } from '../../lib/interactive'
 
@@ -60,7 +60,7 @@ const command = defineCommand({
       throw new Error('Not logged in. Run `agentrig login` first.')
     }
 
-    const baseUrl = resolveCommunityBaseUrl(args.baseUrl, session.baseUrl)
+    const baseUrl = resolveAuthenticatedCommunityBaseUrl(args.baseUrl, session.baseUrl)
     let submissionId = args.submissionId
 
     if (!submissionId) {

@@ -14,7 +14,7 @@ Instead of rebuilding the same setup for every repo or assistant, you can author
 <Cards>
   <Card title="Getting started" href="/getting-started" description="Learn how agentrig helps and how to try it quickly." />
   <Card title="Plugins" href="/plugins" description="Define .plugin/plugin.json, files, and dependencies." />
-  <Card title="Registry" href="/registry" description="Publish registry-backed plugins and separate install trust from discovery." />
+  <Card title="Registry" href="/registry" description="Understand verified mirrors and how install trust differs from discovery." />
   <Card title="Rigs" href="/rigs" description="Combine plugins into reusable setups for teams and projects." />
   <Card title="CLI" href="/cli" description="Commands and flags with examples." />
   <Card title="Configuration" href="/configuration" description="Global and project config schema." />
@@ -26,7 +26,8 @@ Instead of rebuilding the same setup for every repo or assistant, you can author
 
 <Callout title="What is a plugin?">
 A plugin is a folder with `.plugin/plugin.json` plus the files you want to install (skills, scripts, hooks, agents, MCP, and more).
-The CLI's public install contract is static signed registries only.
+The CLI's public install contract is the AgentRig `InstallBundle` resolved from
+approved marketplace listings.
 </Callout>
 
 ## How AgentRig helps
@@ -36,7 +37,7 @@ The CLI's public install contract is static signed registries only.
 Agentrig is not limited to one assistant or editor.
 You can export and install the same plugin as a native integration for the tools many developers already work in every day.
 
-- **Reusable workflow plugins:** package skills, MCP config, hooks, agents, commands, and rules into registry-installable plugins that can be shared across projects.
+- **Reusable workflow plugins:** package skills, MCP config, hooks, agents, commands, and rules into marketplace-installable plugins that can be shared across projects.
 - **Composable rigs for teams:** combine plugins into shared setups for a stack, repo, or org so teams can standardize how they work with AI.
 - **Native delivery where people work:** export the same workflows as integrations for [Claude Code](/integrations/claude-code), [Codex](/integrations/codex), and [Cursor](/integrations/cursor), with tracked installs and safer cleanup.
 

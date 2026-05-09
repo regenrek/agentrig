@@ -142,6 +142,33 @@ export function resolveCommunityBaseUrl(
   return normalizeBaseUrl(baseUrl)
 }
 
+export function resolveAuthenticatedCommunityBaseUrl(
+  explicitBaseUrl: string | undefined,
+  storedBaseUrl: string
+) {
+  const stored = normalizeBaseUrl(storedBaseUrl)
+  const requested = resolveCommunityBaseUrl(explicitBaseUrl, stored)
+  if (requested !== stored) {
+    throw new Error(
+      `Stored AgentRig token is bound to ${stored}. Log in again before using ${requested}.`
+    )
+  }
+  assertAuthenticatedBaseUrl(requested)
+  return requested
+}
+
+function assertAuthenticatedBaseUrl(baseUrl: string) {
+  const url = new URL(baseUrl)
+  if (url.protocol === 'https:') return
+  if (url.protocol === 'http:' && isLoopbackHost(url.hostname)) return
+  throw new Error('Authenticated AgentRig requests require HTTPS or loopback HTTP.')
+}
+
+function isLoopbackHost(hostname: string) {
+  const host = hostname.toLowerCase()
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost')
+}
+
 export async function startCliLogin(baseUrl: string) {
   return await request<CliLoginStart>(baseUrl, '/api/cli/auth/start', {
     method: 'POST',

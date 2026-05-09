@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- Added canonical marketplace listing and install-bundle SDK contracts so CLI installs can consume Convex-backed plugin and artifact listings without registry-materialization fallbacks.
+
+### Changed
+- Updated CLI, provider install paths, and registry docs around canonical marketplace browse/install flows for plugins and standalone artifacts.
+
 ## [0.6.1] - 2026-05-08
 
 ### Added

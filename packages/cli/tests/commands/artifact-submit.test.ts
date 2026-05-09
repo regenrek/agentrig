@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   loadAuthSession: vi.fn(),
   createPluginSubmission: vi.fn(),
-  resolveCommunityBaseUrl: vi.fn(),
+  resolveAuthenticatedCommunityBaseUrl: vi.fn(),
   resolveSubmitSource: vi.fn(),
 }))
 
@@ -13,7 +13,7 @@ vi.mock('../../src/lib/auth', () => ({
 
 vi.mock('../../src/lib/community-api', () => ({
   createPluginSubmission: mocks.createPluginSubmission,
-  resolveCommunityBaseUrl: mocks.resolveCommunityBaseUrl,
+  resolveAuthenticatedCommunityBaseUrl: mocks.resolveAuthenticatedCommunityBaseUrl,
 }))
 
 vi.mock('../../src/lib/submit-source', () => ({
@@ -34,7 +34,7 @@ describe('command:artifact submit', () => {
       accessToken: 'token',
       baseUrl: 'https://agentrig.ai',
     })
-    mocks.resolveCommunityBaseUrl.mockReturnValue('https://agentrig.ai')
+    mocks.resolveAuthenticatedCommunityBaseUrl.mockReturnValue('https://agentrig.ai')
     mocks.createPluginSubmission.mockResolvedValue({
       submissionId: 'submission-123',
       deduped: false,

@@ -8,6 +8,7 @@ import {
   formatArtifactSelector,
   normalizeSelectionPick,
   type ExtractedArtifact,
+  type InstallBundle,
   type SelectableArtifactKind,
   type SelectionBundle,
   type SelectionProviderId,
@@ -27,7 +28,7 @@ import {
   resolveRegistryArtifactInstallSpecIdentity,
 } from './plugin-install-spec'
 import type { ParsedRegistryArtifactKind } from './registry-spec'
-import { registryArtifactSourcePath } from './registry'
+import { installBundleSnapshotDigest } from './registry'
 import {
   createProviderJsonWrite,
   formatKeptModifiedJsonWrite,
@@ -38,17 +39,15 @@ import {
   removeSelectionInstallRecords,
   upsertSelectionInstallRecords,
 } from './plugin-install-ledger'
-import type { ResolvedPlugin } from './registry'
-import type { ResolvedStandaloneArtifact } from './registry'
 import type {
   PluginInstallScopeName,
   PluginInstallScopeSelectorName,
   PluginInstallSpecIdentity,
   PluginInstalledFile,
   PluginJsonWrite,
-  RegistryRef,
   SelectionInstallRecord,
 } from './types'
+import type { RegistryRef } from '@agentrig/sdk'
 
 export type RegistryPluginSelectionInstallInput = {
   sourceKind?: 'registry-plugin'
@@ -57,7 +56,7 @@ export type RegistryPluginSelectionInstallInput = {
   requestedScope: PluginInstallScopeSelectorName
   scope: PluginInstallScopeName
   registryRef: string
-  resolved: ResolvedPlugin
+  resolved: InstallBundle
   pluginDir: string
   picks: string[]
   defaultKind?: SelectableArtifactKind
@@ -72,7 +71,7 @@ export type RegistryArtifactSelectionInstallInput = {
   requestedScope: PluginInstallScopeSelectorName
   scope: PluginInstallScopeName
   registryRef: string
-  resolved: ResolvedStandaloneArtifact
+  resolved: InstallBundle
   pluginDir: string
   picks?: string[]
   force?: boolean
@@ -134,7 +133,7 @@ export async function installArtifactSelection(input: ArtifactSelectionInstallIn
 
   const artifacts = input.sourceKind === 'registry-artifact'
     ? [artifactFromStandaloneRegistryArtifact(input.resolved)]
-    : extractArtifactsFromPluginLock(input.resolved.lockArtifact)
+    : extractArtifactsFromPluginLock(lockFromInstallBundle(input.resolved))
   const selectedSelectors = input.sourceKind === 'registry-artifact'
     ? artifacts.map((artifact) => artifact.selector)
     : input.picks.map((pick) => normalizeSelectionPick(pick, input.defaultKind))
@@ -166,9 +165,9 @@ export async function installArtifactSelection(input: ArtifactSelectionInstallIn
       : getResolvedPluginSpecIdentity(input.resolved),
     registry: getResolvedVerifiedRegistryIdentity(input.resolved),
     scope: input.scope,
-    pluginId: input.sourceKind === 'registry-artifact' ? input.resolved.artifactId : input.resolved.manifest.id,
-    pluginVersion: input.resolved.manifest.version,
-    snapshotDigest: input.resolved.snapshotDigest,
+    pluginId: input.resolved.listing.artifactId,
+    pluginVersion: input.resolved.listing.version,
+    snapshotDigest: installBundleSnapshotDigest(input.resolved),
     selectionId: bundle.selectionId,
     selectedSelectors: bundle.selectedArtifacts.map((artifact) => artifact.selector),
     targetPaths: bundle.targetPaths.map((targetPath) => resolveTargetPath(rootDir, targetPath)),
@@ -236,48 +235,80 @@ function selectionSourceForInstall(input: ArtifactSelectionInstallInput) {
   if (input.sourceKind === 'registry-artifact') {
     return {
       kind: 'registry-artifact' as const,
-      registryAlias: input.resolved.registry.name,
-      registryUrl: input.resolved.registry.url,
-      registryRef: `${input.resolved.registry.name}/${input.resolved.artifactId}@${input.resolved.manifest.version}`,
-      artifactKind: input.resolved.artifactKind,
-      artifactId: input.resolved.artifactId,
-      version: input.resolved.manifest.version,
-      snapshotDigest: input.resolved.snapshotDigest,
+      registryAlias: input.resolved.listing.registryAlias ?? 'agentrig',
+      registryUrl: input.resolved.source.url ?? 'https://agentrig.ai',
+      registryRef: `${input.resolved.listing.registryAlias ?? 'agentrig'}/${input.resolved.listing.slug ?? input.resolved.listing.artifactId}@${input.resolved.listing.version}`,
+      artifactKind: input.resolved.listing.kind,
+      artifactId: input.resolved.listing.artifactId,
+      version: input.resolved.listing.version,
+      snapshotDigest: installBundleSnapshotDigest(input.resolved),
     }
   }
   return {
     kind: 'registry-plugin' as const,
-    registryAlias: input.resolved.registry.name,
-    registryUrl: input.resolved.registry.url,
-    registryRef: `${input.resolved.registry.name}/${input.resolved.manifest.id}@${input.resolved.manifest.version}`,
-    artifactId: input.resolved.manifest.id,
-    version: input.resolved.manifest.version,
-    snapshotDigest: input.resolved.snapshotDigest,
+    registryAlias: input.resolved.listing.registryAlias ?? 'agentrig',
+    registryUrl: input.resolved.source.url ?? 'https://agentrig.ai',
+    registryRef: `${input.resolved.listing.registryAlias ?? 'agentrig'}/${input.resolved.listing.slug ?? input.resolved.listing.artifactId}@${input.resolved.listing.version}`,
+    artifactId: input.resolved.listing.artifactId,
+    version: input.resolved.listing.version,
+    snapshotDigest: installBundleSnapshotDigest(input.resolved),
   }
 }
 
-function artifactFromStandaloneRegistryArtifact(resolved: ResolvedStandaloneArtifact): ExtractedArtifact {
-  const sourcePath = registryArtifactSourcePath(resolved.artifactKind, resolved.artifactId)
-  const name = sourcePath.split('/').pop() ?? resolved.artifactId
-  const selector = formatArtifactSelector(resolved.artifactKind, name)
+function artifactFromStandaloneRegistryArtifact(resolved: InstallBundle): ExtractedArtifact {
+  const sourcePath = standaloneArtifactSourcePath(resolved)
+  const name = sourcePath === '.'
+    ? (resolved.listing.slug ?? resolved.listing.artifactId).split(/[/.]/).pop() ?? resolved.listing.artifactId
+    : sourcePath.split('/').pop() ?? resolved.listing.artifactId
+  const selector = formatArtifactSelector(resolved.listing.kind as ExtractedArtifact['kind'], name)
+  const fileDigests = resolved.file_list.map((file) => ({
+    path: file.path,
+    digest: file.sha256,
+    bytes: file.size,
+  }))
   return {
-    kind: resolved.artifactKind,
+    kind: resolved.listing.kind as ExtractedArtifact['kind'],
     origin: 'standalone',
     name,
-    artifactId: resolved.artifactId,
+    artifactId: resolved.listing.artifactId,
     selector,
     sourcePath,
-    paths: resolved.lockArtifact.file_digests.map((file) => `${sourcePath}/${file.path}`),
-    fileDigests: resolved.lockArtifact.file_digests.map((file) => ({
-      path: `${sourcePath}/${file.path}`,
-      digest: file.digest,
-    })),
+    paths: fileDigests.map((file) => file.path),
+    fileDigests,
     dependencies: [],
-    capabilitySet: resolved.lockArtifact.capability_set,
-    declaredNetworkDomains: resolved.lockArtifact.declared_network_domains,
-    declaredSecrets: resolved.lockArtifact.declared_secrets,
-    runtimeRequirements: resolved.lockArtifact.runtime_requirements,
+    capabilitySet: [],
+    declaredNetworkDomains: [],
+    declaredSecrets: [],
+    runtimeRequirements: [],
   }
+}
+
+function lockFromInstallBundle(bundle: InstallBundle) {
+  return {
+    plugin: bundle.listing.artifactId,
+    version: bundle.listing.version,
+    file_digests: bundle.file_list.map((file) => ({
+      path: file.path,
+      digest: file.sha256,
+      bytes: file.size,
+    })),
+    capability_set: [],
+    declared_network_domains: [],
+    declared_secrets: [],
+    runtime_requirements: [],
+    dependencies: [],
+    snapshot_digest: installBundleSnapshotDigest(bundle),
+  }
+}
+
+function standaloneArtifactSourcePath(bundle: InstallBundle) {
+  const firstPath = bundle.file_list[0]?.path
+  if (!firstPath) return '.'
+  const segments = firstPath.split('/')
+  if (segments.length > 2 && ['skills', 'mcps', 'hooks'].includes(segments[0]!)) {
+    return segments.slice(0, 2).join('/')
+  }
+  return '.'
 }
 
 async function resolveSelectedArtifacts(pluginDir: string, artifacts: ExtractedArtifact[], selectedSelectors: string[]) {
@@ -413,23 +444,25 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
   const missing: string[] = []
   const clearedRecordIds: string[] = []
   for (const record of records) {
+    const rootDir = resolveSelectionRoot(input.cwd, record.provider, record.scope)
     let recordKept = false
     for (const file of record.files) {
-      if (!(await pathExists(file.path))) {
-        missing.push(file.path)
+      const filePath = resolveTargetPath(rootDir, file.path)
+      if (!(await pathExists(filePath))) {
+        missing.push(filePath)
         continue
       }
-      const actual = `sha256:${sha256Hex(await fs.readFile(file.path))}`
+      const actual = `sha256:${sha256Hex(await fs.readFile(filePath))}`
       if (actual !== file.sha256) {
-        kept.push(file.path)
+        kept.push(filePath)
         recordKept = true
         continue
       }
-      if (!input.dryRun) await fs.rm(file.path, { force: true })
-      removed.push(file.path)
+      if (!input.dryRun) await fs.rm(filePath, { force: true })
+      removed.push(filePath)
     }
     for (const write of record.jsonWrites) {
-      const outcome = await removeJsonWrite(write, Boolean(input.dryRun))
+      const outcome = await removeJsonWrite(rootDir, write, Boolean(input.dryRun))
       removed.push(...outcome.removed)
       kept.push(...outcome.kept)
       missing.push(...outcome.missing)
@@ -540,24 +573,25 @@ function readJsonKey(existing: Record<string, unknown>, keyPath: string) {
   return existing[keyPath]
 }
 
-async function removeJsonWrite(write: PluginJsonWrite, dryRun: boolean) {
-  if (!(await pathExists(write.path))) return { removed: [], kept: [], missing: [write.path] }
-  const raw = await readJsonFile<unknown>(write.path)
+async function removeJsonWrite(rootDir: string, write: PluginJsonWrite, dryRun: boolean) {
+  const writePath = resolveTargetPath(rootDir, write.path)
+  if (!(await pathExists(writePath))) return { removed: [], kept: [], missing: [writePath] }
+  const raw = await readJsonFile<unknown>(writePath)
   const record = toRecord(raw)
-  if (!record) return { removed: [], kept: [formatKeptModifiedJsonWrite(write.path, write.keyPath)], missing: [] }
+  if (!record) return { removed: [], kept: [formatKeptModifiedJsonWrite(writePath, write.keyPath)], missing: [] }
   const keys = write.keys ?? []
   const target = write.keyPath === '$' ? record : toRecord(record[write.keyPath])
-  if (!target) return { removed: [], kept: [], missing: [write.path] }
+  if (!target) return { removed: [], kept: [], missing: [writePath] }
   const ownedSubset = Object.fromEntries(keys.filter((key) => key in target).map((key) => [key, target[key]]))
   if (digestJson(ownedSubset) !== write.writtenValueSha256) {
-    return { removed: [], kept: [formatKeptModifiedJsonWrite(write.path, write.keyPath)], missing: [] }
+    return { removed: [], kept: [formatKeptModifiedJsonWrite(writePath, write.keyPath)], missing: [] }
   }
   if (!dryRun) {
     for (const key of keys) delete target[key]
     if (write.keyPath !== '$') record[write.keyPath] = target
-    await writeJsonFile(write.path, record)
+    await writeJsonFile(writePath, record)
   }
-  return { removed: [`${write.path}:${write.keyPath}`], kept: [], missing: [] }
+  return { removed: [`${writePath}:${write.keyPath}`], kept: [], missing: [] }
 }
 
 function sameSelectors(left: string[], right: string[]) {

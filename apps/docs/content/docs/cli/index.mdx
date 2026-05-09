@@ -7,7 +7,7 @@ icon: Terminal
 # CLI overview
 
 The CLI installs full plugin bundles, installs selected artifacts from those
-bundles, manages registries, and applies rigs.
+bundles, manages registry aliases, and applies rigs.
 Run `agentrig --help` for global help.
 
 ## Common commands
@@ -24,15 +24,16 @@ Run `agentrig --help` for global help.
 - `agentrig registry add` - add a registry.
 - `agentrig plugin init` - scaffold a new plugin.
 
-Public installs use latest-first registry refs:
+Public installs use latest-first marketplace refs:
 `<registryAlias>/<namespace.plugin>` for plugins and
 `<registryAlias>/<namespace.skill>` for standalone skills. Add `@<version>` only
 when you need an explicit reproducibility or rollback pin. Install ledgers still
 record the concrete resolved version and snapshot digest, even when the command
-uses the unversioned latest ref.
+uses the unversioned latest ref. Install commands resolve refs by fetching an
+AgentRig `InstallBundle` from `agentrig.ai`.
 
 Plugin install remains the primary full-bundle path. Selection install is the
-selective path for choosing specific artifacts from an installable registry
+selective path for choosing specific artifacts from an installable marketplace
 plugin. In V1, standalone MCP and hook installs without `--pick` are not a
 public flow; install MCPs and hooks as plugin contents with `--pick`.
 

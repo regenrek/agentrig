@@ -10,10 +10,12 @@ AgentRig separates publishing from installability.
 
 ## Installable publishing paths
 
-Installable publication happens through:
+Installable publication happens through the AgentRig marketplace. Approval
+creates a marketplace listing and the CLI resolves installs by fetching an
+`InstallBundle` from `agentrig.ai`.
 
-- the official static signed registry
-- a self-hosted static signed registry that implements the same contract
+The verified registry mirror is a separate audit and verification lane. It is
+not required for marketplace approval or normal public installs.
 
 ## Submission and review
 
@@ -24,9 +26,15 @@ Submission is not itself an install source.
 
 See: [Submission contract](/plugins/uploads)
 
-For the official registry flow, approval in the admin UI does not publish the plugin directly.
-Approval starts promotion and opens or updates a PR into `agentrig-registry`.
-The version becomes publicly installable only after that PR is merged.
+There are two independent lifecycles:
+
+1. Submission lifecycle: submit, validate, review, then approve or reject. An
+   approval materializes the marketplace listing.
+2. Verified-mirror lifecycle: an optional admin **Start verified mirror** action
+   creates a reviewable PR into `agentrig-registry` for approved listings.
+
+Being approved into the marketplace does **not** require a GitHub PR. The only
+repository app used for source fetches is the read-only user-repo-sync app.
 
 ## Trusted publishing from GitHub Actions
 
@@ -38,7 +46,8 @@ Flow:
 - AgentRig verifies issuer, audience, repository, repository id, owner, owner id, workflow, optional environment, SHA, ref, run id, and run attempt.
 - AgentRig mints a short-lived scoped publish token.
 - The CLI submits the canonical plugin snapshot through the normal submission endpoint.
-- Registry promotion still requires review and signed immutable registry output.
+- Marketplace approval still requires review. Verified mirroring, when used, is
+  an explicit admin action after approval.
 
 Required workflow permissions:
 

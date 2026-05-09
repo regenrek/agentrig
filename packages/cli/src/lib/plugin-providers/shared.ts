@@ -348,6 +348,16 @@ export function toPosixPath(value: string) {
   return value.split(path.sep).join('/')
 }
 
+export function assertContainedPath(rootDir: string, candidatePath: string, label: string) {
+  const root = path.resolve(rootDir)
+  const candidate = path.resolve(candidatePath)
+  const relative = path.relative(root, candidate)
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Unsafe ${label} path: ${candidatePath}`)
+  }
+  return candidate
+}
+
 export function normalizeManifestDescription(meta: PluginSourceManifest) {
   return meta.description || meta.name
 }
@@ -640,12 +650,13 @@ export async function copyInstalledPlugin(
 }
 
 async function pruneEmptyDirectories(rootDir: string, filePaths: string[], dryRun: boolean) {
+  const root = path.resolve(rootDir)
   const candidateDirs = new Set<string>()
   for (const filePath of filePaths) {
-    let currentDir = path.dirname(filePath)
-    while (currentDir.startsWith(rootDir)) {
+    let currentDir = path.dirname(assertContainedPath(root, filePath, 'installed file'))
+    while (true) {
       candidateDirs.add(currentDir)
-      if (currentDir === rootDir) break
+      if (currentDir === root) break
       currentDir = path.dirname(currentDir)
     }
   }
@@ -669,28 +680,30 @@ export async function removeInstalledFiles(
   const removed: string[] = []
   const kept: string[] = []
   const missing: string[] = []
+  const safeRoot = path.resolve(rootDir)
 
   for (const file of files) {
-    if (!(await pathExists(file.path))) {
-      missing.push(file.path)
+    const filePath = assertContainedPath(safeRoot, file.path, 'installed file')
+    if (!(await pathExists(filePath))) {
+      missing.push(filePath)
       continue
     }
 
-    const buf = await fs.readFile(file.path)
+    const buf = await fs.readFile(filePath)
     const actual = sha256Hex(buf)
     if (actual !== file.sha256) {
-      kept.push(file.path)
+      kept.push(filePath)
       continue
     }
 
     if (!dryRun) {
-      await fs.rm(file.path, { force: true })
+      await fs.rm(filePath, { force: true })
     }
-    removed.push(file.path)
+    removed.push(filePath)
   }
 
   if (kept.length === 0) {
-    await pruneEmptyDirectories(rootDir, files.map((file) => file.path), dryRun)
+    await pruneEmptyDirectories(safeRoot, files.map((file) => file.path), dryRun)
   }
 
   return { removed, kept, missing }

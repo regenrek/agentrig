@@ -21,6 +21,7 @@ import {
   copyEntries,
   copyInstalledPlugin,
   detectPluginFeatures,
+  assertContainedPath,
   normalizeManifestDescription,
   pluginAuthor,
   removeInstalledFiles,
@@ -209,16 +210,23 @@ export const cursorProvider: PluginProviderAdapter = {
       ledgerEntries,
     }
   },
-  async uninstall({ entries, dryRun }) {
+  async uninstall({ cwd, entries, dryRun }) {
     const removed: string[] = []
     const kept: string[] = []
     const missing: string[] = []
     const clearedRecordIds: string[] = []
-    const locations = [...new Set(entries.flatMap((entry) => entry.targetPaths))]
+    const locations = new Set<string>()
 
     for (const entry of entries) {
       if (entry.provider !== 'cursor') continue
-      const summary = await removeInstalledFiles(entry.metadata.pluginPath, entry.files, dryRun)
+      const pluginRoot = resolveCursorInstallRoot(cwd, entry.scope)
+      const pluginPath = assertContainedPath(
+        pluginRoot,
+        path.join(pluginRoot, entry.pluginName),
+        'Cursor plugin install'
+      )
+      locations.add(pluginPath)
+      const summary = await removeInstalledFiles(pluginPath, entry.files, dryRun)
       if (summary.kept.length > 0) {
         kept.push(entry.pluginName)
         continue
@@ -237,7 +245,7 @@ export const cursorProvider: PluginProviderAdapter = {
       removed,
       kept,
       missing,
-      locations,
+      locations: [...locations],
       clearedRecordIds,
     }
   },

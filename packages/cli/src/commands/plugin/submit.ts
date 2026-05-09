@@ -6,6 +6,7 @@ import {
   createPluginSubmission,
   getPluginSubmissionStatus,
   mintPublishToken,
+  resolveAuthenticatedCommunityBaseUrl,
   resolveCommunityBaseUrl,
 } from '../../lib/community-api'
 import { readJsonFile } from '../../lib/fs'
@@ -123,7 +124,9 @@ const command = defineCommand({
     const source = optionalArg(args.source) ?? (trustedPublish ? defaultTrustedSource() : undefined)
     if (!source) throw new Error('Submit source required. Use a local path, owner/repo@tag, or GitHub URL.')
 
-    const baseUrl = resolveCommunityBaseUrl(optionalArg(args.baseUrl), session?.baseUrl)
+    const baseUrl = trustedPublish
+      ? resolveCommunityBaseUrl(optionalArg(args.baseUrl), session?.baseUrl)
+      : resolveAuthenticatedCommunityBaseUrl(optionalArg(args.baseUrl), session!.baseUrl)
     const payload = await resolveSubmitSource({
       source,
       version: optionalArg(args.version),

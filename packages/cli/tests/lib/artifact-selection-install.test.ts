@@ -13,11 +13,12 @@ import {
   loadPluginInstallLedgers,
   upsertSelectionInstallRecords,
 } from '../../src/lib/plugin-install-ledger'
-import type { ResolvedStandaloneArtifact } from '../../src/lib/registry'
+import { installBundleSnapshotDigest } from '../../src/lib/registry'
 import type { RegistryRef, SelectionInstallRecord } from '../../src/lib/types'
+import type { InstallBundle } from '@agentrig/sdk'
 
 const tempDirs: string[] = []
-const registries: RegistryRef[] = [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }]
+const registries: RegistryRef[] = [{ name: 'agentrig', url: 'https://agentrig.ai' }]
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
@@ -61,7 +62,7 @@ describe('installArtifactSelection', () => {
       kind: 'registry-artifact',
       artifactKind: 'skill',
       artifactId: 'demo.review',
-      registryRef: 'agentrig/demo.review@1.0.0',
+      registryRef: 'agentrig/demo-review@1.0.0',
       version: '1.0.0',
     })
     expect(result.record.specIdentity).toMatchObject({
@@ -71,7 +72,7 @@ describe('installArtifactSelection', () => {
       version: '1.0.0',
     })
     expect(result.record.pluginVersion).toBe('1.0.0')
-    expect(result.record.snapshotDigest).toBe(resolved.snapshotDigest)
+    expect(result.record.snapshotDigest).toBe(installBundleSnapshotDigest(resolved))
     expect(result.record.selectedSelectors).toEqual(['skill:review'])
     expect(result.record.targetPaths).toEqual([
       path.join(cwd, '.codex', 'skills', 'review', '.skill', 'skill.json'),
@@ -192,6 +193,40 @@ describe('uninstallArtifactSelection', () => {
     })
     expect(result.kept).toEqual([`kept modified: ${targetPath}:mcpServers`])
   })
+
+  it('refuses to uninstall selection files outside provider-owned roots', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'agentrig-selection-test-'))
+    const cwd = path.join(root, 'workspace')
+    tempDirs.push(root)
+    await ensureDir(cwd)
+    const outside = path.join(root, 'outside-selection.txt')
+    await writeFile(outside, 'owned-by-user')
+    await upsertSelectionInstallRecords(cwd, 'workspace', [
+      {
+        ...selectionRecord({
+          targetPath: path.join(cwd, '.codex', '.mcp.json'),
+          writtenValueSha256: digestJson({}),
+        }),
+        selectedSelectors: ['skill:review'],
+        targetPaths: [outside],
+        files: [{
+          path: outside,
+          sha256: `sha256:${sha256Hex(new TextEncoder().encode('owned-by-user'))}`,
+        }],
+        jsonWrites: [],
+      },
+    ])
+
+    await expect(uninstallArtifactSelection({
+      cwd,
+      provider: 'codex',
+      source: 'agentrig/demo.plugin@1.0.0',
+      registries,
+      picks: ['skill:review'],
+      scope: 'workspace',
+    })).rejects.toThrow(/Unsafe selection target path/)
+    await expect(pathExists(outside)).resolves.toBe(true)
+  })
 })
 
 function selectionRecord(input: { targetPath: string; writtenValueSha256: string }): SelectionInstallRecord {
@@ -255,7 +290,7 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value)
 }
 
-function standaloneSkill(input: { skillDigest: string; manifestDigest: string }): ResolvedStandaloneArtifact {
+function standaloneSkill(input: { skillDigest: string; manifestDigest: string }): InstallBundle {
   const fileDigests = [
     { path: '.skill/skill.json', digest: input.manifestDigest },
     { path: 'SKILL.md', digest: input.skillDigest },
@@ -274,81 +309,30 @@ function standaloneSkill(input: { skillDigest: string; manifestDigest: string })
     published_at: '2026-04-25T00:00:00.000Z',
   }
   return {
-    artifactKind: 'skill',
-    artifactId: 'demo.review',
-    manifest: {
-      kind: 'agentrig:skill',
-      id: 'demo.review',
-      name: 'Review',
-      description: 'Review code.',
-      version: '1.0.0',
-      entry: 'SKILL.md',
-    },
-    registryDocument: {
-      contract_version: '1',
-      registry_alias: 'agentrig',
-      source_repository: 'https://github.com/agentrig/agentrig-registry',
-      generated_at: '2026-04-25T00:00:00.000Z',
-      signature: {
-        algorithm: 'sha256-json-envelope',
-        key_id: 'agentrig-registry',
-        target: 'registry.json',
-        signed_digest: 'sha256:registry',
-      },
-      items: [],
-    },
-    history: {
+    schemaVersion: 1,
+    listing: {
       kind: 'skill',
-      artifact: 'demo.review',
-      namespace: 'demo',
+      origin: 'standalone',
+      artifactId: 'demo.review',
       name: 'Review',
       description: 'Review code.',
-      latest_version: '1.0.0',
-      trust_tier: 'reviewed',
-      installability: 'installable',
-      active_version: versionRecord,
-      versions: [versionRecord],
-    },
-    versionRecord,
-    lockArtifact: {
-      artifact_kind: 'skill',
-      artifact_id: 'demo.review',
       version: '1.0.0',
-      file_digests: fileDigests,
-      capability_set: [],
-      declared_network_domains: [],
-      declared_secrets: [],
-      runtime_requirements: [],
-      dependencies: [],
-      snapshot_digest: snapshotDigest,
+      source: 'registry',
+      slug: 'demo-review',
+      registryAlias: 'agentrig',
+      registrySnapshotDigest: snapshotDigest,
+      registrySourceRepository: 'https://github.com/agentrig/agentrig-registry',
+      installability: 'available',
+      publishedAt: Date.parse('2026-04-25T00:00:00.000Z'),
+      updatedAt: Date.parse('2026-04-25T00:00:00.000Z'),
     },
-    sourceArtifact: {
-      upstream_repo: 'https://github.com/acme/review',
-      upstream_tag: 'v1.0.0',
-      upstream_commit: '1111111111111111111111111111111111111111',
-      artifact_kind: 'skill',
-      artifact_path: 'skills/review',
-      submitted_by: 'submission:test',
-      snapshot_created_at: '2026-04-25T00:00:00.000Z',
-      snapshot_tree_digest: snapshotDigest,
+    source: {
+      type: 'registry',
+      url: 'https://agentrig.ai',
     },
-    reviewArtifact: {
-      review_status: 'approved',
-      reviewer: 'system:test',
-      reviewed_at: '2026-04-25T00:00:00.000Z',
-      scanner_summary: { status: 'pass', findings: [] },
-      policy_decisions: [],
-      trust_tier_basis: {
-        trust_tier: 'reviewed',
-        installability: 'installable',
-        rationale: 'test',
-      },
-    },
-    snapshotDigest,
-    source: { type: 'url', baseUrl: 'https://agentrig.ai/registry/skills/demo/review/versions/1.0.0/' },
-    sourceLabel: 'agentrig/demo.review@1.0.0',
-    trustTier: 'reviewed',
-    installability: 'installable',
-    registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
+    file_list: [
+      { path: 'skills/review/.skill/skill.json', sha256: input.manifestDigest.replace(/^sha256:/, ''), size: 1 },
+      { path: 'skills/review/SKILL.md', sha256: input.skillDigest.replace(/^sha256:/, ''), size: 1 },
+    ],
   }
 }

@@ -1,63 +1,83 @@
 ---
 title: Official registry workflow
-description: Add plugins or registry entries to the official registry.
+description: Submit marketplace listings and optionally mirror verified entries.
 icon: PackagePlus
 ---
 
 # Official registry workflow
 
-Contributions are welcome! You can:
+AgentRig marketplace submissions and the verified registry mirror are separate
+workflows.
 
-- Add or update a plugin in the canonical registry layout
-- Add a registry to the discovery directory
+## Marketplace listing lifecycle
 
-If you already used the submission flow in AgentRig, the destination is still the same:
-an approved submission opens or updates a PR into `agentrig-registry`, and the
-version becomes publicly installable only after that PR is merged.
+Users submit plugins, skills, MCPs, and hooks through AgentRig. Submissions move
+through one review lifecycle:
 
-Discovery submissions created from pasted repo URLs or `agentrig inspect` output are
-not installable. They help reviewers find candidate files and metadata, but a registry
-version still needs the canonical source, lock, review, README, license, and plugin
-manifest artifacts below.
-
-AI-enriched text is also discovery-only until accepted by an admin. In v1, hosted AI
-enrichment exists only in the web submit flow and is gated by login, Turnstile, quotas,
-and review. The CLI supports only local BYOK enrichment, where the user's provider key
-is sent directly to their configured provider and never to AgentRig.
-
-## Add a plugin
-
-1. Create or update `plugins/<namespace>/<plugin>/plugin.json`.
-2. Add a version at `plugins/<namespace>/<plugin>/versions/<version>/`.
-3. Include `.plugin/plugin.json`, `AGENTRIG_SOURCE.json`, `AGENTRIG_LOCK.json`, `AGENTRIG_REVIEW.json`, `README.md`, and `LICENSE`.
-4. Run the validator:
-
-```bash
-node scripts/validate-registry.mjs --write
-node scripts/validate-registry.mjs --check
+```text
+pending_review -> approved | rejected | blocked
 ```
 
-5. Open a PR against `agentrig-registry`.
+When a submission is approved, AgentRig materializes a Convex
+`artifact_listings` row with an SDK `InstallBundle`. That listing is immediately
+available to the CLI through the `agentrig.ai` install-bundle endpoint. No
+repository pull request or merge is required before users can install the
+approved marketplace listing.
 
-## Rules
+Rejected submissions do not create listings. Blocked submissions are retained for
+moderation and policy history, but they do not resolve to install bundles.
 
-- Do not add compatibility shapes, aliases, or fallback metadata.
-- Do not publish installable artifacts from Convex, ZIP uploads, author repos, or arbitrary URLs.
-- Do not treat external-repo installs, discovery submissions, or AI-enriched draft text as registry trust.
-- The canonical path is:
-  - `registry.json -> plugins/<namespace>/<plugin>/plugin.json -> versions/<version>/...`
-- The canonical install ref is:
-  - `<registryAlias>/<namespace.plugin>` by default
-  - `<registryAlias>/<namespace.plugin>@<version>` only when an exact pin is needed
+## Verified mirror lifecycle
 
-## Add a registry to the directory
+The [`agentrig-registry`](https://github.com/agentrig/agentrig-registry)
+repository is an opt-in verified mirror for transparency and audit. It is not
+part of the approve path, and marketplace listings work without a mirrored
+registry entry.
 
-Add a discovery entry following the directory schema. Directory presence is discovery-only and does not grant install trust.
+An AgentRig admin can explicitly choose **Start verified mirror** on a listing.
+That action opens a pull request against `agentrig/agentrig-registry` using the
+registry mirror GitHub App. The mirror PR serializes the listing's SDK
+`InstallBundle` into `registry.json`, per-artifact history files, lock/source
+documents, review metadata, and the mirrored version tree.
 
-Directory updates are Git-based, not uploads.
+The mirrored files are useful for offline browsing, GitHub review, signed audit
+history, and independent inspection. CLI installs still resolve through
+`agentrig.ai` and the listing's `InstallBundle`.
 
-## Keep changes safe
+## Who triggers what
 
-- Keep all required version artifacts present and aligned.
-- Keep trust tier, installability, and advisory state internally consistent.
-- Keep discovery terms separate from install terms.
+- **User submit:** the user submits an artifact for review. Automated checks and
+  admin review decide whether the submission becomes `approved`, `rejected`, or
+  `blocked`.
+- **Approve flow:** approval writes the Convex `artifact_listings` row and SDK
+  `InstallBundle`. The listing is then available from the AgentRig install-bundle
+  endpoint.
+- **AgentRig admin:** an admin may trigger **Start verified mirror** per listing.
+  This creates the derivative registry PR for audit visibility.
+- **Trusted publisher and verified flags:** trusted publishing and verified
+  identity are provenance signals for review, UI, and mirror eligibility. They do
+  not give publishers a direct registry write path. See the internal provenance
+  story `0004-trusted-publisher-and-provenance.md` for the planned OIDC and
+  verified-publisher model.
+
+## Discovery entries
+
+Discovery submissions created from pasted repo URLs or `agentrig inspect` output
+help reviewers find candidate files and metadata. They become installable only
+when the review flow approves a marketplace listing and stores an
+`InstallBundle`.
+
+AI-enriched text is draft metadata until accepted by an admin. Hosted AI
+enrichment exists only in the web submit flow and is gated by login, Turnstile,
+quotas, and review. The CLI supports only local BYOK enrichment, where the
+user's provider key is sent directly to their configured provider and never to
+AgentRig.
+
+## Mirror safety rules
+
+- Keep marketplace approval separate from verified mirroring.
+- Keep the SDK `InstallBundle` as the source of mirrored install metadata.
+- Keep user repository access on the read-only `agentrig-repository-sync` app.
+- Use the write-capable `agentrig-repository-mirror` app only for AgentRig-owned
+  registry mirror repositories.
+- Treat registry files as audit output, not as a prerequisite for CLI install.

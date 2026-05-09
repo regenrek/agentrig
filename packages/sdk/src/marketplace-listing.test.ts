@@ -70,7 +70,7 @@ describe('verifyInstallBundleHashes', () => {
       .resolves.toEqual({ ok: true, checked: 1, issues: [] })
   })
 
-  it('reports missing, size, and hash mismatches', async () => {
+  it('reports missing files', async () => {
     const result = await verifyInstallBundleHashes(
       {
         ...bundle,
@@ -83,14 +83,78 @@ describe('verifyInstallBundleHashes', () => {
           },
         ],
       },
+      [{ path: 'README.md', bytes: 'hello' }]
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.issues.map((issue) => issue.code)).toEqual(['missing'])
+  })
+
+  it('reports not-retrieved fetch results as missing files', async () => {
+    const result = await verifyInstallBundleHashes(bundle, [
+      { path: 'README.md', missing: true, error: 'Request failed (404)' },
+    ])
+
+    expect(result.ok).toBe(false)
+    expect(result.issues).toEqual([{ path: 'README.md', code: 'missing' }])
+  })
+
+  it('reports sha256 mismatches', async () => {
+    const result = await verifyInstallBundleHashes(bundle, [{ path: 'README.md', bytes: 'jello' }])
+
+    expect(result.ok).toBe(false)
+    expect(result.issues.map((issue) => issue.code)).toEqual(['sha256_mismatch'])
+  })
+
+  it('reports size mismatches', async () => {
+    const result = await verifyInstallBundleHashes(
+      {
+        ...bundle,
+        file_list: [
+          {
+            ...bundle.file_list[0]!,
+            sha256: 'ce06092fb948d9ffac7d1a376e404b26b7575bcc11ee05a4615fef4fec3a308b',
+            size: 5,
+          },
+        ],
+      },
       [{ path: 'README.md', bytes: 'hello!' }]
     )
 
     expect(result.ok).toBe(false)
-    expect(result.issues.map((issue) => issue.code)).toEqual([
-      'size_mismatch',
-      'sha256_mismatch',
-      'missing',
+    expect(result.issues.map((issue) => issue.code)).toEqual(['size_mismatch'])
+  })
+
+  it('reports fetched files that are not listed in the bundle', async () => {
+    const result = await verifyInstallBundleHashes(bundle, [
+      { path: 'README.md', bytes: 'hello' },
+      { path: 'extras/secret.txt', bytes: 'extra' },
     ])
+
+    expect(result.ok).toBe(false)
+    expect(result.issues.map((issue) => issue.code)).toEqual(['extra'])
+  })
+
+  it('reports missing and extra files together', async () => {
+    const result = await verifyInstallBundleHashes(
+      {
+        ...bundle,
+        file_list: [
+          ...bundle.file_list,
+          {
+            path: 'missing.txt',
+            sha256: 'a'.repeat(64),
+            size: 1,
+          },
+        ],
+      },
+      [
+        { path: 'README.md', bytes: 'hello' },
+        { path: 'extras/secret.txt', bytes: 'extra' },
+      ]
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.issues.map((issue) => issue.code)).toEqual(['missing', 'extra'])
   })
 })

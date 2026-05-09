@@ -26,6 +26,7 @@ import {
   copyEntries,
   copyInstalledPlugin,
   detectPluginFeatures,
+  assertContainedPath,
   normalizeManifestDescription,
   pluginAuthor,
   removeInstalledFiles,
@@ -421,21 +422,29 @@ export const codexProvider: PluginProviderAdapter = {
       ledgerEntries,
     }
   },
-  async uninstall({ entries, dryRun }) {
+  async uninstall({ cwd, entries, dryRun }) {
     const removed: string[] = []
     const kept: string[] = []
     const missing: string[] = []
     const clearedRecordIds: string[] = []
-    const locations = [...new Set(entries.flatMap((entry) => entry.targetPaths))]
+    const locations = new Set<string>()
 
     for (const entry of entries) {
       if (entry.provider !== 'codex') continue
+      const { pluginRoot, marketplacePath } = resolveCodexInstallPaths(cwd, entry.scope)
+      const pluginPath = assertContainedPath(
+        pluginRoot,
+        path.join(pluginRoot, entry.pluginName),
+        'Codex plugin install'
+      )
+      locations.add(pluginPath)
+      locations.add(marketplacePath)
 
-      const rawMarketplace = await readJsonFile<unknown>(entry.metadata.marketplacePath)
+      const rawMarketplace = await readJsonFile<unknown>(marketplacePath)
       const parsedMarketplace =
-        rawMarketplace == null ? undefined : parseMutableMarketplace(rawMarketplace, entry.metadata.marketplacePath)
+        rawMarketplace == null ? undefined : parseMutableMarketplace(rawMarketplace, marketplacePath)
 
-      const removal = await removeInstalledFiles(entry.metadata.pluginPath, entry.files, dryRun)
+      const removal = await removeInstalledFiles(pluginPath, entry.files, dryRun)
       let marketplaceOutcome: 'removed' | 'missing' | 'kept' = 'missing'
       if (removal.kept.length > 0) {
         marketplaceOutcome = 'kept'
@@ -454,7 +463,7 @@ export const codexProvider: PluginProviderAdapter = {
           marketplaceOutcome = 'removed'
           if (!dryRun) {
             plugins.splice(index, 1)
-            await writeMutableMarketplace(entry.metadata.marketplacePath, {
+            await writeMutableMarketplace(marketplacePath, {
               ...parsedMarketplace,
               plugins,
             })
@@ -479,7 +488,7 @@ export const codexProvider: PluginProviderAdapter = {
       removed,
       kept,
       missing,
-      locations,
+      locations: [...locations],
       clearedRecordIds,
     }
   },

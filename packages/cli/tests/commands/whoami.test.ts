@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/whoami'
 import { clearAuthSession, loadAuthSession } from '../../src/lib/auth'
-import { CommunityApiError, resolveCommunityBaseUrl, whoAmI } from '../../src/lib/community-api'
+import { CommunityApiError, resolveAuthenticatedCommunityBaseUrl, whoAmI } from '../../src/lib/community-api'
 
 vi.mock('../../src/lib/auth', () => ({
   clearAuthSession: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('../../src/lib/community-api', () => ({
       this.status = status
     }
   },
-  resolveCommunityBaseUrl: vi.fn(),
+  resolveAuthenticatedCommunityBaseUrl: vi.fn(),
   whoAmI: vi.fn(),
 }))
 
@@ -27,7 +27,7 @@ describe('command:whoami', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
-    vi.mocked(resolveCommunityBaseUrl).mockReturnValue('https://agentrig.ai')
+    vi.mocked(resolveAuthenticatedCommunityBaseUrl).mockReturnValue('https://agentrig.ai')
   })
 
   it('prints the current user', async () => {

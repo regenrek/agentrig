@@ -1,6 +1,6 @@
 import { defineCommand, showUsage } from 'citty'
 import { clearAuthSession, loadAuthSession } from '../lib/auth'
-import { CommunityApiError, resolveCommunityBaseUrl, whoAmI } from '../lib/community-api'
+import { CommunityApiError, resolveAuthenticatedCommunityBaseUrl, whoAmI } from '../lib/community-api'
 
 const command = defineCommand({
   meta: {
@@ -27,7 +27,7 @@ const command = defineCommand({
       throw new Error('Not logged in. Run `agentrig login` first.')
     }
 
-    const baseUrl = resolveCommunityBaseUrl(args.baseUrl, session.baseUrl)
+    const baseUrl = resolveAuthenticatedCommunityBaseUrl(args.baseUrl, session.baseUrl)
 
     try {
       const result = await whoAmI(baseUrl, session.accessToken)

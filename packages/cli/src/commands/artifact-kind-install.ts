@@ -5,7 +5,7 @@ import type { SelectableArtifactKind } from '@agentrig/sdk'
 import { loadAuthSession } from '../lib/auth'
 import {
   createPluginSubmission,
-  resolveCommunityBaseUrl,
+  resolveAuthenticatedCommunityBaseUrl,
 } from '../lib/community-api'
 import { loadConfig } from '../lib/config'
 import {
@@ -19,7 +19,6 @@ import {
   parsePluginProviderSelector,
   resolveInstallScope,
 } from '../lib/plugin-providers'
-import { assertInstallableTrust } from '../lib/trust'
 import { parseRegistryArtifactSpec } from '../lib/registry-spec'
 import { resolveStandaloneArtifact } from '../lib/registry'
 import {
@@ -103,12 +102,6 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
           spec.version,
           cfg.registries
         )
-        assertInstallableTrust(
-          resolved.artifactId,
-          resolved.manifest.version,
-          resolved.trustTier,
-          resolved.installability
-        )
         const materialized = await materializeResolvedStandaloneArtifact(resolved)
         try {
           const result = await installArtifactSelection({
@@ -134,14 +127,6 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
       }
 
       const graph = await resolvePluginGraph(String(args.source), cwd, cfg.registries)
-      for (const resolved of graph.resolvedPlugins) {
-        assertInstallableTrust(
-          resolved.manifest.id,
-          resolved.manifest.version,
-          resolved.trustTier,
-          resolved.installability
-        )
-      }
 
       const materialized = await materializeResolvedPluginGraph(graph)
       try {
@@ -209,7 +194,7 @@ export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
         throw new Error('Not logged in. Run `agentrig login` first.')
       }
       if (!args.source) throw new Error(`Submit source required. Use a local path, owner/repo@tag, or GitHub URL.`)
-      const baseUrl = resolveCommunityBaseUrl(args.baseUrl, session.baseUrl)
+      const baseUrl = resolveAuthenticatedCommunityBaseUrl(args.baseUrl, session.baseUrl)
       const payload = await resolveSubmitSource({
         source: String(args.source),
         version: typeof args.version === 'string' ? args.version : undefined,

@@ -3,7 +3,8 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { loadConfig } from '../lib/config'
 import { resolvePluginSpec } from '../lib/plugin-resolver'
-import { describeTrustTier, validatePluginPaths } from '../lib/trust'
+import { installBundleSnapshotDigest } from '../lib/registry'
+import { validatePluginPaths } from '../lib/trust'
 
 const args = {
   spec: {
@@ -43,67 +44,53 @@ const command = defineCommand({
     const spec = args.spec
 
     const resolved = await resolvePluginSpec(spec, cwd, cfg.registries)
-    const manifest = resolved.manifest
-    const installFiles = resolved.lockArtifact.file_digests
-    const trustTier = resolved.trustTier
+    const listing = resolved.listing
+    const installFiles = resolved.file_list
 
     const pathValidation = validatePluginPaths(installFiles)
 
     if (args.json) {
       console.log(JSON.stringify({
-        id: manifest.id,
-        name: manifest.name,
-        description: manifest.description,
-        version: manifest.version,
-        author: manifest.author,
-        license: manifest.license,
-        keywords: manifest.keywords,
-        registry: {
-          alias: resolved.registry.name,
-          url: resolved.registry.url,
-          generatedAt: resolved.registryDocument.generated_at,
-          signedDigest: resolved.registryDocument.signature.signed_digest,
+        id: listing.artifactId,
+        name: listing.name,
+        description: listing.description,
+        version: listing.version,
+        author: listing.author,
+        license: listing.license,
+        keywords: listing.keywords,
+        marketplace: {
+          alias: listing.registryAlias ?? 'agentrig',
+          listingId: listing.listingId,
+          slug: listing.slug,
         },
-        source: resolved.sourceLabel,
-        trustTier,
-        installability: resolved.installability,
-        snapshotDigest: resolved.snapshotDigest,
+        source: resolved.source,
+        installability: listing.installability,
+        snapshotDigest: installBundleSnapshotDigest(resolved),
         files: installFiles,
-        pluginDependencies: resolved.lockArtifact.dependencies,
         pathValidation,
       }, null, 2))
       return
     }
 
     // Human-readable output
-    console.log(`Id: ${manifest.id}`)
-    console.log(`Name: ${manifest.name}`)
-    console.log(`Description: ${manifest.description}`)
-    console.log(`Version: ${manifest.version}`)
-    if (manifest.author) console.log(`Author: ${manifest.author}`)
-    if (manifest.license) console.log(`License: ${manifest.license}`)
-    if (manifest.keywords?.length) console.log(`Keywords: ${manifest.keywords.join(', ')}`)
-    console.log(`Registry: ${resolved.registry.name} (${resolved.registry.url})`)
-    console.log(`Source: ${resolved.sourceLabel}`)
-    console.log(`Trust: ${describeTrustTier(trustTier)}`)
-    console.log(`Installability: ${resolved.installability}`)
-    console.log(`Registry snapshot: ${resolved.registryDocument.signature.signed_digest}`)
-    console.log(`Plugin snapshot: ${resolved.snapshotDigest}`)
-
-    if (resolved.lockArtifact.dependencies.length) {
-      console.log('')
-      console.log('Dependencies:')
-      for (const dep of resolved.lockArtifact.dependencies) {
-        console.log(`  - ${dep.plugin}@${dep.version}`)
-      }
-    }
+    console.log(`Id: ${listing.artifactId}`)
+    console.log(`Name: ${listing.name}`)
+    console.log(`Description: ${listing.description}`)
+    console.log(`Version: ${listing.version}`)
+    if (listing.author) console.log(`Author: ${listing.author}`)
+    if (listing.license) console.log(`License: ${listing.license}`)
+    if (listing.keywords?.length) console.log(`Keywords: ${listing.keywords.join(', ')}`)
+    console.log(`Marketplace: ${listing.registryAlias ?? 'agentrig'}`)
+    if (listing.slug) console.log(`Slug: ${listing.slug}`)
+    console.log(`Installability: ${listing.installability}`)
+    console.log(`Plugin snapshot: ${installBundleSnapshotDigest(resolved)}`)
 
     if (installFiles.length) {
       console.log('')
       console.log('Files:')
     }
     for (const f of installFiles) {
-      console.log(`  ${f.path} [${f.digest.slice(0, 15)}...]`)
+      console.log(`  ${f.path} [${f.sha256.slice(0, 15)}...]`)
     }
 
     if (!pathValidation.valid) {

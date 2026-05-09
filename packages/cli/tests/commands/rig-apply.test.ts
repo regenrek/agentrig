@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   parsePluginProviderSelector: vi.fn(),
   preparePluginInstall: vi.fn(),
   uninstallPluginProviders: vi.fn(),
-  assertInstallableTrust: vi.fn(),
 }))
 
 vi.mock('../../src/lib/config', () => ({
@@ -46,10 +45,6 @@ vi.mock('../../src/lib/plugin-providers', () => ({
   uninstallPluginProviders: mocks.uninstallPluginProviders,
 }))
 
-vi.mock('../../src/lib/trust', () => ({
-  assertInstallableTrust: mocks.assertInstallableTrust,
-}))
-
 import command from '../../src/commands/rig/apply'
 
 describe('command:rig apply', () => {
@@ -71,26 +66,18 @@ describe('command:rig apply', () => {
     })
     mocks.resolvePluginGraph.mockResolvedValue({
       requestedPlugin: {
-        manifest: { id: 'agentrig.core-committer', version: '0.1.0' },
-        sourceLabel: 'agentrig/agentrig.core-committer@0.1.0',
-        trustTier: 'official',
-        installability: 'installable',
+        listing: { artifactId: 'agentrig.core-committer', version: '0.1.0', slug: 'agentrig-core-committer' },
       },
       resolvedPlugins: [
         {
-          manifest: { id: 'agentrig.core-committer', version: '0.1.0' },
-          sourceLabel: 'agentrig/agentrig.core-committer@0.1.0',
-          trustTier: 'official',
-          installability: 'installable',
+          listing: { artifactId: 'agentrig.core-committer', version: '0.1.0', slug: 'agentrig-core-committer' },
         },
       ],
     })
   })
 
-  it('fails before materialization when trust enforcement rejects a rig plugin', async () => {
-    mocks.assertInstallableTrust.mockImplementation(() => {
-      throw new Error('Trust-tier rejection for agentrig.core-committer@0.1.0')
-    })
+  it('fails before install planning when materialization rejects a rig bundle', async () => {
+    mocks.materializeResolvedPluginGraph.mockRejectedValueOnce(new Error('sha256_mismatch'))
 
     await expect(
       run({
@@ -105,9 +92,8 @@ describe('command:rig apply', () => {
           help: false,
         },
       }),
-    ).rejects.toThrow(/trust-tier rejection/i)
+    ).rejects.toThrow(/sha256_mismatch/i)
 
-    expect(mocks.materializeResolvedPluginGraph).not.toHaveBeenCalled()
     expect(mocks.preparePluginInstall).not.toHaveBeenCalled()
   })
 })

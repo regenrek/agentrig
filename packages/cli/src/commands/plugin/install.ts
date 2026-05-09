@@ -14,7 +14,6 @@ import {
   preparePluginInstall,
 } from '../../lib/plugin-providers'
 import { buildResolvedPluginInstallMetadataMap } from '../../lib/plugin-install-spec'
-import { assertInstallableTrust } from '../../lib/trust'
 
 function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginInstall>>) {
   console.log('Install plan:')
@@ -88,14 +87,6 @@ const command = defineCommand({
 
     const cfg = await loadConfig(cwd)
     const graph = await resolvePluginGraph(String(args.spec), cwd, cfg.registries)
-    for (const resolved of graph.resolvedPlugins) {
-      assertInstallableTrust(
-        resolved.manifest.id,
-        resolved.manifest.version,
-        resolved.trustTier,
-        resolved.installability
-      )
-    }
 
     const materialized = await materializeResolvedPluginGraph(graph)
     const installMetadataByPluginId = buildResolvedPluginInstallMetadataMap(graph.resolvedPlugins)

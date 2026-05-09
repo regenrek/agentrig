@@ -2,8 +2,10 @@
 
 import { useControlledState } from "@/hooks/use-controlled-state";
 import { Moon, Sun } from "lucide-react";
-import { motion } from "motion/react";
-import { useCallback, useEffect, useState, forwardRef } from "react";
+import { LazyMotion, domMax, useReducedMotion } from "motion/react";
+import * as m from "motion/react-m";
+import { useCallback } from "react";
+import type { ComponentPropsWithoutRef, Ref } from "react";
 import { cn } from "@/lib/utils";
 
 const themes = [
@@ -21,55 +23,45 @@ const themes = [
 
 type ThemeKey = (typeof themes)[number]["key"];
 
-interface ThemeSwitcherProps extends React.HTMLAttributes<HTMLDivElement> {
+type ThemeSwitcherProps = Omit<ComponentPropsWithoutRef<"div">, "onChange"> & {
+  ref?: Ref<HTMLDivElement>;
   value?: ThemeKey;
   onChange?: (theme: ThemeKey) => void;
   defaultValue?: ThemeKey;
-}
+};
 
-export const ThemeSwitcher = forwardRef<HTMLDivElement, ThemeSwitcherProps>(
-  (
-    {
-      value = undefined,
-      onChange = undefined,
-      defaultValue = "light",
-      className = "",
-      ...props
+export function ThemeSwitcher({
+  value = undefined,
+  onChange = undefined,
+  defaultValue = "light",
+  className = "",
+  ref,
+  ...props
+}: ThemeSwitcherProps) {
+  const [theme, setTheme] = useControlledState({
+    defaultValue: defaultValue,
+    value: value,
+    onChange,
+  });
+  const shouldReduceMotion = useReducedMotion();
+
+  const handleThemeClick = useCallback(
+    (themeKey: ThemeKey) => {
+      setTheme(themeKey);
     },
-    ref,
-  ) => {
-    const [theme, setTheme] = useControlledState({
-      defaultValue: defaultValue,
-      value: value,
-      onChange,
-    });
-    const [mounted, setMounted] = useState(false);
+    [setTheme],
+  );
 
-    const handleThemeClick = useCallback(
-      (themeKey: ThemeKey) => {
-        setTheme(themeKey);
-      },
-      [setTheme],
-    );
-
-    // Prevent hydration mismatch
-    useEffect(() => {
-      setMounted(true);
-    }, []);
-
-    if (!mounted) {
-      return null;
-    }
-
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "relative isolate flex h-8 rounded-full squircle-none bg-background p-1 ring-1 ring-border",
-          className,
-        )}
-        {...props}
-      >
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "relative isolate flex h-8 rounded-full squircle-none bg-background p-1 ring-1 ring-border",
+        className,
+      )}
+      {...props}
+    >
+      <LazyMotion features={domMax} strict>
         {themes.map(({ key, icon: Icon, label }) => {
           const isActive = theme === key;
 
@@ -77,15 +69,19 @@ export const ThemeSwitcher = forwardRef<HTMLDivElement, ThemeSwitcherProps>(
             <button
               key={key}
               aria-label={label}
-              className="relative h-6 w-6 rounded-full squircle-none"
+              className="relative size-6 rounded-full squircle-none"
               onClick={() => handleThemeClick(key)}
               type="button"
             >
               {isActive && (
-                <motion.div
+                <m.div
                   className="absolute inset-0 rounded-full squircle-none bg-secondary"
                   layoutId="activeTheme"
-                  transition={{ type: "spring", duration: 0.5 }}
+                  transition={
+                    shouldReduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", duration: 0.5 }
+                  }
                 />
               )}
               <Icon
@@ -97,9 +93,7 @@ export const ThemeSwitcher = forwardRef<HTMLDivElement, ThemeSwitcherProps>(
             </button>
           );
         })}
-      </div>
-    );
-  },
-);
-
-ThemeSwitcher.displayName = "ThemeSwitcher";
+      </LazyMotion>
+    </div>
+  );
+}

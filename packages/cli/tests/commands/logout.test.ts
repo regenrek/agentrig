@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import command from '../../src/commands/logout'
 import { clearAuthSession, loadAuthSession } from '../../src/lib/auth'
-import { CommunityApiError, logout as logoutRequest, resolveCommunityBaseUrl } from '../../src/lib/community-api'
+import { CommunityApiError, logout as logoutRequest, resolveAuthenticatedCommunityBaseUrl } from '../../src/lib/community-api'
 
 vi.mock('../../src/lib/auth', () => ({
   clearAuthSession: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock('../../src/lib/community-api', () => ({
     }
   },
   logout: vi.fn(),
-  resolveCommunityBaseUrl: vi.fn(),
+  resolveAuthenticatedCommunityBaseUrl: vi.fn(),
 }))
 
 describe('command:logout', () => {
@@ -27,7 +27,7 @@ describe('command:logout', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.spyOn(console, 'log').mockImplementation(() => {})
-    vi.mocked(resolveCommunityBaseUrl).mockReturnValue('https://agentrig.ai')
+    vi.mocked(resolveAuthenticatedCommunityBaseUrl).mockReturnValue('https://agentrig.ai')
   })
 
   it('revokes the current token and clears the local session', async () => {

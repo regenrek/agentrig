@@ -73,7 +73,7 @@ describe('command:init', () => {
 
     expect(writeProjectConfig).toHaveBeenCalledWith('/repo', expect.objectContaining({
       $schema: 'https://agentrig.ai/schema/config.json',
-      registries: [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
+      registries: [{ name: 'agentrig', url: 'https://agentrig.ai' }],
     }))
   })
 })
