@@ -57,6 +57,39 @@ describe('marketplace listing contracts', () => {
     ).toThrow()
   })
 
+  it('accepts a canonical README storage reference on install bundles', () => {
+    expect(
+      InstallBundleSchema.parse({
+        ...bundle,
+        readmeFile: {
+          path: 'README.md',
+          sha256: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+          size: 5,
+          storageId: 'storage-readme-1',
+        },
+      }).readmeFile
+    ).toEqual({
+      path: 'README.md',
+      sha256: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+      size: 5,
+      storageId: 'storage-readme-1',
+    })
+  })
+
+  it('normalizes README bundle metadata to the canonical path only', () => {
+    expect(() =>
+      InstallBundleSchema.parse({
+        ...bundle,
+        readmeFile: {
+          path: 'readme.mdx',
+          sha256: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+          size: 5,
+          storageId: 'storage-readme-1',
+        },
+      })
+    ).toThrow()
+  })
+
   it('only resolves currently available listings', () => {
     expect(isResolvable(listing)).toBe(true)
     expect(isResolvable({ ...listing, installability: 'yanked' })).toBe(false)

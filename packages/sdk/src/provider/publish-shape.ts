@@ -13,6 +13,37 @@ export const PUBLISH_SHAPE_KINDS = [
 
 export type PublishShapeKind = (typeof PUBLISH_SHAPE_KINDS)[number]
 
+export type PublishShapeDefinition = {
+  id: PublishShapeKind
+  label: string
+  description: string
+  helpUrl?: string
+  example?: string
+}
+
+export const PUBLISH_SHAPE_DEFINITIONS = {
+  plugin_all: {
+    id: 'plugin_all',
+    label: 'Submit full plugin',
+    description: "Publish this repo's existing detected `.plugin/plugin.json` plugin as-is.",
+  },
+  generated_plugin: {
+    id: 'generated_plugin',
+    label: 'Generate AgentRig plugin',
+    description: 'Compose selected portable artifacts (skills, MCPs, hooks) from this repo into a new plugin package.',
+  },
+  standalone_artifacts: {
+    id: 'standalone_artifacts',
+    label: 'Submit one skill standalone',
+    description: 'Publish the selected skill as its own registry artifact (semver tag required).',
+  },
+  discovery_only: {
+    id: 'discovery_only',
+    label: 'Submit as discovery only',
+    description: 'Log scan metadata for review without creating an installable registry entry.',
+  },
+} satisfies Record<PublishShapeKind, PublishShapeDefinition>
+
 export type PublishInstallability = 'installable' | 'discovery_only' | 'blocked'
 
 export type SubmitSource = {
@@ -150,13 +181,6 @@ export type BuildSubmitPublishPayloadInput = {
   review: SubmitReviewMetadata
 }
 
-const PUBLISH_SHAPE_LABELS: Record<PublishShapeKind, string> = {
-  plugin_all: 'Publish full plugin',
-  generated_plugin: 'Generate plugin from selected artifacts',
-  standalone_artifacts: 'Publish selected standalone artifacts',
-  discovery_only: 'Discovery only',
-}
-
 export function buildPublishScanResult(input: BuildPublishScanResultInput): PublishScanResult {
   assertSubmitSource(input.source)
   if (!input.report.digest.trim()) throw new Error('Publish scan result requires scan digest.')
@@ -254,7 +278,7 @@ function candidateForShape(
   const blockedReason = blockedReasonForShape(scan, shape, requestedArtifacts, transformPlan)
   return {
     shape,
-    label: PUBLISH_SHAPE_LABELS[shape],
+    label: PUBLISH_SHAPE_DEFINITIONS[shape].label,
     defaultSelected: false,
     allowed: !blockedReason,
     ...(blockedReason ? { blockedReason } : {}),

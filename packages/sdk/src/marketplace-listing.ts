@@ -90,6 +90,15 @@ export const InstallBundleFileSchema = z.object({
 
 export type InstallBundleFile = z.infer<typeof InstallBundleFileSchema>
 
+export const InstallBundleReadmeFileSchema = z.object({
+  path: z.literal('README.md'),
+  sha256: z.string().regex(SHA256_HEX_RE, 'Expected lowercase SHA-256 hex digest'),
+  size: z.number().int().nonnegative(),
+  storageId: z.string().trim().min(1),
+})
+
+export type InstallBundleReadmeFile = z.infer<typeof InstallBundleReadmeFileSchema>
+
 export const InstallBundleSourceSchema = z.object({
   type: z.enum(['github', 'registry', 'convex_storage', 'archive']),
   url: z.string().trim().min(1).optional(),
@@ -104,6 +113,7 @@ export const InstallBundleSchema = z.object({
   schemaVersion: z.literal(1),
   listing: MarketplaceListingSchema,
   source: InstallBundleSourceSchema,
+  readmeFile: InstallBundleReadmeFileSchema.optional(),
   file_list: z.array(InstallBundleFileSchema).min(1),
 })
 
