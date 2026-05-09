@@ -154,12 +154,6 @@ describe('command:plugin install', () => {
       '/repo',
       [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
     )
-    expect(mocks.assertInstallableTrust).toHaveBeenCalledWith(
-      'dep-plugin',
-      '0.1.0',
-      'official',
-      'installable',
-    )
     expect(mocks.preparePluginInstall).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: '/repo',
@@ -171,10 +165,8 @@ describe('command:plugin install', () => {
     expect(mocks.cleanupMaterializedPlugin).toHaveBeenCalledWith('/tmp/materialized-plugins')
   })
 
-  it('fails fast when trust enforcement rejects a resolved snapshot', async () => {
-    mocks.assertInstallableTrust.mockImplementation(() => {
-      throw new Error('Trust-tier rejection for demo-plugin@1.2.3')
-    })
+  it('fails fast when materialization rejects a resolved install bundle', async () => {
+    mocks.materializeResolvedPluginGraph.mockRejectedValueOnce(new Error('sha256_mismatch'))
 
     await expect(
       run({
@@ -188,7 +180,7 @@ describe('command:plugin install', () => {
           help: false,
         },
       }),
-    ).rejects.toThrow(/trust-tier rejection/i)
+    ).rejects.toThrow(/sha256_mismatch/i)
     expect(mocks.cleanupMaterializedPlugin).not.toHaveBeenCalled()
   })
 })

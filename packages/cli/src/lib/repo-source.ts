@@ -265,8 +265,18 @@ function githubHeaders() {
     'X-GitHub-Api-Version': GITHUB_API_VERSION,
   }
   const token = process.env.GITHUB_TOKEN || process.env.AGENTRIG_TEMPLATE_TOKEN
-  if (token?.trim()) headers.Authorization = `Bearer ${token.trim()}`
+  if (token?.trim() && shouldSendGitHubToken()) headers.Authorization = `Bearer ${token.trim()}`
   return headers
+}
+
+function shouldSendGitHubToken(env: NodeJS.ProcessEnv = process.env) {
+  const baseUrl = env.GITHUB_API_BASE_URL || 'https://api.github.com'
+  try {
+    const url = new URL(baseUrl)
+    return url.protocol === 'https:' && url.hostname === 'api.github.com'
+  } catch {
+    return false
+  }
 }
 
 function assertPathInside(root: string, candidate: string) {

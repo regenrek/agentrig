@@ -174,6 +174,34 @@ describe('repo source resolver', () => {
 
     await resolved.cleanup()
   })
+
+  it('does not send GitHub tokens to custom API bases', async () => {
+    const repoRoot = await createRepoRoot()
+    const downloadTemplateMock = vi.fn(async () => ({ dir: repoRoot }))
+    const fetchMock = mockGitHubFetch({
+      defaultBranch: 'main',
+      commits: {
+        main: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+      },
+      apiBaseUrl: 'https://github-api.evil.test',
+    })
+    vi.stubEnv('GITHUB_API_BASE_URL', 'https://github-api.evil.test')
+    vi.stubEnv('GITHUB_TOKEN', 'secret-token')
+
+    const resolved = await resolveRepoSource({
+      source: 'acme/demo',
+      fetchImpl: fetchMock,
+      downloadTemplateImpl: downloadTemplateMock,
+    })
+
+    for (const [, init] of fetchMock.mock.calls) {
+      expect((init as RequestInit | undefined)?.headers).not.toMatchObject({
+        Authorization: expect.any(String),
+      })
+    }
+
+    await resolved.cleanup()
+  })
 })
 
 async function createRepoRoot() {
@@ -184,14 +212,15 @@ async function createRepoRoot() {
   return root
 }
 
-function mockGitHubFetch(input: { defaultBranch: string; commits: Record<string, string> }) {
-  const fetchMock = vi.fn(async (url: string | URL | Request) => {
+function mockGitHubFetch(input: { defaultBranch: string; commits: Record<string, string>; apiBaseUrl?: string }) {
+  const fetchMock = vi.fn(async (url: string | URL | Request, _init?: RequestInit) => {
     const href = String(url)
-    if (href === 'https://api.github.com/repos/acme/demo') {
+    const apiBaseUrl = input.apiBaseUrl ?? 'https://api.github.com'
+    if (href === `${apiBaseUrl}/repos/acme/demo`) {
       return jsonResponse({ default_branch: input.defaultBranch })
     }
 
-    const commitPrefix = 'https://api.github.com/repos/acme/demo/commits/'
+    const commitPrefix = `${apiBaseUrl}/repos/acme/demo/commits/`
     if (href.startsWith(commitPrefix)) {
       const ref = decodeURIComponent(href.slice(commitPrefix.length))
       const sha = input.commits[ref]

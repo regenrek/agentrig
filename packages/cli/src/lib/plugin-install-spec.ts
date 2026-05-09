@@ -1,8 +1,8 @@
 import {
   normalizeRegistryUrl,
   resolveConfiguredRegistry,
-  resolvePluginFromRegistryRef,
-  resolveStandaloneArtifactFromRegistryRef,
+  resolveInstallBundleFromConvex,
+  installBundleSnapshotDigest,
 } from './registry'
 import {
   parseRegistryArtifactSpec,
@@ -10,6 +10,7 @@ import {
   type ParsedRegistryArtifactKind,
 } from './registry-spec'
 import type { ResolvedPlugin, ResolvedStandaloneArtifact } from './registry'
+import type { InstallBundle } from '@agentrig/sdk'
 import type {
   PluginInstallSpecIdentity,
   RegistryRef,
@@ -46,17 +47,18 @@ export async function resolvePluginInstallSpecIdentity(
   const parsed = parseRegistryPluginSpec(spec.trim())
   if (parsed.version) return normalizePluginInstallSpecIdentity(spec, _cwd, registries)
   const registry = resolveConfiguredRegistry(parsed.registry, registries)
-  const resolved = await resolvePluginFromRegistryRef(registry, parsed.plugin)
+  const resolved = await resolveInstallBundleFromConvex(registry, parsed.plugin)
   return getResolvedPluginSpecIdentity(resolved)
 }
 
 export function getResolvedPluginSpecIdentity(resolved: ResolvedPlugin): PluginInstallSpecIdentity {
+  const alias = resolved.listing.registryAlias ?? 'agentrig'
   return {
     kind: 'registry',
-    registryAlias: resolved.registry.name,
-    registryUrl: normalizeRegistryUrl(resolved.registry.url),
-    pluginId: resolved.manifest.id,
-    version: resolved.manifest.version,
+    registryAlias: alias,
+    registryUrl: marketplaceUrlForBundle(resolved),
+    pluginId: resolved.listing.artifactId,
+    version: resolved.listing.version,
   }
 }
 
@@ -90,50 +92,54 @@ export async function resolveRegistryArtifactInstallSpecIdentity(
   const parsed = parseRegistryArtifactSpec(spec.trim(), artifactKind)
   if (parsed.version) return normalizeRegistryArtifactInstallSpecIdentity(spec, artifactKind, _cwd, registries)
   const registry = resolveConfiguredRegistry(parsed.registry, registries)
-  const resolved = await resolveStandaloneArtifactFromRegistryRef(registry, parsed.artifactKind, parsed.artifact)
+  const resolved = await resolveInstallBundleFromConvex(registry, parsed.artifact)
   return getResolvedRegistryArtifactSpecIdentity(resolved)
 }
 
 export function getResolvedRegistryArtifactSpecIdentity(resolved: ResolvedStandaloneArtifact): RegistryArtifactInstallSpecIdentity {
+  const alias = resolved.listing.registryAlias ?? 'agentrig'
   return {
     kind: 'registry-artifact',
-    registryAlias: resolved.registry.name,
-    registryUrl: normalizeRegistryUrl(resolved.registry.url),
-    artifactKind: resolved.artifactKind,
-    artifactId: resolved.artifactId,
-    version: resolved.manifest.version,
+    registryAlias: alias,
+    registryUrl: marketplaceUrlForBundle(resolved),
+    artifactKind: resolved.listing.kind as ParsedRegistryArtifactKind,
+    artifactId: resolved.listing.artifactId,
+    version: resolved.listing.version,
   }
 }
 
 export function getResolvedVerifiedRegistryIdentity(resolved: ResolvedPlugin | ResolvedStandaloneArtifact): VerifiedRegistryIdentity {
+  if (!resolved.listing.registryAlias && !resolved.listing.registrySourceRepository && !resolved.listing.registrySnapshotDigest) {
+    throw new Error(`Marketplace listing "${resolved.listing.artifactId}" does not include verified registry metadata.`)
+  }
   return {
-    registryAlias: resolved.registryDocument.registry_alias,
-    registryUrl: normalizeRegistryUrl(resolved.registry.url),
-    sourceRepository: resolved.registryDocument.source_repository,
-    contractVersion: resolved.registryDocument.contract_version,
-    generatedAt: resolved.registryDocument.generated_at,
+    registryAlias: resolved.listing.registryAlias ?? 'agentrig',
+    registryUrl: marketplaceUrlForBundle(resolved),
+    sourceRepository: resolved.listing.registrySourceRepository ?? resolved.source.url ?? 'https://agentrig.ai',
+    contractVersion: '1',
+    generatedAt: new Date(resolved.listing.updatedAt).toISOString(),
     signature: {
-      algorithm: resolved.registryDocument.signature.algorithm,
-      keyId: resolved.registryDocument.signature.key_id,
-      signedDigest: resolved.registryDocument.signature.signed_digest,
+      algorithm: 'install-bundle-file-list-sha256',
+      keyId: 'agentrig-marketplace-listing',
+      signedDigest: installBundleSnapshotDigest(resolved),
     },
   }
 }
 
 export function buildResolvedPluginSpecIdentityMap(resolvedPlugins: ResolvedPlugin[]) {
   return Object.fromEntries(
-    resolvedPlugins.map((resolved) => [resolved.manifest.id, getResolvedPluginSpecIdentity(resolved)])
+    resolvedPlugins.map((resolved) => [resolved.listing.artifactId, getResolvedPluginSpecIdentity(resolved)])
   ) satisfies Record<string, PluginInstallSpecIdentity>
 }
 
 export function buildResolvedPluginInstallMetadataMap(resolvedPlugins: ResolvedPlugin[]) {
   return Object.fromEntries(
     resolvedPlugins.map((resolved) => [
-      resolved.manifest.id,
+      resolved.listing.artifactId,
       {
         specIdentity: getResolvedPluginSpecIdentity(resolved),
         registry: getResolvedVerifiedRegistryIdentity(resolved),
-        snapshotDigest: resolved.snapshotDigest,
+        snapshotDigest: installBundleSnapshotDigest(resolved),
       } satisfies ResolvedPluginInstallMetadata,
     ])
   ) satisfies Record<string, ResolvedPluginInstallMetadata>
@@ -157,4 +163,8 @@ export function isSamePluginInstallSpecIdentity(
   right: PluginInstallSpecIdentity
 ) {
   return getPluginInstallSpecIdentityKey(left) === getPluginInstallSpecIdentityKey(right)
+}
+
+function marketplaceUrlForBundle(bundle: InstallBundle) {
+  return normalizeRegistryUrl(bundle.source.url ?? 'https://agentrig.ai')
 }

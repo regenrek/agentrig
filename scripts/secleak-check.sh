@@ -18,6 +18,7 @@ NC='\033[0m' # No Color
 echo -e "${YELLOW}=== agentrig Security Check ===${NC}\n"
 
 ERRORS=0
+TRIVY_SKIP_DIRS=(--skip-dirs node_modules --skip-dirs dist --skip-dirs coverage)
 
 # Check for gitleaks
 if command -v gitleaks &> /dev/null; then
@@ -34,13 +35,14 @@ if command -v gitleaks &> /dev/null; then
     ERRORS=$((ERRORS + 1))
   fi
 else
-  echo -e "${YELLOW}⚠ gitleaks not installed, skipping. Install: brew install gitleaks${NC}\n"
+  echo -e "${RED}✗ gitleaks not installed. Install: brew install gitleaks${NC}\n"
+  ERRORS=$((ERRORS + 1))
 fi
 
 # Check for trivy
 if command -v trivy &> /dev/null; then
   echo -e "${YELLOW}Running trivy secret scan...${NC}"
-  if trivy fs --scanners secret,misconfig --exit-code 1 --quiet .; then
+  if trivy fs "${TRIVY_SKIP_DIRS[@]}" --scanners secret,misconfig --exit-code 1 --quiet .; then
     echo -e "${GREEN}✓ trivy secrets: No issues${NC}\n"
   else
     echo -e "${RED}✗ trivy: Secret/misconfig issues detected!${NC}\n"
@@ -48,14 +50,15 @@ if command -v trivy &> /dev/null; then
   fi
 
   echo -e "${YELLOW}Running trivy vulnerability scan (HIGH/CRITICAL)...${NC}"
-  if trivy fs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --quiet .; then
+  if trivy fs "${TRIVY_SKIP_DIRS[@]}" --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --quiet .; then
     echo -e "${GREEN}✓ trivy vulns: No HIGH/CRITICAL vulnerabilities${NC}\n"
   else
     echo -e "${RED}✗ trivy: Vulnerabilities detected!${NC}\n"
     ERRORS=$((ERRORS + 1))
   fi
 else
-  echo -e "${YELLOW}⚠ trivy not installed, skipping. Install: brew install trivy${NC}\n"
+  echo -e "${RED}✗ trivy not installed. Install: brew install trivy${NC}\n"
+  ERRORS=$((ERRORS + 1))
 fi
 
 # Summary

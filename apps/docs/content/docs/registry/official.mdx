@@ -1,35 +1,49 @@
 ---
 title: Official registry
-description: The default registry used by agentrig.
+description: AgentRig's verified registry mirror for audit and transparency.
 icon: BadgeCheck
 ---
 
 # Official registry
 
-The official public registry is served from:
+AgentRig installs marketplace artifacts from `agentrig.ai`. The canonical
+marketplace state is the Convex `artifact_listings` row, and the SDK
+`InstallBundle` is the install contract consumed by the CLI.
 
-```
-https://agentrig.ai/registry
-```
+The [`agentrig-registry`](https://github.com/agentrig/agentrig-registry)
+repository is a verified mirror of selected listings. It gives reviewers and
+users a signed, browseable GitHub history for verified plugins, skills, MCPs, and
+hooks, but it is not the source the CLI depends on for install resolution.
 
-It is the canonical public install source for AgentRig and is treated as **trust tier: `official`**.
+## What makes a listing installable
 
-## What makes it installable
+An approved AgentRig submission creates an `artifact_listings` row with an
+`InstallBundle`. Listings with `installability: "available"` resolve through the
+`agentrig.ai` install-bundle endpoint. Listings marked `yanked` or `taken_down`
+do not resolve for new installs.
 
-Only static, git-mirrorable, signed registries are publicly installable.
+The public directory and the verified mirror are browseable surfaces. Directory
+presence can help discovery; mirror presence can help audit; neither one changes
+whether the CLI can install a listing.
 
-The official registry is the reference implementation of that contract.
+## Verified mirror source
 
-The public directory is not an install source.
-An entry may be visible in the directory before it is installable, but installability still comes only from merged registry state.
+Verified mirror PRs are created only when an AgentRig admin explicitly starts the
+mirror workflow for a listing. The mirror workflow serializes the listing's SDK
+`InstallBundle` into deterministic registry files and opens a signed PR against
+`agentrig/agentrig-registry`.
 
-## Canonical source
+This repository is designed for transparency:
 
-The canonical source of truth for the official registry is the [`agentrig-registry`](https://github.com/agentrig/agentrig-registry) GitHub repository.
+- public GitHub review of verified listings
+- deterministic mirror output for offline browsing
+- source, lock, review, README, and license files beside each mirrored version
+- yanked mirror follow-up PRs when an already mirrored listing is later yanked or
+  taken down
 
-## Canonical layout
+## Mirror layout
 
-The canonical registry layout is:
+The mirror serializes verified listings into this layout:
 
 - `registry.json`
 - `plugins/<namespace>/<plugin>/plugin.json`
@@ -44,13 +58,13 @@ The canonical registry layout is:
 - `skills/<namespace>/<skill>/versions/<version>/`
 - `advisories.json`
 
-Canonical plugin ids use:
+Mirrored plugin ids use:
 
 ```text
 namespace.plugin
 ```
 
-Canonical install refs use:
+Marketplace install refs use:
 
 ```text
 <registryAlias>/<namespace.plugin>
@@ -62,10 +76,18 @@ Example:
 agentrig/agentrig.core-committer
 ```
 
-The unversioned form installs the latest installable version. Append
-`@<version>` only for an explicit reproducibility or rollback pin. The CLI still
-records the concrete resolved version and snapshot digest in its install ledger.
+The unversioned form asks AgentRig for the latest available listing. Append
+`@<version>` only for an explicit reproducibility or rollback pin. The CLI
+records the concrete resolved version, source commit, tree digest, file hashes,
+and scan digest in its install ledger after resolving the `InstallBundle` from
+`agentrig.ai`.
 
 ## CLI behavior
 
-The CLI treats official registry entries as installable and does not fall back to ad hoc URL, ZIP, or author-repo installs.
+The CLI resolves AgentRig marketplace refs through the `agentrig.ai`
+install-bundle endpoint. It verifies the fetched files against the bundle's
+content-addressed lock and rejects mismatches before writing the install ledger.
+
+The CLI does not use the mirror as a fallback for arbitrary URL, ZIP, or
+author-repo installs. The mirror exists so users can inspect verified listing
+history outside the AgentRig app.

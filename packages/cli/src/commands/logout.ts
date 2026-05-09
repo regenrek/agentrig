@@ -1,6 +1,6 @@
 import { defineCommand, showUsage } from 'citty'
 import { clearAuthSession, loadAuthSession } from '../lib/auth'
-import { CommunityApiError, logout as logoutRequest, resolveCommunityBaseUrl } from '../lib/community-api'
+import { CommunityApiError, logout as logoutRequest, resolveAuthenticatedCommunityBaseUrl } from '../lib/community-api'
 
 const command = defineCommand({
   meta: {
@@ -28,7 +28,7 @@ const command = defineCommand({
       return
     }
 
-    const baseUrl = resolveCommunityBaseUrl(args.baseUrl, session.baseUrl)
+    const baseUrl = resolveAuthenticatedCommunityBaseUrl(args.baseUrl, session.baseUrl)
     try {
       await logoutRequest(baseUrl, session.accessToken)
     } catch (error) {

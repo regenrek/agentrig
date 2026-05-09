@@ -12,7 +12,6 @@ import {
   parsePluginProviderSelector,
   resolveInstallScope,
 } from '../lib/plugin-providers'
-import { assertInstallableTrust } from '../lib/trust'
 import { installArtifactSelection } from '../lib/artifact-selection-install'
 import { listRepeatedOptionValues } from '../lib/repeated-options'
 
@@ -80,14 +79,6 @@ const command = defineCommand({
 
     const cfg = await loadConfig(cwd)
     const graph = await resolvePluginGraph(String(args.source), cwd, cfg.registries)
-    for (const resolved of graph.resolvedPlugins) {
-      assertInstallableTrust(
-        resolved.manifest.id,
-        resolved.manifest.version,
-        resolved.trustTier,
-        resolved.installability
-      )
-    }
 
     const materialized = await materializeResolvedPluginGraph(graph)
     try {

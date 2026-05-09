@@ -1,6 +1,6 @@
 ---
 title: Submission contract
-description: Submit canonical upstream snapshots for review and registry preparation.
+description: Submit canonical upstream snapshots for marketplace review.
 icon: Upload
 ---
 
@@ -58,8 +58,12 @@ The normal path looks like this:
 1. submit one exact upstream snapshot
 2. AgentRig validates and scans it
 3. an admin reviews it in the web app
-4. approval opens or updates a PR into `agentrig-registry`
-5. the version becomes publicly installable only after that PR is merged
+4. approval materializes a marketplace listing in AgentRig
+5. the approved listing becomes installable through an AgentRig `InstallBundle`
+
+A verified mirror is separate. An admin may choose **Start verified mirror** for
+an approved listing; that optional step opens or updates a PR into
+`agentrig-registry` for audit and verification.
 
 ## Important boundary
 
@@ -69,7 +73,8 @@ A submission can support:
 
 - review
 - validation
-- promotion into a canonical registry workflow
+- marketplace listing review
+- optional verified mirroring after approval
 
 It does **not** make author repos, ZIPs, arbitrary URLs, or Convex-hosted payloads installable.
 
@@ -102,16 +107,22 @@ Submission validates at least:
 
 The submission pipeline uses these statuses:
 
-- `pending_validation`
-- `validating`
 - `pending_review`
-- `accepted_for_pr`
+- `approved`
 - `rejected`
 - `blocked`
 
 Validation scan status is tracked separately as `pass`, `warn`, or `fail`.
 
+Approved listings also carry installability:
+
+- `available` listings can be installed.
+- `yanked` listings may remain visible for existing users, but are not offered
+  as new installs.
+- `taken_down` listings are removed from normal install and discovery flows.
+
 ## Security notes
 
 - Never submit sources that contain secrets.
-- Review and validation reduce risk, but install trust still belongs to signed registry state, not to submission itself.
+- Review and validation reduce risk, but install trust belongs to the approved
+  marketplace listing and its AgentRig `InstallBundle`, not to submission itself.

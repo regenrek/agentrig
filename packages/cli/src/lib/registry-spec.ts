@@ -1,10 +1,12 @@
 const NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 const PLUGIN_ID_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
+const LISTING_ID_PATTERN =
+  /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/
 const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 const INSTALL_REF_PATTERN =
-  /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?:@((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?))?$/
+  /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\/([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)(?:@((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?))?$/
 const REGISTRY_ARTIFACT_KINDS = ['skill', 'mcp', 'hook'] as const
 
 export type ParsedRegistryArtifactKind = typeof REGISTRY_ARTIFACT_KINDS[number]
@@ -30,6 +32,10 @@ export function isValidPluginId(name: string): boolean {
   return PLUGIN_ID_PATTERN.test(name)
 }
 
+export function isValidListingId(name: string): boolean {
+  return LISTING_ID_PATTERN.test(name)
+}
+
 export function isValidExactPluginVersion(version: string): boolean {
   return SEMVER_PATTERN.test(version)
 }
@@ -44,7 +50,7 @@ export function parseRegistryPluginSpec(spec: string): ParsedRegistryPluginSpec 
   if (!match) {
     throw new Error(
       `Invalid install ref: ${spec}\n` +
-        'Use the canonical public install form: <registryAlias>/<namespace.plugin>. Add @<version> only for an explicit pin.'
+        'Use the canonical public install form: <marketplaceAlias>/<listing-slug>. Add @<version> only for an explicit pin.'
     )
   }
 
@@ -64,7 +70,7 @@ export function parseRegistryArtifactSpec(
   if (!match) {
     throw new Error(
       `Invalid ${artifactKind} install ref: ${spec}\n` +
-        `Use the canonical public standalone ${artifactKind} install form: <registryAlias>/<namespace.${artifactKind}>. Add @<version> only for an explicit pin.`
+        `Use the canonical public standalone ${artifactKind} install form: <marketplaceAlias>/<listing-slug>. Add @<version> only for an explicit pin.`
     )
   }
 

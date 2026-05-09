@@ -3,7 +3,7 @@ import {
 } from './registry'
 import { parseRegistryPluginSpec } from './registry-spec'
 import type { ResolvedPlugin } from './registry'
-import type { RegistryRef } from './types'
+import type { RegistryRef } from '@agentrig/sdk'
 
 export async function resolvePluginSpec(
   spec: string,

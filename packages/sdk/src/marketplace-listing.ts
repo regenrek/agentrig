@@ -90,6 +90,15 @@ export const InstallBundleFileSchema = z.object({
 
 export type InstallBundleFile = z.infer<typeof InstallBundleFileSchema>
 
+export const InstallBundleReadmeFileSchema = z.object({
+  path: z.literal('README.md'),
+  sha256: z.string().regex(SHA256_HEX_RE, 'Expected lowercase SHA-256 hex digest'),
+  size: z.number().int().nonnegative(),
+  storageId: z.string().trim().min(1),
+})
+
+export type InstallBundleReadmeFile = z.infer<typeof InstallBundleReadmeFileSchema>
+
 export const InstallBundleSourceSchema = z.object({
   type: z.enum(['github', 'registry', 'convex_storage', 'archive']),
   url: z.string().trim().min(1).optional(),
@@ -104,6 +113,7 @@ export const InstallBundleSchema = z.object({
   schemaVersion: z.literal(1),
   listing: MarketplaceListingSchema,
   source: InstallBundleSourceSchema,
+  readmeFile: InstallBundleReadmeFileSchema.optional(),
   file_list: z.array(InstallBundleFileSchema).min(1),
 })
 
@@ -127,7 +137,8 @@ export type ListingInstallResolution = z.infer<typeof ListingInstallResolutionSc
 
 export type VerifyIssue = {
   path: string
-  code: 'missing' | 'duplicate' | 'size_mismatch' | 'sha256_mismatch'
+  // `extra` is the hard-cut issue code for fetched bytes that are not declared in file_list.
+  code: 'missing' | 'duplicate' | 'size_mismatch' | 'sha256_mismatch' | 'extra'
   expected?: string | number
   actual?: string | number
 }
@@ -144,10 +155,19 @@ export type VerifyResult =
       issues: VerifyIssue[]
     }
 
-export type FetchedInstallFile = {
-  path: string
-  bytes: Uint8Array | ArrayBuffer | string
-}
+export type FetchedInstallFileBytes = Uint8Array | ArrayBuffer | string
+
+export type FetchedInstallFile =
+  | {
+      path: string
+      bytes: FetchedInstallFileBytes
+      missing?: false
+    }
+  | {
+      path: string
+      missing: true
+      error?: string
+    }
 
 export async function verifyInstallBundleHashes(
   bundle: InstallBundle,
@@ -157,6 +177,7 @@ export async function verifyInstallBundleHashes(
   const duplicatePaths = new Set<string>()
 
   for (const file of fetchedFiles) {
+    if (file.missing) continue
     const bytes = bytesFromFetchedFile(file.bytes)
     if (fetchedByPath.has(file.path)) duplicatePaths.add(file.path)
     fetchedByPath.set(file.path, bytes)
@@ -167,6 +188,7 @@ export async function verifyInstallBundleHashes(
     code: 'duplicate' as const,
   }))
 
+  const expectedPaths = new Set(bundle.file_list.map((file) => file.path))
   let checked = 0
   for (const expected of bundle.file_list) {
     const bytes = fetchedByPath.get(expected.path)
@@ -193,6 +215,12 @@ export async function verifyInstallBundleHashes(
         expected: expected.sha256,
         actual: actualSha256,
       })
+    }
+  }
+
+  for (const path of [...fetchedByPath.keys()].sort()) {
+    if (!expectedPaths.has(path)) {
+      issues.push({ path, code: 'extra' })
     }
   }
 
@@ -240,6 +268,7 @@ export type PluginManifest = z.infer<typeof PluginManifestSchema>
 export type RegistryFileDigest = {
   path: string
   digest: string
+  size: number
 }
 
 export type RegistryVersionDependency = {
@@ -359,19 +388,513 @@ export type RegistryDisplayFile = {
   path: string
   mode?: string
   sha256: string
+  size: number
 }
 
 export function pluginFilesFromLock(lock: RegistryLock): RegistryDisplayFile[] {
   return lock.file_digests.map((entry) => ({
     path: entry.path,
     sha256: entry.digest,
+    size: entry.size,
   }))
 }
 
-function bytesFromFetchedFile(value: FetchedInstallFile['bytes']) {
+export const RegistryFileDigestSchema = z.object({
+  path: z.string().trim().min(1),
+  digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  size: z.number().int().nonnegative(),
+})
+
+export const RegistryVersionDependencySchema = z.object({
+  plugin: z.string().trim().min(1),
+  version: z.string().trim().min(1),
+})
+
+export const RegistrySignatureEnvelopeSchema = z.object({
+  algorithm: z.string().trim().min(1),
+  key_id: z.string().trim().min(1),
+  target: z.string().trim().min(1).optional(),
+  signed_digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+})
+
+export const RegistryVersionRecordSchema = z.object({
+  version: z.string().trim().min(1),
+  path: z.string().trim().min(1),
+  manifest: z.string().trim().min(1),
+  source: z.string().trim().min(1),
+  lock: z.string().trim().min(1),
+  review: z.string().trim().min(1),
+  trust_tier: RegistryTrustTierSchema,
+  installability: InstallabilityStateSchema,
+  snapshot_digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  published_at: z.string().trim().min(1),
+})
+
+export const RegistryHistorySchema = z.object({
+  $schema: z.string().trim().min(1).optional(),
+  kind: ArtifactKindSchema,
+  artifact: z.string().trim().min(1),
+  plugin: z.string().trim().min(1).optional(),
+  namespace: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  description: z.string(),
+  latest_version: z.string().trim().min(1),
+  trust_tier: RegistryTrustTierSchema,
+  installability: InstallabilityStateSchema,
+  active_version: RegistryVersionRecordSchema,
+  keywords: z.array(z.string()).optional(),
+  advisories: z.array(z.string()).optional(),
+  versions: z.array(RegistryVersionRecordSchema).min(1),
+})
+
+export const RegistryIndexItemSchema = z.object({
+  kind: ArtifactKindSchema,
+  artifact: z.string().trim().min(1),
+  plugin: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1),
+  description: z.string(),
+  latest_version: z.string().trim().min(1),
+  history: z.string().trim().min(1),
+  active_version: RegistryVersionRecordSchema,
+  trust_tier: RegistryTrustTierSchema,
+  installability: InstallabilityStateSchema,
+  keywords: z.array(z.string()).optional(),
+  advisories: z.array(z.string()).optional(),
+  summary: z.string().optional(),
+})
+
+export const RegistryIndexSchema = z.object({
+  $schema: z.string().trim().min(1).optional(),
+  contract_version: z.string().trim().min(1),
+  registry_alias: z.string().trim().min(1),
+  source_repository: z.string().trim().min(1),
+  generated_at: z.string().trim().min(1),
+  signature: RegistrySignatureEnvelopeSchema,
+  items: z.array(RegistryIndexItemSchema),
+})
+
+export const RegistryLockSchema = z.object({
+  $schema: z.string().trim().min(1).optional(),
+  plugin: z.string().trim().min(1).optional(),
+  artifact_kind: ArtifactKindSchema.optional(),
+  artifact_id: z.string().trim().min(1).optional(),
+  version: z.string().trim().min(1),
+  file_digests: z.array(RegistryFileDigestSchema).min(1),
+  capability_set: z.array(z.string()),
+  declared_network_domains: z.array(z.string()),
+  declared_secrets: z.array(z.string()),
+  runtime_requirements: z.array(z.string()),
+  dependencies: z.array(RegistryVersionDependencySchema),
+  snapshot_digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+})
+
+export type RegistryMirrorFetchedFile = {
+  path: string
+  bytes: FetchedInstallFileBytes
+}
+
+export type RegistryMirrorArtifacts = {
+  generatedFiles: Array<{ path: string; content: string }>
+  historyDocument: RegistryHistory
+  registryDocument: RegistryIndex
+  advisoriesDocument: Record<string, unknown>
+  sourceArtifact: RegistrySource
+  lockArtifact: RegistryLock
+  reviewArtifact: RegistryReview
+  prTitle: string
+  prBody: string
+  commitMessage: string
+  branchName: string
+  snapshotTreeDigest: string
+  artifactDigest: string
+  warnings: string[]
+  findings: Array<{ severity: 'error' | 'warning'; code: string; message: string }>
+  policyDecisions: string[]
+  alreadyPublished: boolean
+}
+
+export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
+  bundle: InstallBundle
+  files: readonly RegistryMirrorFetchedFile[]
+  submissionId: string
+  reviewedAt: number
+  reviewedBy?: string
+  advisoriesDocument: Record<string, unknown>
+  registryDocument?: RegistryIndex | null
+  existingHistoryDocument?: RegistryHistory | null
+}): Promise<RegistryMirrorArtifacts> {
+  const bundle = InstallBundleSchema.parse(args.bundle)
+  if (!isResolvable(bundle.listing)) {
+    throw new Error(`Cannot mirror non-available listing: ${bundle.listing.installability}`)
+  }
+
+  const listing = bundle.listing
+  const artifactId = listing.registryArtifactId ?? listing.artifactId
+  const [namespace, artifactName] = splitArtifactId(artifactId)
+  const kind = listing.kind
+  const layout = registryLayoutForKind(kind)
+  const version = listing.registryVersion ?? listing.version
+  const versionRoot = `${layout.root}/${namespace}/${artifactName}/versions/${version}`
+  const manifestPath = `${versionRoot}/${layout.manifestDir}/${layout.manifestFile}`
+  const historyPath = `${layout.root}/${namespace}/${artifactName}/${layout.historyFile}`
+  const reviewedAtIso = new Date(args.reviewedAt).toISOString()
+  const source = bundle.source
+
+  const fileBytesByPath = new Map(args.files.map((file) => [file.path, bytesFromFetchedFile(file.bytes)]))
+  const payloadFiles = bundle.file_list.map((file) => {
+    const bytes = fileBytesByPath.get(file.path)
+    if (!bytes) throw new Error(`Missing fetched install bundle file: ${file.path}`)
+    if (bytes.byteLength !== file.size) {
+      throw new Error(`Fetched install bundle file size mismatch for ${file.path}`)
+    }
+    return { ...file, bytes }
+  })
+  const verified = await verifyInstallBundleHashes(
+    bundle,
+    payloadFiles.map((file) => ({ path: file.path, bytes: file.bytes })),
+  )
+  if (!verified.ok) {
+    throw new Error(`Fetched install bundle file hash mismatch: ${verified.issues.map((issue) => `${issue.path}:${issue.code}`).join(', ')}`)
+  }
+
+  const fileDigests = bundle.file_list
+    .map((file) => ({
+      path: file.path,
+      digest: sha256Digest(file.sha256),
+      size: file.size,
+    }))
+    .sort((left, right) => left.path.localeCompare(right.path))
+  const snapshotTreeDigest = await digestJson(fileDigests)
+  const registryTrustTier = listing.registryTrustTier ?? 'reviewed'
+  const registryInstallability = listing.registryInstallability ?? 'installable'
+  const existingVersions = args.existingHistoryDocument?.versions ?? []
+  const existingSameVersion = existingVersions.find((record) => record.version === version)
+  if (existingSameVersion && existingSameVersion.snapshot_digest !== snapshotTreeDigest) {
+    throw new Error(`Registry already contains ${artifactId}@${version} with a different snapshot digest.`)
+  }
+  const alreadyPublished = existingSameVersion?.snapshot_digest === snapshotTreeDigest
+
+  const sourceArtifact = sortKeys({
+    $schema: 'https://agentrig.ai/schema/agentrig-source.json',
+    upstream_repo: source.url ?? listing.sourceUrl ?? listing.source,
+    upstream_tag: source.ref ?? version,
+    upstream_commit: source.commitSha ?? '',
+    submitted_by: `submission:${args.submissionId}`,
+    snapshot_created_at: new Date(listing.publishedAt).toISOString(),
+    snapshot_tree_digest: snapshotTreeDigest,
+    ...(kind === 'plugin'
+      ? { plugin_path: source.subdir ?? '.' }
+      : { artifact_kind: kind, artifact_path: source.subdir ?? '.' }),
+  }) as RegistrySource
+
+  const lockArtifact = RegistryLockSchema.parse(sortKeys({
+    $schema: 'https://agentrig.ai/schema/agentrig-lock.json',
+    ...(kind === 'plugin' ? { plugin: artifactId } : { artifact_kind: kind, artifact_id: artifactId }),
+    version,
+    file_digests: fileDigests,
+    capability_set: listing.capabilityTags ?? [],
+    declared_network_domains: [],
+    declared_secrets: [],
+    runtime_requirements: [],
+    dependencies: [],
+    snapshot_digest: snapshotTreeDigest,
+  }))
+
+  const reviewArtifact = sortKeys({
+    $schema: 'https://agentrig.ai/schema/agentrig-review.json',
+    review_status: 'approved',
+    reviewer: args.reviewedBy ? `user:${args.reviewedBy}` : 'system:review-approval',
+    reviewed_at: reviewedAtIso,
+    scanner_summary: { status: 'pass' },
+    policy_decisions: [
+      'mirror_input_is_sdk_install_bundle',
+      'install_bundle_hashes_verified',
+      'listing_installability_available',
+    ],
+    trust_tier_basis: {
+      trust_tier: registryTrustTier,
+      installability: registryInstallability,
+      rationale: 'This registry entry mirrors a Convex-approved AgentRig marketplace listing.',
+    },
+  }) as RegistryReview
+
+  const newVersionRecord = RegistryVersionRecordSchema.parse(sortKeys({
+    version,
+    path: `${versionRoot}/`,
+    manifest: manifestPath,
+    source: `${versionRoot}/AGENTRIG_SOURCE.json`,
+    lock: `${versionRoot}/AGENTRIG_LOCK.json`,
+    review: `${versionRoot}/AGENTRIG_REVIEW.json`,
+    trust_tier: registryTrustTier,
+    installability: registryInstallability,
+    snapshot_digest: snapshotTreeDigest,
+    published_at: reviewedAtIso,
+  }))
+  const versions = existingVersions
+    .filter((record) => record.version !== version)
+    .concat(newVersionRecord)
+    .sort((left, right) => right.version.localeCompare(left.version))
+  const advisoryIds = Array.isArray(args.advisoriesDocument.items)
+    ? args.advisoriesDocument.items
+        .filter((item) => isRecord(item) && item.plugin === artifactId)
+        .map((item) => String(item.id ?? ''))
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(right))
+    : []
+
+  const historyDocument = RegistryHistorySchema.parse(sortKeys({
+    $schema: 'https://agentrig.ai/schema/plugin-history.json',
+    kind,
+    artifact: artifactId,
+    ...(kind === 'plugin' ? { plugin: artifactId } : {}),
+    namespace,
+    name: listing.name,
+    description: listing.description,
+    latest_version: versions[0]!.version,
+    trust_tier: versions[0]!.trust_tier,
+    installability: versions[0]!.installability,
+    active_version: versions[0],
+    keywords: listing.keywords?.length ? listing.keywords : undefined,
+    advisories: advisoryIds.length ? advisoryIds : undefined,
+    versions,
+  }))
+
+  const registryItems = (args.registryDocument?.items ?? [])
+    .filter((item) => item.artifact !== artifactId)
+    .concat(sortKeys({
+      kind,
+      artifact: artifactId,
+      ...(kind === 'plugin' ? { plugin: artifactId } : {}),
+      name: listing.name,
+      description: listing.description,
+      latest_version: historyDocument.latest_version,
+      history: historyPath,
+      active_version: historyDocument.active_version,
+      trust_tier: historyDocument.trust_tier,
+      installability: historyDocument.installability,
+      keywords: historyDocument.keywords,
+      advisories: historyDocument.advisories,
+    }))
+    .sort((left, right) => {
+      const kindComparison = left.kind.localeCompare(right.kind)
+      return kindComparison || left.artifact.localeCompare(right.artifact)
+    })
+  const advisoriesDocument = sortKeys(args.advisoriesDocument)
+  const generatedAt = [String((advisoriesDocument as Record<string, unknown>).generated_at ?? ''), reviewedAtIso]
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? reviewedAtIso
+  const unsignedRegistry = sortKeys({
+    $schema: 'https://agentrig.ai/schema/registry.json',
+    contract_version: '1',
+    registry_alias: 'agentrig',
+    source_repository: 'https://github.com/agentrig/agentrig-registry',
+    generated_at: generatedAt,
+    items: registryItems,
+  })
+  const registryDocument = RegistryIndexSchema.parse(sortKeys({
+    ...unsignedRegistry,
+    signature: {
+      algorithm: 'sha256-json-envelope',
+      key_id: 'agentrig-registry',
+      target: 'registry.json',
+      signed_digest: await digestJson(unsignedRegistry),
+    },
+  }))
+
+  const generatedFiles = [
+    ...payloadFiles.map((file) => ({
+      path: `${versionRoot}/${file.path}`,
+      content: new TextDecoder().decode(file.bytes),
+    })),
+    { path: `${versionRoot}/AGENTRIG_SOURCE.json`, content: stableJsonPretty(sourceArtifact) },
+    { path: `${versionRoot}/AGENTRIG_LOCK.json`, content: stableJsonPretty(lockArtifact) },
+    { path: `${versionRoot}/AGENTRIG_REVIEW.json`, content: stableJsonPretty(reviewArtifact) },
+    { path: historyPath, content: stableJsonPretty(historyDocument) },
+    { path: 'advisories.json', content: stableJsonPretty(advisoriesDocument) },
+    { path: 'registry.json', content: stableJsonPretty(registryDocument) },
+  ].sort((left, right) => left.path.localeCompare(right.path))
+
+  const artifactDigest = await digestJson(await Promise.all(
+    generatedFiles.map(async (file) => ({
+      path: file.path,
+      digest: `sha256:${await sha256Hex(new TextEncoder().encode(file.content))}`,
+    })),
+  ))
+  const branchName = `promotion/${artifactId.replace(/\./g, '-')}-${version}-${(source.commitSha ?? 'mirror').slice(0, 12)}`
+
+  return {
+    generatedFiles,
+    historyDocument,
+    registryDocument,
+    advisoriesDocument,
+    sourceArtifact,
+    lockArtifact,
+    reviewArtifact,
+    prTitle: `Mirror ${artifactId}@${version}`,
+    prBody: `## Summary\n- Mirror \`${artifactId}@${version}\` from marketplace listing \`${listing.listingId ?? listing.artifactId}\`\n- Source: \`${source.url ?? listing.source}\` @ \`${source.ref ?? version}\` (${source.commitSha ?? 'unknown commit'})\n- Serializer: SDK InstallBundle\n\n## Test plan\n- [ ] Registry CI passes on this PR\n- [ ] Maintainer confirms the mirrored entry matches the approved marketplace listing\n`,
+    commitMessage: `Mirror ${artifactId}@${version}\n\nDerived from AgentRig marketplace InstallBundle for submission ${args.submissionId}.`,
+    branchName,
+    snapshotTreeDigest,
+    artifactDigest,
+    warnings: [],
+    findings: [],
+    policyDecisions: ['mirror_input_is_sdk_install_bundle'],
+    alreadyPublished,
+  }
+}
+
+export async function buildRegistryYankMirrorArtifacts(args: {
+  listing: MarketplaceListing
+  registryDocument: RegistryIndex
+  existingHistoryDocument: RegistryHistory
+  reason?: string
+  changedAt: number
+}): Promise<RegistryMirrorArtifacts> {
+  const listing = MarketplaceListingSchema.parse(args.listing)
+  const artifactId = listing.registryArtifactId ?? listing.artifactId
+  const [namespace, artifactName] = splitArtifactId(artifactId)
+  const layout = registryLayoutForKind(listing.kind)
+  const historyPath = `${layout.root}/${namespace}/${artifactName}/${layout.historyFile}`
+  const changedAtIso = new Date(args.changedAt).toISOString()
+  const yankedVersions = args.existingHistoryDocument.versions.map((version, index) =>
+    index === 0
+      ? RegistryVersionRecordSchema.parse(sortKeys({
+          ...version,
+          trust_tier: 'yanked',
+          installability: 'yanked',
+        }))
+      : version,
+  )
+  const active = yankedVersions[0]
+  if (!active) throw new Error(`Cannot mark ${artifactId} as yanked without registry history.`)
+  const historyDocument = RegistryHistorySchema.parse(sortKeys({
+    ...args.existingHistoryDocument,
+    trust_tier: 'yanked',
+    installability: 'yanked',
+    active_version: active,
+    versions: yankedVersions,
+  }))
+  const registryItems = args.registryDocument.items
+    .map((item) =>
+      item.artifact === artifactId
+        ? sortKeys({
+            ...item,
+            trust_tier: 'yanked',
+            installability: 'yanked',
+            active_version: active,
+          })
+        : item,
+    )
+    .sort((left, right) => {
+      const kindComparison = left.kind.localeCompare(right.kind)
+      return kindComparison || left.artifact.localeCompare(right.artifact)
+    })
+  const unsignedRegistry = sortKeys({
+    ...args.registryDocument,
+    signature: undefined,
+    generated_at: changedAtIso,
+    items: registryItems,
+  })
+  const registryDocument = RegistryIndexSchema.parse(sortKeys({
+    ...unsignedRegistry,
+    signature: {
+      algorithm: 'sha256-json-envelope',
+      key_id: 'agentrig-registry',
+      target: 'registry.json',
+      signed_digest: await digestJson(unsignedRegistry),
+    },
+  }))
+  const generatedFiles = [
+    { path: historyPath, content: stableJsonPretty(historyDocument) },
+    { path: 'registry.json', content: stableJsonPretty(registryDocument) },
+  ]
+  const artifactDigest = await digestJson(await Promise.all(
+    generatedFiles.map(async (file) => ({
+      path: file.path,
+      digest: `sha256:${await sha256Hex(new TextEncoder().encode(file.content))}`,
+    })),
+  ))
+
+  return {
+    generatedFiles,
+    historyDocument,
+    registryDocument,
+    advisoriesDocument: {},
+    sourceArtifact: {} as RegistrySource,
+    lockArtifact: {} as RegistryLock,
+    reviewArtifact: {} as RegistryReview,
+    prTitle: `Mark ${artifactId} as yanked`,
+    prBody: `## Summary\n- Mark \`${artifactId}\` as yanked in the verified registry mirror\n- Marketplace listing installability: \`${listing.installability}\`\n- Reason: ${args.reason ?? listing.yankReason ?? 'not specified'}\n\n## Test plan\n- [ ] Registry CI passes on this PR\n- [ ] Maintainer confirms Convex install resolution refuses this listing\n`,
+    commitMessage: `Mark ${artifactId} as yanked\n\nConvex marketplace listing ${listing.listingId ?? listing.artifactId} is no longer available.`,
+    branchName: `mirror-yank/${artifactId.replace(/\./g, '-')}-${String(args.changedAt).slice(-10)}`,
+    snapshotTreeDigest: active.snapshot_digest,
+    artifactDigest,
+    warnings: [],
+    findings: [],
+    policyDecisions: ['mirror_followup_marks_yanked_listing'],
+    alreadyPublished: args.existingHistoryDocument.installability === 'yanked',
+  }
+}
+
+function bytesFromFetchedFile(value: FetchedInstallFileBytes) {
   if (typeof value === 'string') return new TextEncoder().encode(value)
   if (value instanceof Uint8Array) return value
   return new Uint8Array(value)
+}
+
+function registryLayoutForKind(kind: ArtifactKind) {
+  if (kind === 'plugin') {
+    return { root: 'plugins', historyFile: 'plugin.json', manifestDir: '.plugin', manifestFile: 'plugin.json' }
+  }
+  if (kind === 'skill') {
+    return { root: 'skills', historyFile: 'skill.json', manifestDir: '.skill', manifestFile: 'skill.json' }
+  }
+  if (kind === 'mcp') {
+    return { root: 'mcps', historyFile: 'mcp.json', manifestDir: '.mcp', manifestFile: 'mcp.json' }
+  }
+  return { root: 'hooks', historyFile: 'hook.json', manifestDir: '.hook', manifestFile: 'hook.json' }
+}
+
+function splitArtifactId(artifactId: string) {
+  const [namespace, artifactName] = artifactId.split('.')
+  if (!namespace || !artifactName) throw new Error(`Invalid registry artifact id: ${artifactId}`)
+  return [namespace, artifactName] as const
+}
+
+function sha256Digest(value: string) {
+  const digest = value.trim().replace(/^sha256:/, '').toLowerCase()
+  if (!SHA256_HEX_RE.test(digest)) throw new Error(`Invalid SHA-256 digest: ${value}`)
+  return `sha256:${digest}`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function sortKeys<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => sortKeys(item)) as T
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, child]) => child !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, sortKeys(child)]),
+    ) as T
+  }
+  return value
+}
+
+function stableJson(value: unknown) {
+  return JSON.stringify(sortKeys(value))
+}
+
+function stableJsonPretty(value: unknown) {
+  return `${JSON.stringify(sortKeys(value), null, 2)}\n`
+}
+
+async function digestJson(value: unknown) {
+  return `sha256:${await sha256Hex(new TextEncoder().encode(stableJson(value)))}`
 }
 
 async function sha256Hex(bytes: Uint8Array) {

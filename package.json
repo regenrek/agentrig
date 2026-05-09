@@ -31,7 +31,9 @@
   },
   "pnpm": {
     "overrides": {
-      "vite": "npm:@voidzero-dev/vite-plus-core@latest"
+      "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+      "kysely": "0.28.14",
+      "postcss": "8.5.10"
     }
   },
   "devDependencies": {

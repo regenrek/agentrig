@@ -15,7 +15,7 @@ const args = {
   },
   url: {
     type: 'positional',
-    description: 'Registry base URL (must contain registry.json at root)',
+    description: 'Marketplace base URL',
     required: true,
   },
   cwd: {

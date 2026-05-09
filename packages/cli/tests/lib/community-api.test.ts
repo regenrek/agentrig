@@ -7,6 +7,7 @@ import {
   listPluginSubmissions,
   logout,
   mintPublishToken,
+  resolveAuthenticatedCommunityBaseUrl,
   resolveCommunityBaseUrl,
   startCliLogin,
   whoAmI,
@@ -27,6 +28,24 @@ describe('community api client', () => {
     expect(resolveCommunityBaseUrl()).toBe('http://localhost:3000')
     expect(() => resolveCommunityBaseUrl('not a url')).toThrow(/Invalid AgentRig base URL/)
     expect(() => resolveCommunityBaseUrl('file:///tmp/agentrig')).toThrow(/protocol/)
+  })
+
+  it('keeps stored bearer tokens bound to the login host', () => {
+    expect(resolveAuthenticatedCommunityBaseUrl(undefined, 'https://agentrig.test/app')).toBe('https://agentrig.test/app')
+    expect(resolveAuthenticatedCommunityBaseUrl('http://127.0.0.1:3000', 'http://127.0.0.1:3000')).toBe(
+      'http://127.0.0.1:3000'
+    )
+
+    vi.stubEnv('AGENTRIG_BASE_URL', 'https://evil.example')
+    expect(() => resolveAuthenticatedCommunityBaseUrl(undefined, 'https://agentrig.test')).toThrow(/bound to/)
+    vi.unstubAllEnvs()
+
+    expect(() => resolveAuthenticatedCommunityBaseUrl('https://evil.example', 'https://agentrig.test')).toThrow(
+      /bound to/
+    )
+    expect(() => resolveAuthenticatedCommunityBaseUrl('http://agentrig.test', 'http://agentrig.test')).toThrow(
+      /HTTPS or loopback HTTP/
+    )
   })
 
   it('posts publish-token mint requests with the generated plugin shape', async () => {

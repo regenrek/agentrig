@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vite-plus/test'
+import { describe, expect, it } from 'vitest'
 import {
   buildPublishScanResult,
   buildPublishShapeCandidates,
   buildSubmitPublishPayload,
   normalizePublishSelectors,
+  PUBLISH_SHAPE_DEFINITIONS,
+  PUBLISH_SHAPE_KINDS,
   type PublishPluginCandidate,
   type SubmitSource,
 } from '../../src/provider/publish-shape'
@@ -38,6 +40,15 @@ async function scanFixture() {
 }
 
 describe('publish shape primitives', () => {
+  it('defines labels and descriptions for every publish shape', () => {
+    expect(Object.keys(PUBLISH_SHAPE_DEFINITIONS).sort()).toEqual([...PUBLISH_SHAPE_KINDS].sort())
+    for (const shape of PUBLISH_SHAPE_KINDS) {
+      expect(PUBLISH_SHAPE_DEFINITIONS[shape]).toMatchObject({ id: shape })
+      expect(PUBLISH_SHAPE_DEFINITIONS[shape].label.trim()).not.toBe('')
+      expect(PUBLISH_SHAPE_DEFINITIONS[shape].description.trim()).not.toBe('')
+    }
+  })
+
   it('defaults to plugin_all when a plugin candidate exists', async () => {
     const scan = buildPublishScanResult({
       source,

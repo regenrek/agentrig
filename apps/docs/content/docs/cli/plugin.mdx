@@ -18,7 +18,7 @@ agentrig view <plugin-spec>
 agentrig plugin install <provider> <plugin-spec>
 ```
 
-For public installs, `<plugin-spec>` must be the canonical registry ref
+For public installs, `<plugin-spec>` must be the canonical marketplace ref
 `<registryAlias>/<namespace.plugin>`. Add `@<version>` only when you need to pin
 an exact version for reproducibility or rollback.
 
@@ -32,8 +32,9 @@ agentrig plugin uninstall codex agentrig/agentrig.core-committer
 ```
 
 This is the main path for installing an entire published plugin. The install
-ledger records the resolved concrete version, registry identity, and snapshot
-digest even when you use the unversioned latest ref.
+ledger records the resolved concrete version, marketplace identity, and
+snapshot digest even when you use the unversioned latest ref. The CLI resolves
+the ref by fetching an AgentRig `InstallBundle` from `agentrig.ai`.
 
 ## Selected artifact install
 
@@ -73,12 +74,13 @@ selectors, closure status, written files, and hash-owned JSON writes. Uninstall
 removes only files and JSON entries still matching the recorded hashes; user
 modified files or MCP entries are kept and reported.
 
-Selection install is currently registry-backed. For arbitrary third-party repos,
-use `inspect` and `use` to scan and materialize a local plugin first.
+Selection install resolves from the same AgentRig `InstallBundle` as full-plugin
+install. For arbitrary third-party repos, use `inspect` and `use` to scan and
+materialize a local plugin first.
 
 For third-party repos that are not in a signed registry, use the top-level
 `inspect` and `use` commands. Those commands create external-repo provenance,
-not registry identity.
+not marketplace identity.
 
 ## inspect and use
 
@@ -95,7 +97,7 @@ computed from detector output only; AI output never changes it.
 `use --as-plugin <id>` writes a local plugin directory with `x-agentrig.source`
 provenance. `use --install` stages the same external-repo plugin shape and installs
 it through the provider installer. Both paths record external-repo provenance, not
-registry trust.
+marketplace trust.
 
 ## Local BYOK enrichment
 

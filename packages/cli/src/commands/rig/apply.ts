@@ -20,7 +20,6 @@ import {
   preparePluginInstall,
   uninstallPluginProviders,
 } from '../../lib/plugin-providers'
-import { assertInstallableTrust } from '../../lib/trust'
 import type { ResolvedPlugin } from '../../lib/registry'
 
 function resolveRigPlugins(
@@ -117,18 +116,19 @@ function mergePluginGraphs(graphs: ResolvedPluginGraph[]) {
 
   for (const graph of graphs) {
     for (const resolved of graph.resolvedPlugins) {
-      const visitKey = `${resolved.sourceLabel}:${resolved.manifest.id}`
+      const sourceLabel = `${resolved.listing.slug ?? resolved.listing.artifactId}@${resolved.listing.version}`
+      const visitKey = `${sourceLabel}:${resolved.listing.artifactId}`
       if (visitKeys.has(visitKey)) continue
 
-      const existingSource = sourcesByPluginId.get(resolved.manifest.id)
-      if (existingSource && existingSource !== resolved.sourceLabel) {
+      const existingSource = sourcesByPluginId.get(resolved.listing.artifactId)
+      if (existingSource && existingSource !== sourceLabel) {
         throw new Error(
-          `Rig resolves plugin "${resolved.manifest.id}" from multiple sources (${existingSource}, ${resolved.sourceLabel}). Use one canonical source per plugin id.`
+          `Rig resolves plugin "${resolved.listing.artifactId}" from multiple sources (${existingSource}, ${sourceLabel}). Use one canonical source per plugin id.`
         )
       }
 
       visitKeys.add(visitKey)
-      sourcesByPluginId.set(resolved.manifest.id, resolved.sourceLabel)
+      sourcesByPluginId.set(resolved.listing.artifactId, sourceLabel)
       ordered.push(resolved)
     }
   }
@@ -175,14 +175,6 @@ const command = defineCommand({
       graphs.push(await resolvePluginGraph(pluginSpec, cwd, cfg.registries))
     }
     const resolvedPlugins = mergePluginGraphs(graphs)
-    for (const resolved of resolvedPlugins) {
-      assertInstallableTrust(
-        resolved.manifest.id,
-        resolved.manifest.version,
-        resolved.trustTier,
-        resolved.installability
-      )
-    }
 
     const materialized = await materializeResolvedPluginGraph({
       requestedPlugin: graphs[0]!.requestedPlugin,

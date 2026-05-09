@@ -9,9 +9,11 @@ icon: Database
 Manage the registries in your config file.
 
 The official registry is seeded by `agentrig init`.
-Third-party registries are explicit: add the registry first, then install plugins
-from it with `<registryAlias>/<namespace.plugin>`. Add `@<version>` only when
-you need an exact reproducibility or rollback pin.
+For AgentRig marketplace refs, the CLI resolves an `InstallBundle` from
+`agentrig.ai`. Third-party static signed registries are explicit: add the
+registry first, then install plugins from it with
+`<registryAlias>/<namespace.plugin>`. Add `@<version>` only when you need an
+exact reproducibility or rollback pin.
 
 ## List registries
 
@@ -34,9 +36,10 @@ agentrig plugin install codex georg/georg.ts-master-plugin
 
 Registry aliases are for static signed registries only. Direct URLs, local files, ZIP uploads, and author repos are outside the public install contract.
 
-Unversioned refs resolve to the registry's latest installable version. The
-install ledger records the concrete resolved version and snapshot digest, so
-uninstall and repair stay deterministic.
+Unversioned refs resolve to the latest installable version returned by the
+marketplace or third-party registry. The install ledger records the concrete
+resolved version and snapshot digest, so uninstall and repair stay
+deterministic.
 
 `agentrig inspect <repo>` and `agentrig use <repo>` are separate external-repo workflows.
 They can scan and reuse selected files, but they must not be added as registry aliases and
@@ -69,5 +72,6 @@ real latest-first refs such as `agentrig/agentrig.core-committer`.
 ## Notes
 
 - Registry aliases use lowercase letters, numbers, and hyphens.
-- Registry URLs must point at a base URL that serves `registry.json` at the root.
+- Third-party registry URLs must point at a base URL that serves `registry.json`
+  at the root.
 - Use `--global` when you want a registry available across repos instead of only in the current project.

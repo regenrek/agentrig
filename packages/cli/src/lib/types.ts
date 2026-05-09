@@ -1,9 +1,5 @@
-import type { ArtifactKind } from '@agentrig/sdk'
-
-export type RegistryRef = {
-  name: string
-  url: string
-}
+import type { ArtifactKind, RegistryRef } from '@agentrig/sdk'
+export type { RegistryRef } from '@agentrig/sdk'
 
 export type RigDefinition = {
   extends?: string[]
