@@ -1,12 +1,15 @@
 # Changelog
 
-## [Unreleased]
+## [0.7.0] - 2026-05-09
 
 ### Added
 - Added canonical marketplace listing and install-bundle SDK contracts so CLI installs can consume Convex-backed plugin and artifact listings without registry-materialization fallbacks.
+- Exported `PUBLISH_SHAPE_DEFINITIONS` from `@agentrig/sdk` so submit UIs can render canonical labels, descriptions, and examples without maintaining local copies.
+- Added an immutable version-snapshot resolution path for CLI installs (`resolveInstallBundleFromConvex` reads through listing `currentVersionId → artifact_listing_versions.installBundle`), plus content-addressed verification via `verifyInstallBundleHashes` against `file_list[].sha256/size`.
 
 ### Changed
 - Updated CLI, provider install paths, and registry docs around canonical marketplace browse/install flows for plugins and standalone artifacts.
+- CLI install resolution now flows through Convex-backed listing IDs instead of the legacy `resolvePluginFromRegistryRef` path; registry refs without a backing listing are no longer resolvable.
 
 ## [0.6.1] - 2026-05-08
 
