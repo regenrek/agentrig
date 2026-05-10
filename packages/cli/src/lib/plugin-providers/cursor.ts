@@ -18,6 +18,7 @@ import {
   type CursorPluginManifest,
 } from './schemas'
 import {
+  cleanEmptyAncestors,
   copyEntries,
   copyInstalledPlugin,
   detectPluginFeatures,
@@ -243,10 +244,13 @@ export const cursorProvider: PluginProviderAdapter = {
       if (summary.removed.length > 0) {
         removed.push(entry.pluginName)
         clearedRecordIds.push(entry.id)
-        continue
+      } else {
+        missing.push(entry.pluginName)
+        clearedRecordIds.push(entry.id)
       }
-      missing.push(entry.pluginName)
-      clearedRecordIds.push(entry.id)
+      if (!dryRun) {
+        await cleanEmptyAncestors(pluginPath, pluginRoot, dryRun).catch(() => {})
+      }
     }
 
     return {

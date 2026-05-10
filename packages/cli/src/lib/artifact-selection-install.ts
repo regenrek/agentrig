@@ -33,6 +33,7 @@ import {
   createProviderJsonWrite,
   formatKeptModifiedJsonWrite,
 } from './plugin-providers/json-ownership'
+import { cleanEmptyAncestors } from './plugin-providers/shared'
 import {
   listSelectionInstallRecords,
   loadPluginInstallLedgers,
@@ -446,6 +447,7 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
   for (const record of records) {
     const rootDir = resolveSelectionRoot(input.cwd, record.provider, record.scope)
     let recordKept = false
+    const removedFileParents = new Set<string>()
     for (const file of record.files) {
       const filePath = resolveTargetPath(rootDir, file.path)
       if (!(await pathExists(filePath))) {
@@ -460,6 +462,7 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
       }
       if (!input.dryRun) await fs.rm(filePath, { force: true })
       removed.push(filePath)
+      removedFileParents.add(path.dirname(filePath))
     }
     for (const write of record.jsonWrites) {
       const outcome = await removeJsonWrite(rootDir, write, Boolean(input.dryRun))
@@ -468,7 +471,17 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
       missing.push(...outcome.missing)
       if (outcome.kept.length > 0) recordKept = true
     }
-    if (!recordKept) clearedRecordIds.push(record.id)
+    if (!recordKept) {
+      if (!input.dryRun) {
+        for (const parent of removedFileParents) {
+          const ancestorRoot = resolveSelectionCleanupRoot(rootDir, parent)
+          if (ancestorRoot) {
+            await cleanEmptyAncestors(parent, ancestorRoot, false)
+          }
+        }
+      }
+      clearedRecordIds.push(record.id)
+    }
   }
 
   if (!input.dryRun) {
@@ -500,6 +513,19 @@ function resolveContainedPath(rootDir: string, relativePath: string, label: stri
     throw new Error(`Unsafe ${label} path: ${relativePath}`)
   }
   return targetPath
+}
+
+function resolveSelectionCleanupRoot(rootDir: string, startDir: string) {
+  const relative = path.relative(rootDir, startDir)
+  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) return null
+  const segments = relative.split(path.sep).filter(Boolean)
+  const rootSegments = segments[0] === '.cursor' && segments[1]
+    ? ['.cursor', segments[1]]
+    : [segments[0]]
+  const ownedRoots = new Set(['skills', 'mcps', 'hooks', 'commands', 'agents'])
+  const ownedRootName = rootSegments[rootSegments.length - 1]
+  if (!ownedRootName || !ownedRoots.has(ownedRootName)) return null
+  return path.join(rootDir, ...rootSegments)
 }
 
 async function readArtifactJson(source: SelectionFileSource, artifact: Pick<SelectedArtifactForBundle, 'fileDigests' | 'selector'>) {

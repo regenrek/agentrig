@@ -113,6 +113,10 @@ describe('uninstallArtifactSelection', () => {
       resolved,
       pluginDir: artifactDir,
     })
+    const skillDir = path.join(cwd, '.codex', 'skills', 'review')
+    const skillRoot = path.join(cwd, '.codex', 'skills')
+    await writeFile(path.join(skillDir, '.DS_Store'), '')
+    await writeFile(path.join(skillRoot, '.DS_Store'), '')
 
     const result = await uninstallArtifactSelection({
       sourceKind: 'registry-artifact',
@@ -133,6 +137,9 @@ describe('uninstallArtifactSelection', () => {
       false,
       false,
     ])
+    await expect(pathExists(skillDir)).resolves.toBe(false)
+    await expect(pathExists(skillRoot)).resolves.toBe(false)
+    await expect(pathExists(path.join(cwd, '.codex'))).resolves.toBe(true)
     const ledgers = await loadPluginInstallLedgers(cwd)
     expect(listSelectionInstallRecords(ledgers, 'workspace')).toEqual([])
   })

@@ -676,17 +676,52 @@ async function pruneEmptyDirectories(rootDir: string, filePaths: string[], dryRu
   const orderedDirs = [...candidateDirs].sort((left, right) => right.length - left.length)
   for (const directory of orderedDirs) {
     if (!(await pathExists(directory))) continue
-    const dsStorePath = path.join(directory, '.DS_Store')
-    if (await pathExists(dsStorePath)) {
-      if (!dryRun) {
-        await fs.rm(dsStorePath, { force: true })
-      }
-    }
-    const contents = await fs.readdir(directory)
-    if (contents.length > 0) continue
+    await removeDirectoryIfEmptyAfterDsStore(directory, dryRun)
+  }
+}
+
+async function removeDirectoryIfEmptyAfterDsStore(directory: string, dryRun: boolean): Promise<boolean> {
+  if (!(await pathExists(directory))) return false
+  const dsStorePath = path.join(directory, '.DS_Store')
+  if (await pathExists(dsStorePath)) {
     if (!dryRun) {
-      await fs.rmdir(directory)
+      await fs.rm(dsStorePath, { force: true })
     }
+  }
+  const contents = await fs.readdir(directory)
+  if (contents.length > 0) return false
+  if (!dryRun) {
+    await fs.rmdir(directory)
+  }
+  return true
+}
+
+/**
+ * Walk upward from `startDir` toward `ancestorRoot` (inclusive), deleting any
+ * `.DS_Store` files we own and removing the directory if it ends up empty.
+ * Stops at the first non-empty ancestor (i.e. one that still has tracked siblings).
+ *
+ * `startDir` and `ancestorRoot` may both be missing on disk; that's fine — we just
+ * skip what doesn't exist.
+ */
+export async function cleanEmptyAncestors(
+  startDir: string,
+  ancestorRoot: string,
+  dryRun: boolean
+) {
+  const safeRoot = path.resolve(ancestorRoot)
+  let current = path.resolve(startDir)
+  const relative = path.relative(safeRoot, current)
+  if (relative !== '' && (relative.startsWith('..') || path.isAbsolute(relative))) {
+    return
+  }
+  while (true) {
+    const removed = await removeDirectoryIfEmptyAfterDsStore(current, dryRun)
+    if (!removed) return
+    if (current === safeRoot) return
+    const parent = path.dirname(current)
+    if (parent === current) return
+    current = parent
   }
 }
 

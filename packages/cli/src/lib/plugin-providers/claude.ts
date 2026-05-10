@@ -1,5 +1,7 @@
+import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { ensureDir, writeJsonFile } from '../fs'
+import { ensureDir, pathExists, removeIfExists, writeJsonFile } from '../fs'
+import { getClaudeMarketplaceCacheRoot } from '../paths'
 import { getPluginInstallRecordId } from '../plugin-install-ledger'
 import type { ClaudePluginInstallRecord } from '../types'
 import type {
@@ -16,12 +18,60 @@ import {
   type ClaudePluginManifest,
 } from './schemas'
 import {
+  cleanEmptyAncestors,
   copyEntries,
   detectPluginFeatures,
   normalizeManifestDescription,
   pluginAuthor,
   providerPluginName,
 } from './shared'
+
+/**
+ * Stage the rendered Claude marketplace into a persistent directory under
+ * `<agentRigHome>/.agentrig/cache/claude-marketplaces/<name>/` so the
+ * `claude plugin marketplace add <path>` pointer remains valid after the
+ * tempdir-backed `result.outRoot` is cleaned up.
+ *
+ * Returns the persistent path that should be passed to the Claude CLI.
+ */
+async function stageClaudeMarketplaceForInstall(
+  outRoot: string,
+  marketplaceName: string
+): Promise<string> {
+  const persistentRoot = getClaudeMarketplaceCacheRoot(marketplaceName)
+  await ensureDir(path.dirname(persistentRoot))
+  // Hard-cut: replace any prior staging contents wholesale so the marketplace
+  // matches what we just exported. Atomic replace via mkdtemp -> rename.
+  const stagingParent = path.dirname(persistentRoot)
+  const stagingDir = await fs.mkdtemp(path.join(stagingParent, `.${path.basename(persistentRoot)}.staging-`))
+  let backupDir: string | undefined
+  let backupPath: string | undefined
+  try {
+    await fs.cp(outRoot, stagingDir, { recursive: true, force: true })
+    if (await pathExists(persistentRoot)) {
+      backupDir = await fs.mkdtemp(path.join(stagingParent, `.${path.basename(persistentRoot)}.backup-`))
+      backupPath = path.join(backupDir, path.basename(persistentRoot))
+      await fs.rename(persistentRoot, backupPath)
+      await fs.rename(stagingDir, persistentRoot)
+      await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {})
+      backupDir = undefined
+      backupPath = undefined
+    } else {
+      await fs.rename(stagingDir, persistentRoot)
+    }
+  } catch (error) {
+    await removeIfExists(stagingDir)
+    if (backupPath && await pathExists(backupPath)) {
+      await removeIfExists(persistentRoot)
+      await fs.rename(backupPath, persistentRoot)
+    }
+    if (backupDir) {
+      await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {})
+    }
+    throw error
+  }
+  return persistentRoot
+}
 
 function scopeToClaudeArg(scope: 'personal' | 'workspace') {
   return scope === 'workspace' ? 'project' : 'user'
@@ -113,14 +163,16 @@ export const claudeProvider: PluginProviderAdapter = {
       plugins,
     }
   },
-  previewInstall({ outRoot, plugins, scope, cfg }) {
+  previewInstall({ plugins, scope, cfg }) {
     const scopeArg = scopeToClaudeArg(scope)
+    const previewRoot = getClaudeMarketplaceCacheRoot(cfg.providers.claude.marketplaceName)
     return {
       provider: 'claude',
       scope,
-      locations: [outRoot],
+      locations: [previewRoot],
       actions: [
-        `claude plugin marketplace add ${outRoot}`,
+        `stage marketplace -> ${previewRoot}`,
+        `claude plugin marketplace add ${previewRoot}`,
         ...plugins.map(
           (plugin) => {
             const pluginName = providerPluginName(plugin, 'claude', cfg.pluginPrefix)
@@ -133,9 +185,9 @@ export const claudeProvider: PluginProviderAdapter = {
   async install({ result, cfg, dryRun, runner, scope, requestedScope, installMetadataByPluginId }) {
     const installed: string[] = []
     const skipped: string[] = []
-    const locations = [result.outRoot]
     const ledgerEntries: ClaudePluginInstallRecord[] = []
     const scopeArg = scopeToClaudeArg(scope)
+    const previewRoot = getClaudeMarketplaceCacheRoot(result.marketplaceName)
 
     if (dryRun) {
       return {
@@ -143,14 +195,22 @@ export const claudeProvider: PluginProviderAdapter = {
         scope,
         installed: result.plugins.map((plugin) => providerPluginName(plugin, 'claude', cfg.pluginPrefix)),
         skipped,
-        locations,
+        locations: [previewRoot],
         ledgerEntries,
       }
     }
 
+    // Stage the freshly exported marketplace into a persistent path so the
+    // pointer registered with `claude plugin marketplace add` survives across
+    // CLI invocations and tempdir cleanup.
+    const persistentMarketplacePath = await stageClaudeMarketplaceForInstall(
+      result.outRoot,
+      result.marketplaceName
+    )
+
     let marketplaceAdded = true
     try {
-      await runner('claude', ['plugin', 'marketplace', 'add', result.outRoot])
+      await runner('claude', ['plugin', 'marketplace', 'add', persistentMarketplacePath])
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
       if (!message.includes('already')) {
@@ -179,14 +239,14 @@ export const claudeProvider: PluginProviderAdapter = {
         pluginVersion: plugin.manifest.version,
         snapshotDigest: installMetadata.snapshotDigest,
         pluginName,
-        targetPaths: [result.outRoot],
+        targetPaths: [persistentMarketplacePath],
         installedAt: new Date().toISOString(),
         files: [],
         metadata: {
           marketplaceName: result.marketplaceName,
           pluginRef,
           scopeArg,
-          marketplaceSourcePath: result.outRoot,
+          marketplaceSourcePath: persistentMarketplacePath,
           marketplaceAdded,
         },
       })
@@ -197,7 +257,7 @@ export const claudeProvider: PluginProviderAdapter = {
       scope,
       installed,
       skipped,
-      locations,
+      locations: [persistentMarketplacePath],
       ledgerEntries,
     }
   },
@@ -210,6 +270,7 @@ export const claudeProvider: PluginProviderAdapter = {
     const knownClaudeEntries = [...entries, ...remainingEntries].filter(
       (entry): entry is ClaudePluginInstallRecord => entry.provider === 'claude'
     )
+    const keptEntries: ClaudePluginInstallRecord[] = []
 
     for (const entry of entries) {
       if (entry.provider !== 'claude') continue
@@ -231,9 +292,11 @@ export const claudeProvider: PluginProviderAdapter = {
           continue
         }
         kept.push(entry.pluginName)
+        keptEntries.push(entry)
       }
     }
 
+    const stillInstalledEntries = [...remainingEntries, ...keptEntries]
     const marketplacesToRemove = [...new Set(
       entries
         .filter((entry): entry is ClaudePluginInstallRecord => entry.provider === 'claude')
@@ -243,7 +306,7 @@ export const claudeProvider: PluginProviderAdapter = {
             knownClaudeEntries.some(
               (entry) => entry.metadata.marketplaceName === marketplaceName && entry.metadata.marketplaceAdded
             ) &&
-            !remainingEntries.some(
+            !stillInstalledEntries.some(
               (entry) => entry.provider === 'claude' && entry.metadata.marketplaceName === marketplaceName
             )
         )
@@ -262,6 +325,16 @@ export const claudeProvider: PluginProviderAdapter = {
           throw error
         }
       }
+
+      // Best-effort: remove the persistent staging dir we created for this
+      // marketplace once no install records reference it anymore.
+      const persistentRoot = getClaudeMarketplaceCacheRoot(marketplaceName)
+      await removeIfExists(persistentRoot)
+      await cleanEmptyAncestors(
+        path.dirname(persistentRoot),
+        path.dirname(path.dirname(persistentRoot)),
+        false
+      )
     }
 
     return {

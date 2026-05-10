@@ -13,7 +13,12 @@ import {
   parsePluginProviderSelector,
   preparePluginInstall,
 } from '../../lib/plugin-providers'
+import { resolveInstallScope } from '../../lib/plugin-providers/shared'
+import { selfHealClaudeInstalls } from '../../lib/plugin-providers/claude-self-heal'
 import { buildResolvedPluginInstallMetadataMap } from '../../lib/plugin-install-spec'
+import { listPluginInstallRecords, loadPluginInstallLedgers } from '../../lib/plugin-install-ledger'
+import { parseRegistryPluginSpec } from '../../lib/registry-spec'
+import { pathExists } from '../../lib/fs'
 
 function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginInstall>>) {
   console.log('Install plan:')
@@ -85,6 +90,35 @@ const command = defineCommand({
       ? parsePluginInstallScopeSelector(String(args.scope))
       : 'auto'
 
+    // Heal pre-0.7.4 Claude installs whose marketplace source path is stale
+    // (typically `/tmp/agentrig-plugins-*`) before we make install decisions.
+    const heal = await selfHealClaudeInstalls(cwd)
+    for (const entry of heal.patchedLedgerEntries) {
+      console.log(
+        `[self-heal] Claude install ${entry.id}: marketplace source ${entry.previousSource} -> ${entry.nextSource}`
+      )
+    }
+    for (const warning of heal.warnings) {
+      console.warn(`[self-heal] ${warning}`)
+    }
+
+    if (!args.force) {
+      const alreadyInstalled = await detectAlreadyInstalled({
+        cwd,
+        provider,
+        spec: String(args.spec),
+        scope,
+      })
+      if (alreadyInstalled) {
+        console.log(
+          `Already installed: ${alreadyInstalled.pluginId}@${alreadyInstalled.pluginVersion} ` +
+          `(${alreadyInstalled.provider}, ${alreadyInstalled.scope}) at ${alreadyInstalled.installPath}.`
+        )
+        console.log('Use --force to reinstall.')
+        return
+      }
+    }
+
     const cfg = await loadConfig(cwd)
     const graph = await resolvePluginGraph(String(args.spec), cwd, cfg.registries)
 
@@ -118,5 +152,63 @@ const command = defineCommand({
     }
   },
 })
+
+/**
+ * Pre-flight: skip the heavy resolve/materialize/install pipeline when the
+ * requested plugin is already installed for this provider/scope and matches
+ * the canonical pluginId. Returns the matching ledger record summary or null.
+ *
+ * Note: matching is intentionally pluginId-only (not version-aware) so that
+ * `agentrig plugin install <provider> <pluginId>` without `--force` is always
+ * a graceful no-op when the plugin is present, regardless of installed
+ * version. `--force` reinstalls and updates the version if needed.
+ */
+async function detectAlreadyInstalled(params: {
+  cwd: string
+  provider: 'claude' | 'codex' | 'cursor'
+  spec: string
+  scope: 'auto' | 'personal' | 'workspace'
+}): Promise<
+  | {
+      provider: string
+      scope: string
+      pluginId: string
+      pluginVersion: string
+      installPath: string
+    }
+  | null
+> {
+  let parsed: ReturnType<typeof parseRegistryPluginSpec>
+  try {
+    parsed = parseRegistryPluginSpec(params.spec.trim())
+  } catch {
+    return null
+  }
+  const ledgers = await loadPluginInstallLedgers(params.cwd)
+  const records = listPluginInstallRecords(ledgers, params.scope)
+  const targetScope = resolveInstallScope(params.provider, params.scope)
+  const match = records.find(
+    (record) =>
+      record.provider === params.provider &&
+      record.pluginId === parsed.plugin &&
+      record.scope === targetScope
+  )
+  if (!match) return null
+
+  // Quick sanity check: if the recorded install path no longer exists on disk,
+  // the install is stale (e.g. the user manually deleted the directory or it
+  // was a /tmp staging path that got cleaned). Don't claim "already installed".
+  const installPath = match.targetPaths[0]
+  if (installPath && !(await pathExists(installPath))) {
+    return null
+  }
+  return {
+    provider: match.provider,
+    scope: match.scope,
+    pluginId: match.pluginId,
+    pluginVersion: match.pluginVersion,
+    installPath: installPath ?? '<unknown>',
+  }
+}
 
 export default command
