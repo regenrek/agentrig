@@ -2,9 +2,11 @@ import { isPublishableSignalKind, type SignalKind } from '../repo-scan/types'
 
 export const ARTIFACT_KINDS = ['plugin', 'skill', 'mcp', 'hook', 'command', 'agent'] as const
 export const SELECTABLE_ARTIFACT_KINDS = ['skill', 'mcp', 'hook', 'command', 'agent'] as const
+export const CLI_SUPPORTED_ARTIFACT_KINDS = ['plugin', 'skill', 'mcp', 'hook'] as const
 
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number]
 export type SelectableArtifactKind = (typeof SELECTABLE_ARTIFACT_KINDS)[number]
+export type CliSupportedKind = (typeof CLI_SUPPORTED_ARTIFACT_KINDS)[number]
 
 export type ArtifactSelector = {
   kind: SelectableArtifactKind
@@ -16,6 +18,10 @@ const ARTIFACT_NAME_RE = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/
 
 export function isArtifactKind(value: string): value is ArtifactKind {
   return (ARTIFACT_KINDS as readonly string[]).includes(value)
+}
+
+export function isCliSupportedKind(value: string): value is CliSupportedKind {
+  return (CLI_SUPPORTED_ARTIFACT_KINDS as readonly string[]).includes(value)
 }
 
 export function isSelectableArtifactKind(value: string): value is SelectableArtifactKind {

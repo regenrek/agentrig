@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   InstallBundleSchema,
+  MarketplaceListingPublicSchema,
   MarketplaceListingSchema,
   isResolvable,
   verifyInstallBundleHashes,
   type InstallBundle,
   type MarketplaceListing,
+  type MarketplaceListingPublic,
 } from './marketplace-listing'
 
 const listing: MarketplaceListing = MarketplaceListingSchema.parse({
@@ -39,6 +41,28 @@ const bundle: InstallBundle = InstallBundleSchema.parse({
 })
 
 describe('marketplace listing contracts', () => {
+  it('keeps internal Convex ids out of the public listing type', () => {
+    expectTypeOf<MarketplaceListingPublic>().not.toHaveProperty('listingId')
+    expectTypeOf<MarketplaceListingPublic>().not.toHaveProperty('submissionId')
+    expectTypeOf<MarketplaceListingPublic>().not.toHaveProperty('ownerUserId')
+    expectTypeOf<MarketplaceListingPublic>().not.toHaveProperty('parentArtifactListingId')
+
+    expect(
+      MarketplaceListingPublicSchema.parse({
+        ...listing,
+        listingId: 'listing-1',
+        submissionId: 'submission-1',
+        ownerUserId: 'user-1',
+        parentArtifactListingId: 'listing-parent',
+      })
+    ).not.toMatchObject({
+      listingId: expect.anything(),
+      submissionId: expect.anything(),
+      ownerUserId: expect.anything(),
+      parentArtifactListingId: expect.anything(),
+    })
+  })
+
   it('requires installability on listings', () => {
     expect(() =>
       MarketplaceListingSchema.parse({

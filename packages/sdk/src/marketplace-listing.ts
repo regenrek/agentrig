@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { ARTIFACT_KINDS, type ArtifactKind } from './provider/artifact-kinds'
+import {
+  ARTIFACT_KINDS,
+  CLI_SUPPORTED_ARTIFACT_KINDS,
+  type ArtifactKind,
+} from './provider/artifact-kinds'
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/
 
@@ -15,6 +19,7 @@ export const MarketplaceInstallabilitySchema = z.enum(MARKETPLACE_INSTALLABILITI
 export const RegistryTrustTierSchema = z.enum(REGISTRY_TRUST_TIERS)
 export const InstallabilityStateSchema = z.enum(INSTALLABILITY_STATES)
 export const ArtifactKindSchema = z.enum(ARTIFACT_KINDS)
+export const CliSupportedKindSchema = z.enum(CLI_SUPPORTED_ARTIFACT_KINDS)
 
 export type SubmissionStatus = z.infer<typeof SubmissionStatusSchema>
 export type RegistryMirrorStatus = z.infer<typeof RegistryMirrorStatusSchema>
@@ -25,11 +30,11 @@ export type TrustTier = RegistryTrustTier
 export type InstallabilityState = z.infer<typeof InstallabilityStateSchema>
 export type RegistryInstallability = InstallabilityState
 
-export const MarketplaceListingSchema = z.object({
-  listingId: z.string().trim().min(1).optional(),
-  kind: ArtifactKindSchema,
+const MarketplaceListingPublicBaseSchema = z.object({
+  kind: CliSupportedKindSchema,
   origin: z.enum(['standalone', 'bundled']),
   artifactId: z.string().trim().min(1),
+  slug: z.string().trim().min(1).optional(),
   name: z.string().trim().min(1),
   description: z.string(),
   version: z.string().trim().min(1),
@@ -37,18 +42,36 @@ export const MarketplaceListingSchema = z.object({
   license: z.string().trim().min(1).optional(),
   keywords: z.array(z.string()).optional(),
   capabilityTags: z.array(z.string()).optional(),
-  verificationTier: z.string().trim().min(1).optional(),
-  submissionId: z.string().trim().min(1).optional(),
   source: z.string().trim().min(1),
   sourceType: z
     .enum(['submission', 'registry', 'github_repo', 'claimed_project', 'mcp', 'manual_curation'])
     .optional(),
   sourceUrl: z.string().trim().min(1).optional(),
+  sourceRepoFullName: z.string().trim().min(1).optional(),
+  parentArtifactId: z.string().trim().min(1).optional(),
+  publishShape: z.string().trim().min(1).optional(),
+  registryAlias: z.string().trim().min(1).optional(),
+  registryArtifactId: z.string().trim().min(1).optional(),
+  registryVersion: z.string().trim().min(1).optional(),
+  registryTrustTier: RegistryTrustTierSchema.optional(),
+  registryInstallability: InstallabilityStateSchema.optional(),
+  registrySourceRepository: z.string().trim().min(1).optional(),
+  registrySnapshotDigest: z.string().trim().min(1).optional(),
+  installability: MarketplaceInstallabilitySchema,
+  publishedAt: z.number().int().nonnegative(),
+  updatedAt: z.number().int().nonnegative(),
+})
+
+export const MarketplaceListingPublicSchema = MarketplaceListingPublicBaseSchema
+export type MarketplaceListingPublic = z.infer<typeof MarketplaceListingPublicSchema>
+
+export const MarketplaceListingInternalSchema = MarketplaceListingPublicBaseSchema.extend({
+  listingId: z.string().trim().min(1).optional(),
+  verificationTier: z.string().trim().min(1).optional(),
+  submissionId: z.string().trim().min(1).optional(),
   ownerUserId: z.string().trim().min(1).optional(),
   canonicalEntryId: z.string().trim().min(1).optional(),
-  slug: z.string().trim().min(1).optional(),
   parentArtifactListingId: z.string().trim().min(1).optional(),
-  parentArtifactId: z.string().trim().min(1).optional(),
   directoryState: z.enum(['listed', 'reviewed', 'official', 'blocked', 'yanked', 'delisted']).optional(),
   directoryReviewStatus: z.enum(['unreviewed', 'reviewed', 'official', 'rejected']).optional(),
   authorVerificationStatus: z.enum(['unverified', 'verified_author', 'verified_org']).optional(),
@@ -58,26 +81,20 @@ export const MarketplaceListingSchema = z.object({
   lastVerifiedAt: z.number().int().nonnegative().optional(),
   lastRefreshedAt: z.number().int().nonnegative().optional(),
   sourceRepoId: z.number().int().nonnegative().optional(),
-  sourceRepoFullName: z.string().trim().min(1).optional(),
-  registryAlias: z.string().trim().min(1).optional(),
-  registryArtifactId: z.string().trim().min(1).optional(),
-  registryVersion: z.string().trim().min(1).optional(),
-  registryTrustTier: RegistryTrustTierSchema.optional(),
-  registryInstallability: InstallabilityStateSchema.optional(),
   registryHistoryPath: z.string().trim().min(1).optional(),
   registryLinkedAt: z.number().int().nonnegative().optional(),
-  registrySourceRepository: z.string().trim().min(1).optional(),
-  registrySnapshotDigest: z.string().trim().min(1).optional(),
   registryMirrorStatus: RegistryMirrorStatusSchema.optional(),
   likeCountAllTime: z.number().int().nonnegative().optional(),
-  installability: MarketplaceInstallabilitySchema,
   yankReason: z.string().trim().min(1).optional(),
   yankedAt: z.number().int().nonnegative().optional(),
-  publishedAt: z.number().int().nonnegative(),
-  updatedAt: z.number().int().nonnegative(),
 })
 
-export type MarketplaceListing = z.infer<typeof MarketplaceListingSchema>
+export type MarketplaceListingInternal = z.infer<typeof MarketplaceListingInternalSchema>
+
+// Back-compat for server-side Convex code in this monorepo. New public wire
+// contracts should use MarketplaceListingPublicSchema/MarketplaceListingPublic.
+export const MarketplaceListingSchema = MarketplaceListingInternalSchema
+export type MarketplaceListing = MarketplaceListingInternal
 
 export const InstallBundleFileSchema = z.object({
   path: z.string().trim().min(1),
@@ -102,7 +119,7 @@ export const InstallBundleReadmeFileSchema = z.object({
   path: z.literal('README.md'),
   sha256: z.string().regex(SHA256_HEX_RE, 'Expected lowercase SHA-256 hex digest'),
   size: z.number().int().nonnegative(),
-  storageId: z.string().trim().min(1),
+  storageId: z.string().trim().min(1).optional(),
 })
 
 export type InstallBundleReadmeFile = z.infer<typeof InstallBundleReadmeFileSchema>
@@ -119,7 +136,7 @@ export type InstallBundleSource = z.infer<typeof InstallBundleSourceSchema>
 
 export const InstallBundleSchema = z.object({
   schemaVersion: z.literal(1),
-  listing: MarketplaceListingSchema,
+  listing: MarketplaceListingPublicSchema,
   source: InstallBundleSourceSchema,
   readmeFile: InstallBundleReadmeFileSchema.optional(),
   file_list: z.array(InstallBundleFileSchema).min(1),
@@ -130,12 +147,12 @@ export type InstallBundle = z.infer<typeof InstallBundleSchema>
 export const ListingInstallResolutionSchema = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('resolvable'),
-    listing: MarketplaceListingSchema,
+    listing: MarketplaceListingPublicSchema,
     bundle: InstallBundleSchema,
   }),
   z.object({
     status: z.literal('unresolvable'),
-    listing: MarketplaceListingSchema.optional(),
+    listing: MarketplaceListingPublicSchema.optional(),
     reason: z.enum(['not_found', 'yanked', 'taken_down', 'invalid_bundle']),
     message: z.string().trim().min(1).optional(),
   }),
@@ -235,7 +252,7 @@ export async function verifyInstallBundleHashes(
   return issues.length ? { ok: false, checked, issues } : { ok: true, checked, issues: [] }
 }
 
-export function isResolvable(listing: Pick<MarketplaceListing, 'installability'>): boolean {
+export function isResolvable(listing: Pick<MarketplaceListingPublic, 'installability'>): boolean {
   return listing.installability === 'available'
 }
 
@@ -740,7 +757,7 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
     lockArtifact,
     reviewArtifact,
     prTitle: `Mirror ${artifactId}@${version}`,
-    prBody: `## Summary\n- Mirror \`${artifactId}@${version}\` from marketplace listing \`${listing.listingId ?? listing.artifactId}\`\n- Source: \`${source.url ?? listing.source}\` @ \`${source.ref ?? version}\` (${source.commitSha ?? 'unknown commit'})\n- Serializer: SDK InstallBundle\n\n## Test plan\n- [ ] Registry CI passes on this PR\n- [ ] Maintainer confirms the mirrored entry matches the approved marketplace listing\n`,
+    prBody: `## Summary\n- Mirror \`${artifactId}@${version}\` from marketplace artifact \`${listing.artifactId}\`\n- Source: \`${source.url ?? listing.source}\` @ \`${source.ref ?? version}\` (${source.commitSha ?? 'unknown commit'})\n- Serializer: SDK InstallBundle\n\n## Test plan\n- [ ] Registry CI passes on this PR\n- [ ] Maintainer confirms the mirrored entry matches the approved marketplace listing\n`,
     commitMessage: `Mirror ${artifactId}@${version}\n\nDerived from AgentRig marketplace InstallBundle for submission ${args.submissionId}.`,
     branchName,
     snapshotTreeDigest,
@@ -834,7 +851,7 @@ export async function buildRegistryYankMirrorArtifacts(args: {
     reviewArtifact: {} as RegistryReview,
     prTitle: `Mark ${artifactId} as yanked`,
     prBody: `## Summary\n- Mark \`${artifactId}\` as yanked in the verified registry mirror\n- Marketplace listing installability: \`${listing.installability}\`\n- Reason: ${args.reason ?? listing.yankReason ?? 'not specified'}\n\n## Test plan\n- [ ] Registry CI passes on this PR\n- [ ] Maintainer confirms Convex install resolution refuses this listing\n`,
-    commitMessage: `Mark ${artifactId} as yanked\n\nConvex marketplace listing ${listing.listingId ?? listing.artifactId} is no longer available.`,
+    commitMessage: `Mark ${artifactId} as yanked\n\nMarketplace artifact ${listing.artifactId} is no longer available.`,
     branchName: `mirror-yank/${artifactId.replace(/\./g, '-')}-${String(args.changedAt).slice(-10)}`,
     snapshotTreeDigest: active.snapshot_digest,
     artifactDigest,
