@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.2] - 2026-05-10
+
+### Fixed
+- Mirror promotion now decodes inline base64 install-bundle files (`.plugin/plugin.json` in `generated_plugin` shape) instead of attempting to fetch them from upstream GitHub.
+- Hard-cut listing-head `installBundle` denormalization; install/browse/mirror all read through `currentVersionId → artifact_listing_versions` only.
+- `currentVersionId` dereferences now validate version-row ownership; corrupt pointers no longer leak the wrong artifact.
+- Search and install now agree on the canonical `artifactId` (dotted form). CLI search prints the canonical install token; `agentrig plugin install <hyphenated>` falls back to dot form with a clear deprecation hint.
+- Public install-bundle and search responses no longer expose internal Convex IDs (`listingId`, `submissionId`, `ownerUserId`, `parentArtifactListingId`). Public DTO type is `MarketplaceListingPublic`.
+- Dev-only migration `20260509_materialize_approved_listing_submissions` now requires both the `assertDevOnly()` env gate AND a confirm-token literal.
+- Prod deploy script now refuses to deploy unless `verify-prod-target.mjs` confirms the Convex deployment matches the prod allowlist.
+
+### Changed
+- SDK type `MarketplaceListing` is split into `MarketplaceListingPublic` (wire format, no internal IDs) and `MarketplaceListingInternal` (Convex-only). Re-exported `MarketplaceListingPublic` is the new public surface — consumers reading `listingId`/`submissionId`/`ownerUserId` must switch to stable `artifactId` + `kind`.
+- HTTP routes now reject malformed slugs (`/`, `\`, `..`, charset violations) with 400 instead of generic 404.
+- `agentrig` kind enum is now strictly `plugin | skill | mcp | hook` on the public CLI/HTTP surface; `command`/`agent` remain in SDK schema for future support.
+- `release.ts` fails loud if GitHub Release create fails after tag push (prevents stranded tags).
+
 ## [0.7.1] - 2026-05-10
 
 ### Fixed
