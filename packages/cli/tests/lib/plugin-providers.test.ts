@@ -3,8 +3,10 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { sha256Hex } from '../../src/lib/hash'
-import { uninstallPluginProviders } from '../../src/lib/plugin-providers'
+import { installPluginProviders, uninstallPluginProviders } from '../../src/lib/plugin-providers'
+import { loadPluginInstallLedgers } from '../../src/lib/plugin-install-ledger'
 import { defaultCommandRunner } from '../../src/lib/plugin-providers/shared'
+import type { ResolvedPluginInstallMetadata } from '../../src/lib/plugin-providers/shared'
 import type { PluginInstallRecord } from '../../src/lib/types'
 
 const tempDirs: string[] = []
@@ -87,8 +89,48 @@ describe('plugin provider command runner', () => {
       },
     }
 
-    await expect(uninstallPluginProviders([maliciousRecord], { cwd })).rejects.toThrow(/Unsafe installed file path/)
+    await expect(uninstallPluginProviders([maliciousRecord], { cwd })).rejects.toThrow(/Unsafe (Cursor plugin install|installed file) path/)
     await expect(fs.readFile(outside, 'utf-8')).resolves.toBe('owned-by-user')
+  })
+
+  it('installs dotted artifact IDs into Codex with provider-safe plugin names', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const pluginsRoot = path.join(root, 'plugins')
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+
+    const result = await installPluginProviders({
+      cwd,
+      agent: 'codex',
+      pluginsDir: pluginsRoot,
+      scope: 'workspace',
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+    })
+
+    const providerName = 'agentrig-regenrek-agent-skills'
+    expect(result[0]?.installed).toEqual([providerName])
+    await expect(readJson(path.join(cwd, 'plugins', providerName, '.codex-plugin', 'plugin.json'))).resolves.toMatchObject({
+      name: providerName,
+    })
+    await expect(readJson(path.join(cwd, '.agents', 'plugins', 'marketplace.json'))).resolves.toMatchObject({
+      plugins: [
+        expect.objectContaining({
+          name: providerName,
+          source: { source: 'local', path: `./plugins/${providerName}` },
+        }),
+      ],
+    })
+    const ledgers = await loadPluginInstallLedgers(cwd)
+    expect(Object.values(ledgers.workspace.installs)[0]).toMatchObject({
+      pluginId: 'regenrek.agent-skills',
+      pluginName: providerName,
+      specIdentity: {
+        kind: 'external-repo',
+        pluginId: 'regenrek.agent-skills',
+      },
+    })
   })
 })
 
@@ -96,4 +138,36 @@ async function tempRoot() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'agentrig-plugin-providers-'))
   tempDirs.push(dir)
   return dir
+}
+
+async function writePluginSource(pluginsRoot: string, pluginId: string) {
+  const pluginDir = path.join(pluginsRoot, pluginId)
+  await fs.mkdir(path.join(pluginDir, '.plugin'), { recursive: true })
+  await fs.writeFile(path.join(pluginDir, '.plugin', 'plugin.json'), `${JSON.stringify({
+    kind: 'agentrig:plugin',
+    id: pluginId,
+    name: pluginId,
+    description: 'Dotted artifact plugin for provider install tests.',
+    version: '1.0.0',
+    configSchema: {},
+  }, null, 2)}\n`)
+}
+
+function installMetadata(pluginId: string): ResolvedPluginInstallMetadata {
+  return {
+    specIdentity: {
+      kind: 'external-repo',
+      repoUrl: 'https://github.com/regenrek/agent-skills',
+      commitSha: '1234567890abcdef1234567890abcdef12345678',
+      scanDigest: 'a'.repeat(64),
+      pickedSignalPaths: ['skills/research'],
+      pluginId,
+      version: '1.0.0',
+    },
+    snapshotDigest: 'b'.repeat(64),
+  }
+}
+
+async function readJson(filePath: string) {
+  return JSON.parse(await fs.readFile(filePath, 'utf-8')) as unknown
 }

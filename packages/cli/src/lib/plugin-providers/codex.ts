@@ -29,6 +29,7 @@ import {
   assertContainedPath,
   normalizeManifestDescription,
   pluginAuthor,
+  providerPluginName,
   removeInstalledFiles,
 } from './shared'
 
@@ -46,10 +47,11 @@ async function copyCodexPlugin(pluginSourceDir: string, pluginDir: string) {
 function buildCodexPluginManifest(
   plugin: PluginEntry,
   owner: PluginOwner,
-  features: PluginFeatures
+  features: PluginFeatures,
+  pluginName: string
 ): CodexPluginManifest {
   return codexPluginManifestSchema.parse({
-    name: plugin.pluginName,
+    name: pluginName,
     version: plugin.manifest.version,
     description: normalizeManifestDescription(plugin.manifest),
     ...(pluginAuthor(plugin.manifest, owner) ? { author: pluginAuthor(plugin.manifest, owner) } : {}),
@@ -75,18 +77,21 @@ function buildCodexMarketplaceManifest(
     interface: {
       displayName: cfg.providers.codex.displayName,
     },
-    plugins: plugins.map((plugin) => ({
-      name: plugin.pluginName,
-      source: {
-        source: 'local',
-        path: `${pluginRoot}/${plugin.pluginName}`,
-      },
-      policy: {
-        installation: cfg.providers.codex.installationPolicy,
-        authentication: cfg.providers.codex.authenticationPolicy,
-      },
-      category: cfg.providers.codex.category,
-    })),
+    plugins: plugins.map((plugin) => {
+      const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
+      return {
+        name: pluginName,
+        source: {
+          source: 'local',
+          path: `${pluginRoot}/${pluginName}`,
+        },
+        policy: {
+          installation: cfg.providers.codex.installationPolicy,
+          authentication: cfg.providers.codex.authenticationPolicy,
+        },
+        category: cfg.providers.codex.category,
+      }
+    }),
   })
 }
 
@@ -272,12 +277,13 @@ export const codexProvider: PluginProviderAdapter = {
     await ensureDir(path.dirname(marketplacePath))
 
     for (const plugin of plugins) {
-      const pluginDir = path.join(pluginRoot, plugin.pluginName)
+      const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
+      const pluginDir = path.join(pluginRoot, pluginName)
       await copyCodexPlugin(plugin.pluginSourceDir, pluginDir)
       const features = await detectPluginFeatures(pluginDir)
       await writeJsonFile(
         path.join(pluginDir, '.codex-plugin', 'plugin.json'),
-        buildCodexPluginManifest(plugin, cfg.owner, features)
+        buildCodexPluginManifest(plugin, cfg.owner, features, pluginName)
       )
     }
 
@@ -290,14 +296,15 @@ export const codexProvider: PluginProviderAdapter = {
       plugins,
     }
   },
-  previewInstall({ cwd, plugins, scope }) {
+  previewInstall({ cwd, plugins, scope, cfg }) {
     const { pluginRoot, marketplacePath } = resolveCodexInstallPaths(cwd, scope)
+    const providerNames = plugins.map((plugin) => providerPluginName(plugin, 'codex', cfg.pluginPrefix))
     return {
       provider: 'codex',
       scope,
-      locations: [pluginRoot, marketplacePath, ...plugins.map((plugin) => path.join(pluginRoot, plugin.pluginName))],
+      locations: [pluginRoot, marketplacePath, ...providerNames.map((pluginName) => path.join(pluginRoot, pluginName))],
       actions: [
-        ...plugins.map((plugin) => `copy ${plugin.pluginName} -> ${path.join(pluginRoot, plugin.pluginName)}`),
+        ...providerNames.map((pluginName) => `copy ${pluginName} -> ${path.join(pluginRoot, pluginName)}`),
         `update ${marketplacePath}`,
       ],
     }
@@ -311,25 +318,26 @@ export const codexProvider: PluginProviderAdapter = {
     const installLedger = dryRun ? null : await loadPluginInstallLedger(cwd, scope)
 
     for (const plugin of result.plugins) {
+      const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
       const installMetadata = installMetadataByPluginId[plugin.manifest.id]
       if (!installMetadata) {
         throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
       }
 
-      const destinationDir = path.join(pluginRoot, plugin.pluginName)
-      const existingRecordId = getPluginInstallRecordId('codex', scope, plugin.pluginName)
+      const destinationDir = path.join(pluginRoot, pluginName)
+      const existingRecordId = getPluginInstallRecordId('codex', scope, pluginName)
       const destinationExists = dryRun ? false : await pathExists(destinationDir)
       if (!destinationExists || force) continue
 
       const existingRecord = installLedger?.installs[existingRecordId]
       if (!existingRecord) {
         throw new Error(
-          `Codex plugin ${plugin.pluginName} already exists at ${destinationDir} without a matching AgentRig ledger entry. Re-run with --force to repair.`
+          `Codex plugin ${pluginName} already exists at ${destinationDir} without a matching AgentRig ledger entry. Re-run with --force to repair.`
         )
       }
       if (!isSamePluginInstallSpecIdentity(existingRecord.specIdentity, installMetadata.specIdentity)) {
         throw new Error(
-          `Codex plugin ${plugin.pluginName} already exists at ${destinationDir} for a different AgentRig source. Re-run with --force to replace it.`
+          `Codex plugin ${pluginName} already exists at ${destinationDir} for a different AgentRig source. Re-run with --force to replace it.`
         )
       }
     }
@@ -339,23 +347,24 @@ export const codexProvider: PluginProviderAdapter = {
     const existingPlugins: unknown[] = [...marketplace.plugins]
 
     for (const plugin of result.plugins) {
-      const sourceDir = path.join(pluginSourceRoot, plugin.pluginName)
-      const destinationDir = path.join(pluginRoot, plugin.pluginName)
+      const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
+      const sourceDir = path.join(pluginSourceRoot, pluginName)
+      const destinationDir = path.join(pluginRoot, pluginName)
       const copyResult = dryRun
         ? { changed: true, files: [] }
         : await copyInstalledPlugin(sourceDir, destinationDir, force)
       const changed = copyResult.changed
       if (changed) {
-        installed.push(plugin.pluginName)
+        installed.push(pluginName)
       } else {
-        skipped.push(plugin.pluginName)
+        skipped.push(pluginName)
       }
 
       const entry = codexMarketplacePluginSchema.parse({
-        name: plugin.pluginName,
+        name: pluginName,
         source: {
           source: 'local',
-          path: `${relativePluginRoot}/${plugin.pluginName}`,
+          path: `${relativePluginRoot}/${pluginName}`,
         },
         policy: {
           installation: cfg.providers.codex.installationPolicy,
@@ -364,9 +373,14 @@ export const codexProvider: PluginProviderAdapter = {
         category: cfg.providers.codex.category,
       })
 
-      const index = existingPlugins.findIndex(
-        (item) => toRecord(item)?.name === plugin.pluginName
-      )
+      const legacyPath = `${relativePluginRoot}/${plugin.pluginName}`
+      const retainedPlugins = existingPlugins.filter((item) => {
+        const record = toRecord(item)
+        const source = toRecord(record?.source)
+        return record?.name !== plugin.pluginName && source?.path !== legacyPath
+      })
+      existingPlugins.splice(0, existingPlugins.length, ...retainedPlugins)
+      const index = existingPlugins.findIndex((item) => toRecord(item)?.name === pluginName)
       if (index >= 0) {
         existingPlugins[index] = mergeMarketplacePlugin(existingPlugins[index], entry)
       } else {
@@ -379,7 +393,7 @@ export const codexProvider: PluginProviderAdapter = {
           throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
         }
         ledgerEntries.push({
-          id: getPluginInstallRecordId('codex', scope, plugin.pluginName),
+          id: getPluginInstallRecordId('codex', scope, pluginName),
           provider: 'codex',
           requestedScope,
           specIdentity: installMetadata.specIdentity,
@@ -388,7 +402,7 @@ export const codexProvider: PluginProviderAdapter = {
           pluginId: plugin.manifest.id,
           pluginVersion: plugin.manifest.version,
           snapshotDigest: installMetadata.snapshotDigest,
-          pluginName: plugin.pluginName,
+          pluginName,
           targetPaths: [destinationDir, marketplacePath],
           installedAt: new Date().toISOString(),
           files: copyResult.files,
@@ -434,7 +448,7 @@ export const codexProvider: PluginProviderAdapter = {
       const { pluginRoot, marketplacePath } = resolveCodexInstallPaths(cwd, entry.scope)
       const pluginPath = assertContainedPath(
         pluginRoot,
-        path.join(pluginRoot, entry.pluginName),
+        entry.metadata.pluginPath,
         'Codex plugin install'
       )
       locations.add(pluginPath)

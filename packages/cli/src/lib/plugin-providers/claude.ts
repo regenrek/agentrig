@@ -20,6 +20,7 @@ import {
   detectPluginFeatures,
   normalizeManifestDescription,
   pluginAuthor,
+  providerPluginName,
 } from './shared'
 
 function scopeToClaudeArg(scope: 'personal' | 'workspace') {
@@ -45,10 +46,11 @@ async function copyClaudePlugin(pluginSourceDir: string, pluginDir: string) {
 function buildClaudePluginManifest(
   plugin: PluginEntry,
   owner: PluginOwner,
-  features: PluginFeatures
+  features: PluginFeatures,
+  pluginName: string
 ): ClaudePluginManifest {
   return claudePluginManifestSchema.parse({
-    name: plugin.pluginName,
+    name: pluginName,
     description: normalizeManifestDescription(plugin.manifest),
     version: plugin.manifest.version,
     ...(pluginAuthor(plugin.manifest, owner) ? { author: pluginAuthor(plugin.manifest, owner) } : {}),
@@ -68,13 +70,16 @@ function buildClaudeMarketplaceManifest(
       ...(cfg.owner.email ? { email: cfg.owner.email } : {}),
     },
     metadata: cfg.providers.claude.metadata,
-    plugins: plugins.map((plugin) => ({
-      name: plugin.pluginName,
-      source: `${cfg.providers.claude.metadata.pluginRoot}/${plugin.pluginName}`,
-      description: plugin.manifest.description,
-      version: plugin.manifest.version,
-      tags: plugin.manifest.keywords,
-    })),
+    plugins: plugins.map((plugin) => {
+      const pluginName = providerPluginName(plugin, 'claude', cfg.pluginPrefix)
+      return {
+        name: pluginName,
+        source: `${cfg.providers.claude.metadata.pluginRoot}/${pluginName}`,
+        description: plugin.manifest.description,
+        version: plugin.manifest.version,
+        tags: plugin.manifest.keywords,
+      }
+    }),
   })
 }
 
@@ -86,12 +91,13 @@ export const claudeProvider: PluginProviderAdapter = {
     await ensureDir(path.join(outRoot, '.claude-plugin'))
 
     for (const plugin of plugins) {
-      const pluginDir = path.join(pluginRoot, plugin.pluginName)
+      const pluginName = providerPluginName(plugin, 'claude', cfg.pluginPrefix)
+      const pluginDir = path.join(pluginRoot, pluginName)
       await copyClaudePlugin(plugin.pluginSourceDir, pluginDir)
       const features = await detectPluginFeatures(pluginDir)
       await writeJsonFile(
         path.join(pluginDir, '.claude-plugin', 'plugin.json'),
-        buildClaudePluginManifest(plugin, cfg.owner, features)
+        buildClaudePluginManifest(plugin, cfg.owner, features, pluginName)
       )
     }
 
@@ -116,13 +122,15 @@ export const claudeProvider: PluginProviderAdapter = {
       actions: [
         `claude plugin marketplace add ${outRoot}`,
         ...plugins.map(
-          (plugin) =>
-            `claude plugin install ${plugin.pluginName}@${cfg.providers.claude.marketplaceName} --scope ${scopeArg}`
+          (plugin) => {
+            const pluginName = providerPluginName(plugin, 'claude', cfg.pluginPrefix)
+            return `claude plugin install ${pluginName}@${cfg.providers.claude.marketplaceName} --scope ${scopeArg}`
+          }
         ),
       ],
     }
   },
-  async install({ result, dryRun, runner, scope, requestedScope, installMetadataByPluginId }) {
+  async install({ result, cfg, dryRun, runner, scope, requestedScope, installMetadataByPluginId }) {
     const installed: string[] = []
     const skipped: string[] = []
     const locations = [result.outRoot]
@@ -133,7 +141,7 @@ export const claudeProvider: PluginProviderAdapter = {
       return {
         provider: 'claude',
         scope,
-        installed: result.plugins.map((plugin) => plugin.pluginName),
+        installed: result.plugins.map((plugin) => providerPluginName(plugin, 'claude', cfg.pluginPrefix)),
         skipped,
         locations,
         ledgerEntries,
@@ -152,15 +160,16 @@ export const claudeProvider: PluginProviderAdapter = {
     }
 
     for (const plugin of result.plugins) {
+      const pluginName = providerPluginName(plugin, 'claude', cfg.pluginPrefix)
       const installMetadata = installMetadataByPluginId[plugin.manifest.id]
       if (!installMetadata) {
         throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
       }
-      const pluginRef = `${plugin.pluginName}@${result.marketplaceName}`
+      const pluginRef = `${pluginName}@${result.marketplaceName}`
       await runner('claude', ['plugin', 'install', pluginRef, '--scope', scopeArg])
-      installed.push(plugin.pluginName)
+      installed.push(pluginName)
       ledgerEntries.push({
-        id: getPluginInstallRecordId('claude', scope, plugin.pluginName),
+        id: getPluginInstallRecordId('claude', scope, pluginName),
         provider: 'claude',
         requestedScope,
         specIdentity: installMetadata.specIdentity,
@@ -169,7 +178,7 @@ export const claudeProvider: PluginProviderAdapter = {
         pluginId: plugin.manifest.id,
         pluginVersion: plugin.manifest.version,
         snapshotDigest: installMetadata.snapshotDigest,
-        pluginName: plugin.pluginName,
+        pluginName,
         targetPaths: [result.outRoot],
         installedAt: new Date().toISOString(),
         files: [],

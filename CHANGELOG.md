@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3] - 2026-05-10
+
+### Fixed
+- Provider plugin installs now sanitize canonical dotted AgentRig artifact IDs at the Codex, Claude, and Cursor provider boundary. For example, `regenrek.agent-skills` installs as `agentrig-regenrek-agent-skills` while the install ledger keeps the canonical `artifactId` for uninstall tracking.
+- Codex marketplace entries and `.codex-plugin/plugin.json` manifests no longer use dotted plugin names, preventing Codex from silently dropping AgentRig Local marketplace entries.
+- Provider uninstall now resolves plugin directories from AgentRig ledger metadata and prunes residual `.DS_Store` files from removed plugin trees.
+
 ## [0.7.2] - 2026-05-10
 
 ### Fixed
