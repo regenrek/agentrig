@@ -1,6 +1,6 @@
 {
   "name": "@agentrig/sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Runtime-neutral AgentRig scanner, provider, and enrichment contracts.",
   "license": "MIT",
   "repository": {

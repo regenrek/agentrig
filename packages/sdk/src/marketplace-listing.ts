@@ -86,6 +86,14 @@ export const InstallBundleFileSchema = z.object({
   sourcePath: z.string().trim().min(1).optional(),
   storageId: z.string().trim().min(1).optional(),
   contentType: z.string().trim().min(1).optional(),
+  // Pre-signed download URL for files that cannot be reconstructed from
+  // `source` (synthesized manifests, Convex-stored payloads). When present,
+  // the consumer must prefer this over the `source`-derived URL.
+  url: z.string().trim().min(1).optional(),
+  // Base64-encoded inline payload for synthesized files (e.g. server-built
+  // `.plugin/plugin.json`) that have no upstream source bytes. When present,
+  // the consumer must use these bytes directly and skip any network fetch.
+  inline: z.string().trim().min(1).optional(),
 })
 
 export type InstallBundleFile = z.infer<typeof InstallBundleFileSchema>

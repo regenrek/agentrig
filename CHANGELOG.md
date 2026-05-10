@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.1] - 2026-05-10
+
+### Fixed
+- Fixed `agentrig plugin install` against the marketplace by switching the install-bundle wire contract to a slug-stable identifier. The CLI now calls `GET /api/cli/install-bundle?kind=<plugin|skill|mcp|hook>&artifactId=<slug>&origin=<standalone|bundled>?` instead of leaking internal Convex listing IDs, and the SDK helper `resolveInstallBundleFromConvex` accepts `{kind, artifactId, origin?}` rather than an opaque listingId.
+- Fixed `Missing .plugin/plugin.json` install errors for `generated_plugin`-shape marketplace listings: the install bundle's `file_list[]` now includes the canonical synthesized plugin manifest with content-addressed sha256, inlined bytes, and the original ref/scan-digest preserved in `x-agentrig.source`.
+
+### Added
+- Added `agentrig search <query>` for full-text marketplace search (kind/limit/json flags), backed by the new `/api/cli/search?q=...&limit=...&kind=...?` endpoint.
+
+### Changed
+- CLI install-bundle resolution prefers any `inline` payload on a `file_list[]` entry before falling back to the source-derived URL, so server-synthesized files (plugin manifests, etc.) are self-contained and never require a separate fetch.
+- `@agentrig/sdk` bumped to `0.1.2`. `InstallBundleFile` adds optional `url` and `inline` fields. The CLI consumes the new shape; downstream SDK consumers do not have to.
+
 ## [0.7.0] - 2026-05-09
 
 ### Added

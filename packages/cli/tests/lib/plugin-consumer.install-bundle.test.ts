@@ -34,7 +34,7 @@ describe('install bundle resolution and materialization', () => {
     const server = await startFixtureServer({
       routes: [
         {
-          pathname: '/api/cli/plugins/install-bundle',
+          pathname: '/api/cli/install-bundle',
           handler: (request) => ({
             body: {
               status: 'resolvable',
@@ -51,7 +51,7 @@ describe('install bundle resolution and materialization', () => {
 
     const resolved = await resolvePluginFromRegistryAlias(
       'agentrig',
-      'community-typescript',
+      'community.typescript',
       undefined,
       [{ name: 'agentrig', url: server.baseUrl }]
     )
@@ -62,8 +62,9 @@ describe('install bundle resolution and materialization', () => {
       await expect(
         fs.readFile(path.join(materialized.pluginDir, 'skills', 'typescript', 'SKILL.md'), 'utf-8')
       ).resolves.toBe(skill)
-      expect(server.requests[0]?.pathname).toBe('/api/cli/plugins/install-bundle')
-      expect(server.requests[0]?.search).toContain('listingId=community-typescript')
+      expect(server.requests[0]?.pathname).toBe('/api/cli/install-bundle')
+      expect(server.requests[0]?.search).toContain('kind=plugin')
+      expect(server.requests[0]?.search).toContain('artifactId=community.typescript')
     } finally {
       await cleanupMaterializedPlugin(materialized.pluginsRoot)
     }
@@ -72,12 +73,12 @@ describe('install bundle resolution and materialization', () => {
   it('surfaces yanked and taken-down install responses as hard errors', async () => {
     const server = await startFixtureServer({
       routes: [{
-        pathname: '/api/cli/plugins/install-bundle',
+        pathname: '/api/cli/install-bundle',
         handler: (request) => {
-          const listingId = new URLSearchParams(request.search).get('listingId')
+          const artifactId = new URLSearchParams(request.search).get('artifactId')
           return {
             status: 410,
-            body: listingId === 'community-typescript-yanked'
+            body: artifactId === 'community.typescript-yanked'
               ? {
                   status: 'unresolvable',
                   reason: 'yanked',
@@ -96,14 +97,14 @@ describe('install bundle resolution and materialization', () => {
 
     await expect(resolvePluginFromRegistryAlias(
       'agentrig',
-      'community-typescript-yanked',
+      'community.typescript-yanked',
       undefined,
       [{ name: 'agentrig', url: server.baseUrl }]
     )).rejects.toThrow(/yanked.*Publisher withdrew/i)
 
     await expect(resolvePluginFromRegistryAlias(
       'agentrig',
-      'community-typescript-taken-down',
+      'community.typescript-taken-down',
       undefined,
       [{ name: 'agentrig', url: server.baseUrl }]
     )).rejects.toThrow(/taken down.*Policy violation/i)
@@ -126,7 +127,7 @@ describe('install bundle resolution and materialization', () => {
     const server = await startFixtureServer({
       routes: [
         {
-          pathname: '/api/cli/plugins/install-bundle',
+          pathname: '/api/cli/install-bundle',
           handler: () => ({
             body: {
               status: 'resolvable',
@@ -141,7 +142,7 @@ describe('install bundle resolution and materialization', () => {
     servers.push(server)
     const resolved = await resolvePluginFromRegistryAlias(
       'agentrig',
-      'community-typescript',
+      'community.typescript',
       undefined,
       [{ name: 'agentrig', url: server.baseUrl }]
     )
@@ -158,7 +159,7 @@ describe('install bundle resolution and materialization', () => {
     const skill = '# TypeScript skill\n'
     const server = await startFixtureServer({
       routes: [{
-        pathname: '/api/cli/plugins/install-bundle',
+        pathname: '/api/cli/install-bundle',
         handler: () => ({
           body: {
             status: 'resolvable',
@@ -171,7 +172,7 @@ describe('install bundle resolution and materialization', () => {
     servers.push(server)
     const resolved = await resolvePluginFromRegistryAlias(
       'agentrig',
-      'community-typescript',
+      'community.typescript',
       undefined,
       [{ name: 'agentrig', url: server.baseUrl }]
     )

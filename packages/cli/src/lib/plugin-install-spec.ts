@@ -47,7 +47,10 @@ export async function resolvePluginInstallSpecIdentity(
   const parsed = parseRegistryPluginSpec(spec.trim())
   if (parsed.version) return normalizePluginInstallSpecIdentity(spec, _cwd, registries)
   const registry = resolveConfiguredRegistry(parsed.registry, registries)
-  const resolved = await resolveInstallBundleFromConvex(registry, parsed.plugin)
+  const resolved = await resolveInstallBundleFromConvex(registry, {
+    kind: 'plugin',
+    artifactId: parsed.plugin,
+  })
   return getResolvedPluginSpecIdentity(resolved)
 }
 
@@ -92,7 +95,11 @@ export async function resolveRegistryArtifactInstallSpecIdentity(
   const parsed = parseRegistryArtifactSpec(spec.trim(), artifactKind)
   if (parsed.version) return normalizeRegistryArtifactInstallSpecIdentity(spec, artifactKind, _cwd, registries)
   const registry = resolveConfiguredRegistry(parsed.registry, registries)
-  const resolved = await resolveInstallBundleFromConvex(registry, parsed.artifact)
+  const resolved = await resolveInstallBundleFromConvex(registry, {
+    kind: artifactKind,
+    artifactId: parsed.artifact,
+    origin: 'standalone',
+  })
   return getResolvedRegistryArtifactSpecIdentity(resolved)
 }
 

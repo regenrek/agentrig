@@ -22,6 +22,7 @@ const main = defineCommand({
   subCommands: {
     init: () => import('./commands/init').then((m) => m.default),
     install: () => import('./commands/install').then((m) => m.default),
+    search: () => import('./commands/search').then((m) => m.default),
     view: () => import('./commands/view').then((m) => m.default),
     list: () => import('./commands/list').then((m) => m.default),
     inspect: () => import('./commands/inspect').then((m) => m.default),

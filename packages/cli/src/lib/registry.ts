@@ -11,6 +11,12 @@ import {
 } from '@agentrig/sdk'
 import type { PluginUploadPolicySnapshot } from './types'
 
+export type InstallBundleResolveInput = {
+  kind: ArtifactKind
+  artifactId: string
+  origin?: 'standalone' | 'bundled'
+}
+
 export const OFFICIAL_REGISTRY_ALIAS = 'agentrig'
 export const OFFICIAL_REGISTRY_URL = normalizeRegistryUrl(
   process.env.AGENTRIG_OFFICIAL_REGISTRY_URL
@@ -117,10 +123,12 @@ export function resolveConfiguredRegistry(alias: string, registries: RegistryRef
 
 export async function resolveInstallBundleFromConvex(
   registry: RegistryRef,
-  listingId: string
+  input: InstallBundleResolveInput
 ): Promise<InstallBundle> {
-  const url = new URL('/api/cli/plugins/install-bundle', marketplaceBaseUrl(registry.url))
-  url.searchParams.set('listingId', listingId)
+  const url = new URL('/api/cli/install-bundle', marketplaceBaseUrl(registry.url))
+  url.searchParams.set('kind', input.kind)
+  url.searchParams.set('artifactId', input.artifactId)
+  if (input.origin) url.searchParams.set('origin', input.origin)
   const raw = await fetchJson<unknown>(url.toString())
   const resolution = ListingInstallResolutionSchema.parse(raw)
   if (resolution.status === 'resolvable') {
@@ -128,26 +136,27 @@ export async function resolveInstallBundleFromConvex(
   }
 
   const detail = resolution.message ? ` ${resolution.message}` : ''
+  const label = `${input.kind}:${input.artifactId}`
   if (resolution.reason === 'yanked') {
-    throw new Error(`Marketplace listing "${listingId}" has been yanked and cannot be installed.${detail}`)
+    throw new Error(`Marketplace listing "${label}" has been yanked and cannot be installed.${detail}`)
   }
   if (resolution.reason === 'taken_down') {
-    throw new Error(`Marketplace listing "${listingId}" has been taken down and cannot be installed.${detail}`)
+    throw new Error(`Marketplace listing "${label}" has been taken down and cannot be installed.${detail}`)
   }
-  throw new Error(`Marketplace listing "${listingId}" cannot be installed: ${resolution.reason}.${detail}`)
+  throw new Error(`Marketplace listing "${label}" cannot be installed: ${resolution.reason}.${detail}`)
 }
 
 export async function resolveInstallBundleFromRegistryAlias(
   alias: string,
-  listingId: string,
+  input: InstallBundleResolveInput,
   version: string | undefined,
   registries: RegistryRef[]
 ): Promise<InstallBundle> {
   const registry = resolveConfiguredRegistry(alias, registries)
-  const bundle = await resolveInstallBundleFromConvex(registry, listingId)
+  const bundle = await resolveInstallBundleFromConvex(registry, input)
   if (version && bundle.listing.version !== version) {
     throw new Error(
-      `Marketplace listing "${listingId}" resolved to version ${bundle.listing.version}, not requested ${version}.`
+      `Marketplace listing "${input.kind}:${input.artifactId}" resolved to version ${bundle.listing.version}, not requested ${version}.`
     )
   }
   return bundle
@@ -155,13 +164,18 @@ export async function resolveInstallBundleFromRegistryAlias(
 
 export async function resolvePluginFromRegistryAlias(
   alias: string,
-  listingId: string,
+  artifactId: string,
   version: string | undefined,
   registries: RegistryRef[]
 ): Promise<ResolvedPlugin> {
-  const bundle = await resolveInstallBundleFromRegistryAlias(alias, listingId, version, registries)
+  const bundle = await resolveInstallBundleFromRegistryAlias(
+    alias,
+    { kind: 'plugin', artifactId },
+    version,
+    registries
+  )
   if (bundle.listing.kind !== 'plugin') {
-    throw new Error(`Marketplace listing "${listingId}" is a ${bundle.listing.kind}, not a plugin.`)
+    throw new Error(`Marketplace listing "${artifactId}" is a ${bundle.listing.kind}, not a plugin.`)
   }
   return bundle
 }
@@ -169,13 +183,18 @@ export async function resolvePluginFromRegistryAlias(
 export async function resolveStandaloneArtifact(
   alias: string,
   artifactKind: StandaloneRegistryArtifactKind,
-  listingId: string,
+  artifactId: string,
   version: string | undefined,
   registries: RegistryRef[]
 ): Promise<ResolvedStandaloneArtifact> {
-  const bundle = await resolveInstallBundleFromRegistryAlias(alias, listingId, version, registries)
+  const bundle = await resolveInstallBundleFromRegistryAlias(
+    alias,
+    { kind: artifactKind, artifactId, origin: 'standalone' },
+    version,
+    registries
+  )
   if (bundle.listing.kind !== artifactKind) {
-    throw new Error(`Marketplace listing "${listingId}" is a ${bundle.listing.kind}, not a ${artifactKind}.`)
+    throw new Error(`Marketplace listing "${artifactId}" is a ${bundle.listing.kind}, not a ${artifactKind}.`)
   }
   return bundle
 }
@@ -205,6 +224,17 @@ export async function readSourceFile(source: SourceBase, relPath: string): Promi
 export async function fetchInstallBundleFiles(bundle: InstallBundle): Promise<FetchedInstallFile[]> {
   return Promise.all(
     bundle.file_list.map(async (file) => {
+      if (file.inline) {
+        try {
+          return { path: file.path, bytes: decodeBase64(file.inline) }
+        } catch (error) {
+          return {
+            path: file.path,
+            missing: true,
+            error: `Invalid inline payload: ${error instanceof Error ? error.message : String(error)}`,
+          }
+        }
+      }
       try {
         return {
           path: file.path,
@@ -219,6 +249,10 @@ export async function fetchInstallBundleFiles(bundle: InstallBundle): Promise<Fe
       }
     })
   )
+}
+
+function decodeBase64(value: string): Uint8Array {
+  return new Uint8Array(Buffer.from(value, 'base64'))
 }
 
 export function installBundleSourceLabel(bundle: InstallBundle) {
@@ -250,6 +284,7 @@ function marketplaceBaseUrl(configuredUrl: string) {
 }
 
 function installBundleFileUrl(bundle: InstallBundle, file: InstallBundleFile) {
+  if (file.url) return file.url
   const relPath = file.sourcePath ?? file.path
   if (bundle.source.type === 'github') {
     return githubRawUrl(bundle, relPath)
