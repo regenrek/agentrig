@@ -27,7 +27,7 @@
     "@zip.js/zip.js": "^2.8.26",
     "citty": "^0.2.2",
     "giget": "^3.2.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@agentrig/sdk": "workspace:^0.1.3",
