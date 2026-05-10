@@ -62,7 +62,7 @@ const command = defineCommand({
     if (!args.available) return
 
     console.log('Available marketplace listing browse is no longer served from local registry indexes.')
-    console.log('Use agentrig.ai marketplace search for discovery, then install by listing slug.')
+    console.log('Use `agentrig search` for discovery, then install by canonical namespace.artifact token.')
   },
 })
 

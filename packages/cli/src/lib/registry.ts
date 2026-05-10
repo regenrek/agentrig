@@ -3,7 +3,7 @@ import process from 'node:process'
 import {
   InstallBundleSchema,
   ListingInstallResolutionSchema,
-  type ArtifactKind,
+  type CliSupportedKind,
   type FetchedInstallFile,
   type InstallBundle,
   type InstallBundleFile,
@@ -12,7 +12,7 @@ import {
 import type { PluginUploadPolicySnapshot } from './types'
 
 export type InstallBundleResolveInput = {
-  kind: ArtifactKind
+  kind: CliSupportedKind
   artifactId: string
   origin?: 'standalone' | 'bundled'
 }
@@ -27,7 +27,7 @@ export const OFFICIAL_REGISTRY_URL = normalizeRegistryUrl(
 export type SourceBase = { type: 'url'; baseUrl: string }
 export type ResolvedPlugin = InstallBundle
 export type ResolvedStandaloneArtifact = InstallBundle
-export type StandaloneRegistryArtifactKind = Extract<ArtifactKind, 'skill' | 'mcp' | 'hook'>
+export type StandaloneRegistryArtifactKind = Extract<CliSupportedKind, 'skill' | 'mcp' | 'hook'>
 
 export const LOCAL_PLUGIN_POLICY: PluginUploadPolicySnapshot = {
   maxZipBytes: 10 * 1024 * 1024,
@@ -125,14 +125,27 @@ export async function resolveInstallBundleFromConvex(
   registry: RegistryRef,
   input: InstallBundleResolveInput
 ): Promise<InstallBundle> {
-  const url = new URL('/api/cli/install-bundle', marketplaceBaseUrl(registry.url))
-  url.searchParams.set('kind', input.kind)
-  url.searchParams.set('artifactId', input.artifactId)
-  if (input.origin) url.searchParams.set('origin', input.origin)
-  const raw = await fetchJson<unknown>(url.toString())
-  const resolution = ListingInstallResolutionSchema.parse(raw)
+  const resolution = await fetchInstallBundleResolution(registry, input)
   if (resolution.status === 'resolvable') {
     return InstallBundleSchema.parse(resolution.bundle)
+  }
+
+  if (resolution.reason === 'not_found') {
+    const fallbackArtifactId = canonicalInstallTokenFromSlug(input.artifactId)
+    if (fallbackArtifactId !== input.artifactId) {
+      const fallbackResolution = await fetchInstallBundleResolution(registry, {
+        ...input,
+        artifactId: fallbackArtifactId,
+      })
+      if (fallbackResolution.status === 'resolvable') {
+        const bundle = InstallBundleSchema.parse(fallbackResolution.bundle)
+        const canonicalId = bundle.listing.artifactId
+        console.warn(
+          `Resolved by hyphen→dot fallback; canonical id is \`${canonicalId}\`. Update your scripts.`
+        )
+        return bundle
+      }
+    }
   }
 
   const detail = resolution.message ? ` ${resolution.message}` : ''
@@ -144,6 +157,26 @@ export async function resolveInstallBundleFromConvex(
     throw new Error(`Marketplace listing "${label}" has been taken down and cannot be installed.${detail}`)
   }
   throw new Error(`Marketplace listing "${label}" cannot be installed: ${resolution.reason}.${detail}`)
+}
+
+async function fetchInstallBundleResolution(registry: RegistryRef, input: InstallBundleResolveInput) {
+  const url = new URL('/api/cli/install-bundle', marketplaceBaseUrl(registry.url))
+  url.searchParams.set('kind', input.kind)
+  url.searchParams.set('artifactId', input.artifactId)
+  if (input.origin) url.searchParams.set('origin', input.origin)
+  const raw = await fetchJson<unknown>(url.toString())
+  return ListingInstallResolutionSchema.parse(raw)
+}
+
+export function canonicalInstallTokenFromSlug(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.includes('.')) return trimmed
+  const separatorIndex = trimmed.indexOf('--')
+  const head = separatorIndex === -1 ? trimmed : trimmed.slice(0, separatorIndex)
+  const tail = separatorIndex === -1 ? '' : trimmed.slice(separatorIndex)
+  const firstHyphen = head.indexOf('-')
+  if (firstHyphen === -1) return trimmed
+  return `${head.slice(0, firstHyphen)}.${head.slice(firstHyphen + 1)}${tail}`
 }
 
 export async function resolveInstallBundleFromRegistryAlias(
@@ -187,9 +220,13 @@ export async function resolveStandaloneArtifact(
   version: string | undefined,
   registries: RegistryRef[]
 ): Promise<ResolvedStandaloneArtifact> {
+  // Omit `origin` so the server resolver can fall back from `standalone` to
+  // `bundled`. Skill artifacts published as part of a parent plugin keep
+  // `origin = bundled` server-side, but the CLI still treats them as
+  // installable standalone references.
   const bundle = await resolveInstallBundleFromRegistryAlias(
     alias,
-    { kind: artifactKind, artifactId, origin: 'standalone' },
+    { kind: artifactKind, artifactId },
     version,
     registries
   )

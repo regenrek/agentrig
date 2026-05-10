@@ -60,7 +60,6 @@ const command = defineCommand({
         keywords: listing.keywords,
         marketplace: {
           alias: listing.registryAlias ?? 'agentrig',
-          listingId: listing.listingId,
           slug: listing.slug,
         },
         source: resolved.source,

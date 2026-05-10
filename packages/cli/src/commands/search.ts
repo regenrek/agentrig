@@ -2,13 +2,22 @@ import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import { z } from 'zod'
+import {
+  CLI_SUPPORTED_ARTIFACT_KINDS,
+  CliSupportedKindSchema,
+  isCliSupportedKind,
+} from '@agentrig/sdk'
 import { loadConfig } from '../lib/config'
-import { resolveConfiguredRegistry, normalizeRegistryUrl } from '../lib/registry'
+import {
+  canonicalInstallTokenFromSlug,
+  resolveConfiguredRegistry,
+  normalizeRegistryUrl,
+} from '../lib/registry'
 
 const SearchHitSchema = z.object({
   slug: z.string().trim().min(1),
-  artifactId: z.string().trim().min(1),
-  kind: z.enum(['plugin', 'skill', 'mcp', 'hook']),
+  artifactId: z.string().trim().min(1).optional(),
+  kind: CliSupportedKindSchema,
   origin: z.enum(['standalone', 'bundled']),
   displayName: z.string().trim().min(1),
   summary: z.string().trim().min(1).optional(),
@@ -20,7 +29,9 @@ const SearchResponseSchema = z.object({
   results: z.array(SearchHitSchema),
 })
 
-export type SearchHit = z.infer<typeof SearchHitSchema>
+export type SearchHit = Omit<z.infer<typeof SearchHitSchema>, 'artifactId'> & {
+  artifactId: string
+}
 
 const command = defineCommand({
   meta: {
@@ -77,8 +88,8 @@ const command = defineCommand({
     if (limit) url.searchParams.set('limit', String(limit))
     if (args.kind) {
       const kind = String(args.kind).trim().toLowerCase()
-      if (!['plugin', 'skill', 'mcp', 'hook'].includes(kind)) {
-        throw new Error(`Invalid --kind "${args.kind}". Use plugin, skill, mcp, or hook.`)
+      if (!isCliSupportedKind(kind)) {
+        throw new Error(`Invalid --kind "${args.kind}". Use ${CLI_SUPPORTED_ARTIFACT_KINDS.join(', ')}.`)
       }
       url.searchParams.set('kind', kind)
     }
@@ -87,7 +98,9 @@ const command = defineCommand({
     if (!response.ok) {
       throw new Error(`Search failed (${response.status}): ${text || response.statusText}`)
     }
-    const parsed = SearchResponseSchema.parse(text.length ? JSON.parse(text) : { results: [] })
+    const parsed = normalizeSearchResponse(
+      SearchResponseSchema.parse(text.length ? JSON.parse(text) : { results: [] })
+    )
     if (args.json) {
       console.log(JSON.stringify(parsed, null, 2))
       return
@@ -102,11 +115,20 @@ const command = defineCommand({
   },
 })
 
+function normalizeSearchResponse(response: z.infer<typeof SearchResponseSchema>): { results: SearchHit[] } {
+  return {
+    results: response.results.map((hit) => ({
+      ...hit,
+      artifactId: hit.artifactId ?? canonicalInstallTokenFromSlug(hit.slug),
+    })),
+  }
+}
+
 export function formatSearchHit(hit: SearchHit) {
   const version = hit.version ? `  v${hit.version}` : ''
   const kindTag = `[${hit.kind}]`
   const score = hit.score.toFixed(3)
-  return `${hit.slug}${version}  ${kindTag}  ${hit.displayName}  (${score})`
+  return `${hit.artifactId}${version}  ${kindTag}  ${hit.displayName}  (${score})`
 }
 
 function parseLimit(raw: unknown) {

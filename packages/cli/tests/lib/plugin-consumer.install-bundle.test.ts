@@ -9,7 +9,7 @@ import {
   verifyFetchedInstallBundleFiles,
   type ResolvedPluginGraph,
 } from '../../src/lib/plugin-consumer'
-import { resolvePluginFromRegistryAlias } from '../../src/lib/registry'
+import { canonicalInstallTokenFromSlug, resolvePluginFromRegistryAlias } from '../../src/lib/registry'
 import { startFixtureServer, type FixtureServer } from '../helpers/harness'
 import type { InstallBundle } from '@agentrig/sdk'
 
@@ -21,6 +21,14 @@ afterEach(async () => {
 })
 
 describe('install bundle resolution and materialization', () => {
+  it('converts hyphenated marketplace slugs to canonical install tokens without flattening child separators', () => {
+    expect(canonicalInstallTokenFromSlug('regenrek-agent-skills')).toBe('regenrek.agent-skills')
+    expect(canonicalInstallTokenFromSlug('regenrek-agent-skills--skill-pr-commiter')).toBe(
+      'regenrek.agent-skills--skill-pr-commiter'
+    )
+    expect(canonicalInstallTokenFromSlug('regenrek.agent-skills')).toBe('regenrek.agent-skills')
+  })
+
   it('resolves a marketplace listing slug to an InstallBundle and materializes verified files', async () => {
     const pluginJson = JSON.stringify({
       kind: 'agentrig:plugin',
@@ -68,6 +76,69 @@ describe('install bundle resolution and materialization', () => {
     } finally {
       await cleanupMaterializedPlugin(materialized.pluginsRoot)
     }
+  })
+
+  it('retries install resolution with the canonical dotted token after a hyphenated not_found', async () => {
+    const pluginJson = JSON.stringify({
+      kind: 'agentrig:plugin',
+      id: 'regenrek.agent-skills',
+      name: 'Agent skills',
+      description: 'Agent skills.',
+      version: '0.1.0',
+      configSchema: {},
+    })
+    const skill = '# Agent skills\n'
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const server = await startFixtureServer({
+      routes: [
+        {
+          pathname: '/api/cli/install-bundle',
+          handler: (request) => {
+            const artifactId = new URLSearchParams(request.search).get('artifactId')
+            if (artifactId === 'regenrek-agent-skills') {
+              return {
+                status: 404,
+                body: {
+                  status: 'unresolvable',
+                  reason: 'not_found',
+                  message: 'No plugin listing found for regenrek-agent-skills.',
+                },
+              }
+            }
+            return {
+              body: {
+                status: 'resolvable',
+                listing: bundle(server.baseUrl, pluginJson, skill, {
+                  artifactId: 'regenrek.agent-skills',
+                  slug: 'regenrek-agent-skills',
+                }).listing,
+                bundle: bundle(server.baseUrl, pluginJson, skill, {
+                  artifactId: 'regenrek.agent-skills',
+                  slug: 'regenrek-agent-skills',
+                }),
+              },
+            }
+          },
+        },
+        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        { pathname: '/raw/skills/typescript/SKILL.md', handler: () => ({ body: skill }) },
+      ],
+    })
+    servers.push(server)
+
+    const resolved = await resolvePluginFromRegistryAlias(
+      'agentrig',
+      'regenrek-agent-skills',
+      undefined,
+      [{ name: 'agentrig', url: server.baseUrl }]
+    )
+
+    expect(resolved.listing.artifactId).toBe('regenrek.agent-skills')
+    expect(server.requests.filter((request) => request.pathname === '/api/cli/install-bundle')).toHaveLength(2)
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Resolved by hyphen→dot fallback; canonical id is `regenrek.agent-skills`. Update your scripts.'
+    )
+    warnSpy.mockRestore()
   })
 
   it('surfaces yanked and taken-down install responses as hard errors', async () => {
@@ -199,6 +270,52 @@ describe('install bundle resolution and materialization', () => {
       { path: 'extra.txt', bytes: 'extra' },
     ])).rejects.toThrow(/extra.txt: extra/)
   })
+
+  it('materializes mixed URL-backed and inline-base64 install bundle files, preferring inline over url', async () => {
+    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const inlineSkill = '# Inline skill\n'
+    const urlSkill = '# URL skill\n'
+    const server = await startFixtureServer({
+      routes: [
+        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        { pathname: '/inline-url/skills/typescript/SKILL.md', handler: () => ({ body: urlSkill }) },
+      ],
+    })
+    servers.push(server)
+    const resolved = bundle(server.baseUrl, pluginJson, inlineSkill, {
+      skillFile: {
+        url: `${server.baseUrl}/inline-url/skills/typescript/SKILL.md`,
+        inline: Buffer.from(inlineSkill).toString('base64'),
+      },
+    })
+    const graph = { requestedPlugin: resolved, resolvedPlugins: [resolved] } satisfies ResolvedPluginGraph
+    const materialized = await materializeResolvedPluginGraph(graph)
+
+    try {
+      await expect(
+        fs.readFile(path.join(materialized.pluginDir, '.plugin', 'plugin.json'), 'utf-8')
+      ).resolves.toBe(pluginJson)
+      await expect(
+        fs.readFile(path.join(materialized.pluginDir, 'skills', 'typescript', 'SKILL.md'), 'utf-8')
+      ).resolves.toBe(inlineSkill)
+      expect(server.requests.some((request) => request.pathname === '/inline-url/skills/typescript/SKILL.md')).toBe(false)
+    } finally {
+      await cleanupMaterializedPlugin(materialized.pluginsRoot)
+    }
+  })
+
+  it('fails loudly when an install bundle file has neither inline bytes nor a readable url/source', async () => {
+    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const skill = '# TypeScript skill\n'
+    const resolved = {
+      ...bundle('https://example.test', pluginJson, skill),
+      source: { type: 'convex_storage' as const },
+    }
+    const graph = { requestedPlugin: resolved, resolvedPlugins: [resolved] } satisfies ResolvedPluginGraph
+
+    await expect(materializeResolvedPluginGraph(graph))
+      .rejects.toThrow(/skills\/typescript\/SKILL\.md: missing/)
+  })
 })
 
 async function installBundleServer(pluginJson: string, fetchedSkill: string, expectedSkill: string) {
@@ -212,19 +329,24 @@ async function installBundleServer(pluginJson: string, fetchedSkill: string, exp
   return server
 }
 
-function bundle(baseUrl: string, pluginJson: string, skill: string): InstallBundle {
+function bundle(
+  baseUrl: string,
+  pluginJson: string,
+  skill: string,
+  options: { artifactId?: string; slug?: string; skillFile?: { url?: string; inline?: string } } = {}
+): InstallBundle {
+  const artifactId = options.artifactId ?? 'community.typescript'
   return {
     schemaVersion: 1,
     listing: {
-      listingId: 'listing-1',
       kind: 'plugin',
       origin: 'standalone',
-      artifactId: 'community.typescript',
+      artifactId,
       name: 'TypeScript skill',
       description: 'TypeScript patterns.',
       version: '0.1.0',
       source: 'registry',
-      slug: 'community-typescript',
+      slug: options.slug ?? 'community-typescript',
       registryAlias: 'agentrig',
       registrySnapshotDigest: `sha256:${sha256Hex(`${pluginJson}\0${skill}`)}`,
       installability: 'available',
@@ -234,7 +356,13 @@ function bundle(baseUrl: string, pluginJson: string, skill: string): InstallBund
     source: { type: 'registry', url: `${baseUrl}/raw/` },
     file_list: [
       { path: '.plugin/plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
-      { path: 'skills/typescript/SKILL.md', sha256: sha256Hex(skill), size: Buffer.byteLength(skill) },
+      {
+        path: 'skills/typescript/SKILL.md',
+        sha256: sha256Hex(skill),
+        size: Buffer.byteLength(skill),
+        ...(options.skillFile?.url ? { url: options.skillFile.url } : {}),
+        ...(options.skillFile?.inline ? { inline: options.skillFile.inline } : {}),
+      },
     ],
   }
 }

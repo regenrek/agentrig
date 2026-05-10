@@ -1,7 +1,7 @@
 import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
-import type { SelectableArtifactKind } from '@agentrig/sdk'
+import type { CliSupportedKind } from '@agentrig/sdk'
 import { loadAuthSession } from '../lib/auth'
 import {
   createPluginSubmission,
@@ -28,7 +28,7 @@ import {
 import { listRepeatedOptionValues } from '../lib/repeated-options'
 import { resolveSubmitSource } from '../lib/submit-source'
 
-type SubmittableArtifactKind = Extract<SelectableArtifactKind, 'skill' | 'mcp' | 'hook'>
+type SubmittableArtifactKind = Extract<CliSupportedKind, 'skill' | 'mcp' | 'hook'>
 
 export function createArtifactKindCommand(kind: SubmittableArtifactKind) {
   const install = defineCommand({

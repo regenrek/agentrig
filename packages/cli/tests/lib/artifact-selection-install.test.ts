@@ -71,6 +71,7 @@ describe('installArtifactSelection', () => {
       artifactId: 'demo.review',
       version: '1.0.0',
     })
+    expect(JSON.stringify(result.record)).not.toContain('listingId')
     expect(result.record.pluginVersion).toBe('1.0.0')
     expect(result.record.snapshotDigest).toBe(installBundleSnapshotDigest(resolved))
     expect(result.record.selectedSelectors).toEqual(['skill:review'])

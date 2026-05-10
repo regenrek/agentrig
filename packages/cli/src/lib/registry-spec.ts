@@ -50,7 +50,7 @@ export function parseRegistryPluginSpec(spec: string): ParsedRegistryPluginSpec 
   if (!match) {
     throw new Error(
       `Invalid install ref: ${spec}\n` +
-        'Use the canonical public install form: <marketplaceAlias>/<listing-slug>. Add @<version> only for an explicit pin.'
+        'Use the canonical public install form: <marketplaceAlias>/<namespace.artifact>. Add @<version> only for an explicit pin.'
     )
   }
 
@@ -70,7 +70,7 @@ export function parseRegistryArtifactSpec(
   if (!match) {
     throw new Error(
       `Invalid ${artifactKind} install ref: ${spec}\n` +
-        `Use the canonical public standalone ${artifactKind} install form: <marketplaceAlias>/<listing-slug>. Add @<version> only for an explicit pin.`
+        `Use the canonical public standalone ${artifactKind} install form: <marketplaceAlias>/<namespace.artifact>. Add @<version> only for an explicit pin.`
     )
   }
 

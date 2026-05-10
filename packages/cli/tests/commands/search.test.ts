@@ -40,7 +40,7 @@ describe('command:search', () => {
     })
   })
 
-  it('formats slug, version, kind, name, and score in one line per hit', () => {
+  it('formats the canonical install token, version, kind, name, and score in one line per hit', () => {
     expect(
       formatSearchHit({
         slug: 'regenrek-agent-skills',
@@ -51,7 +51,7 @@ describe('command:search', () => {
         version: '0.1.0',
         score: 0.875,
       }),
-    ).toBe('regenrek-agent-skills  v0.1.0  [skill]  Agent skills  (0.875)')
+    ).toBe('regenrek.agent-skills  v0.1.0  [skill]  Agent skills  (0.875)')
   })
 
   it('hits the configured marketplace search endpoint with q + limit + kind', async () => {
@@ -88,6 +88,38 @@ describe('command:search', () => {
   it('refuses unknown --kind values without hitting the network', async () => {
     await expect(runSearch({ args: { query: 'demo', cwd: '/repo', kind: 'banana' } })).rejects.toThrow(/Invalid --kind/)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each(['command', 'agent'])('refuses unsupported public CLI kind %s without hitting the network', async (kind) => {
+    await expect(runSearch({ args: { query: 'demo', cwd: '/repo', kind } })).rejects.toThrow(/Invalid --kind/)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('derives the canonical install token from legacy slug-only search responses', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: async () =>
+        JSON.stringify({
+          results: [
+            {
+              slug: 'regenrek-agent-skills--skill-pr-commiter',
+              kind: 'skill',
+              origin: 'bundled',
+              displayName: 'PR commiter',
+              version: '0.1.0',
+              score: 0.5,
+            },
+          ],
+        }),
+    })
+
+    await runSearch({ args: { query: 'commiter', cwd: '/repo' } })
+
+    expect(console.log).toHaveBeenCalledWith(
+      'regenrek.agent-skills--skill-pr-commiter  v0.1.0  [skill]  PR commiter  (0.500)'
+    )
   })
 
   it('throws when the search endpoint returns a non-OK response', async () => {

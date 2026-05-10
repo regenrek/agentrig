@@ -98,7 +98,6 @@ export async function resolveRegistryArtifactInstallSpecIdentity(
   const resolved = await resolveInstallBundleFromConvex(registry, {
     kind: artifactKind,
     artifactId: parsed.artifact,
-    origin: 'standalone',
   })
   return getResolvedRegistryArtifactSpecIdentity(resolved)
 }
