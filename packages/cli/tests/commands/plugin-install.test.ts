@@ -48,7 +48,7 @@ vi.mock('../../src/lib/trust', () => ({
 import command from '../../src/commands/plugin/install'
 
 describe('command:plugin install', () => {
-  const run = command.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+  const run = command.run as (ctx: { args: Record<string, unknown>, rawArgs?: string[] }) => Promise<void>
 
   beforeEach(() => {
     vi.resetAllMocks()
@@ -156,7 +156,6 @@ describe('command:plugin install', () => {
         scope: undefined,
         force: false,
         dryRun: false,
-        noEnable: false,
         help: false,
       },
     })
@@ -240,7 +239,6 @@ describe('command:plugin install', () => {
         scope: undefined,
         force: false,
         dryRun: false,
-        noEnable: false,
         help: false,
       },
     })).resolves.toBeUndefined()
@@ -266,7 +264,6 @@ describe('command:plugin install', () => {
           scope: undefined,
           force: false,
           dryRun: false,
-          noEnable: false,
           help: false,
         },
       }),
@@ -276,6 +273,13 @@ describe('command:plugin install', () => {
 
   it('plumbs --no-enable to provider install planning', async () => {
     await run({
+      rawArgs: [
+        'codex',
+        'agentrig/demo-plugin',
+        '--cwd',
+        '/repo',
+        '--no-enable',
+      ],
       args: {
         provider: 'codex',
         spec: 'agentrig/demo-plugin',
@@ -283,7 +287,6 @@ describe('command:plugin install', () => {
         scope: undefined,
         force: false,
         dryRun: false,
-        noEnable: true,
         help: false,
       },
     })

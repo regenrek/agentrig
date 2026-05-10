@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.6] - 2026-05-10
+
+### Fixed
+- Hard-cut Codex personal installs to write plugin payloads only under the canonical cache layout: `~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/`.
+- Made `--no-enable` the canonical Codex install flag for leaving a plugin disabled after install.
+
+### Changed
+- Removed the v0.7.5 legacy Codex mirror write to `~/.codex/plugins/<name>/`; users who installed with v0.7.5 may manually remove leftover mirror directories with `rm -rf ~/.codex/plugins/<name>`.
+- Removed camelCase CLI flag registration for Codex no-enable installs; `--noEnable` is no longer accepted.
+
 ## [0.7.5] - 2026-05-10
 
 ### Added

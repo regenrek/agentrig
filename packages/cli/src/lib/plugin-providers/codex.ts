@@ -109,9 +109,31 @@ function resolveCodexInstallPaths(cwd: string, scope: PluginInstallScope) {
 
   const home = getAgentRigHome()
   return {
-    pluginRoot: path.join(home, '.codex', 'plugins'),
+    pluginRoot: path.join(home, '.codex', 'plugins', 'cache'),
     marketplacePath: path.join(home, '.agents', 'plugins', 'marketplace.json'),
-    relativePluginRoot: './.codex/plugins',
+    relativePluginRoot: './.codex/plugins/cache',
+  }
+}
+
+function resolveCodexPluginDestination(params: {
+  pluginRoot: string
+  relativePluginRoot: string
+  scope: PluginInstallScope
+  marketplaceName: string
+  pluginName: string
+  version: string
+}) {
+  if (params.scope === 'workspace') {
+    return {
+      destinationDir: path.join(params.pluginRoot, params.pluginName),
+      marketplaceSourcePath: `${params.relativePluginRoot}/${params.pluginName}`,
+    }
+  }
+
+  const pathSegments = [params.marketplaceName, params.pluginName, params.version]
+  return {
+    destinationDir: path.join(params.pluginRoot, ...pathSegments),
+    marketplaceSourcePath: `${params.relativePluginRoot}/${pathSegments.join('/')}`,
   }
 }
 
@@ -320,10 +342,10 @@ function shouldFallBackFromAppServer(result: Exclude<CodexInstallResult, { ok: t
 
 function warnCodexAppServerFallback(result: Exclude<CodexInstallResult, { ok: true }>) {
   if (result.reason === 'codex_too_old') {
-    console.warn(`${result.detail} Falling back to the legacy Codex marketplace write; upgrade Codex to >= 0.113.0 for automatic enable.`)
+    console.warn(`${result.detail} Falling back to direct Codex marketplace writes; upgrade Codex to >= 0.113.0 for automatic enable.`)
     return
   }
-  console.warn(`Codex JSON-RPC install unavailable (${result.detail}). Falling back to the legacy Codex marketplace write.`)
+  console.warn(`Codex JSON-RPC install unavailable (${result.detail}). Falling back to direct Codex marketplace writes.`)
 }
 
 function failCodexAppServer(result: Exclude<CodexInstallResult, { ok: true }>): never {
@@ -366,13 +388,26 @@ export const codexProvider: PluginProviderAdapter = {
   },
   previewInstall({ cwd, plugins, scope, cfg }) {
     const { pluginRoot, marketplacePath } = resolveCodexInstallPaths(cwd, scope)
-    const providerNames = plugins.map((plugin) => providerPluginName(plugin, 'codex', cfg.pluginPrefix))
+    const providerPlugins = plugins.map((plugin) => {
+      const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
+      return {
+        pluginName,
+        ...resolveCodexPluginDestination({
+          pluginRoot,
+          relativePluginRoot: '',
+          scope,
+          marketplaceName: cfg.providers.codex.marketplaceName,
+          pluginName,
+          version: plugin.manifest.version,
+        }),
+      }
+    })
     return {
       provider: 'codex',
       scope,
-      locations: [pluginRoot, marketplacePath, ...providerNames.map((pluginName) => path.join(pluginRoot, pluginName))],
+      locations: [pluginRoot, marketplacePath, ...providerPlugins.map((plugin) => plugin.destinationDir)],
       actions: [
-        ...providerNames.map((pluginName) => `copy ${pluginName} -> ${path.join(pluginRoot, pluginName)}`),
+        ...providerPlugins.map((plugin) => `copy ${plugin.pluginName} -> ${plugin.destinationDir}`),
         `update ${marketplacePath}`,
       ],
     }
@@ -474,7 +509,14 @@ export const codexProvider: PluginProviderAdapter = {
         throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
       }
 
-      const destinationDir = path.join(pluginRoot, pluginName)
+      const { destinationDir } = resolveCodexPluginDestination({
+        pluginRoot,
+        relativePluginRoot,
+        scope,
+        marketplaceName: result.marketplaceName,
+        pluginName,
+        version: plugin.manifest.version,
+      })
       const existingRecordId = getPluginInstallRecordId('codex', scope, pluginName)
       const destinationExists = dryRun ? false : await pathExists(destinationDir)
       if (!destinationExists || force) continue
@@ -499,7 +541,14 @@ export const codexProvider: PluginProviderAdapter = {
     for (const plugin of result.plugins) {
       const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
       const sourceDir = path.join(pluginSourceRoot, pluginName)
-      const destinationDir = path.join(pluginRoot, pluginName)
+      const { destinationDir, marketplaceSourcePath } = resolveCodexPluginDestination({
+        pluginRoot,
+        relativePluginRoot,
+        scope,
+        marketplaceName: result.marketplaceName,
+        pluginName,
+        version: plugin.manifest.version,
+      })
       const copyResult = dryRun
         ? { changed: true, files: [] }
         : await copyInstalledPlugin(sourceDir, destinationDir, force)
@@ -514,7 +563,7 @@ export const codexProvider: PluginProviderAdapter = {
         name: pluginName,
         source: {
           source: 'local',
-          path: `${relativePluginRoot}/${pluginName}`,
+          path: marketplaceSourcePath,
         },
         policy: {
           installation: cfg.providers.codex.installationPolicy,
@@ -523,13 +572,6 @@ export const codexProvider: PluginProviderAdapter = {
         category: cfg.providers.codex.category,
       })
 
-      const legacyPath = `${relativePluginRoot}/${plugin.pluginName}`
-      const retainedPlugins = existingPlugins.filter((item) => {
-        const record = toRecord(item)
-        const source = toRecord(record?.source)
-        return record?.name !== plugin.pluginName && source?.path !== legacyPath
-      })
-      existingPlugins.splice(0, existingPlugins.length, ...retainedPlugins)
       const index = existingPlugins.findIndex((item) => toRecord(item)?.name === pluginName)
       if (index >= 0) {
         existingPlugins[index] = mergeMarketplacePlugin(existingPlugins[index], entry)
@@ -621,7 +663,7 @@ export const codexProvider: PluginProviderAdapter = {
           kept.push(entry.pluginName)
           continue
         }
-        console.warn(`Codex JSON-RPC uninstall unavailable (${uninstallResult.detail}). Falling back to the legacy Codex file cleanup.`)
+        console.warn(`Codex JSON-RPC uninstall unavailable (${uninstallResult.detail}). Falling back to direct Codex file cleanup.`)
       }
       const { pluginRoot, marketplacePath } = resolveCodexInstallPaths(cwd, entry.scope)
       const pluginPath = assertContainedPath(

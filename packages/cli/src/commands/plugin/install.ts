@@ -36,6 +36,28 @@ function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginIn
   }
 }
 
+const knownInstallFlags = new Set([
+  '--cwd',
+  '--scope',
+  '--force',
+  '--dry-run',
+  '--no-enable',
+  '--help',
+])
+
+function assertKnownInstallFlags(rawArgs: string[] | undefined) {
+  if (!rawArgs) return
+  for (const arg of rawArgs) {
+    if (arg === '--') return
+    if (!arg.startsWith('--')) continue
+
+    const flag = arg.split('=', 1)[0]
+    if (!knownInstallFlags.has(flag)) {
+      throw new Error(`Unknown option: ${flag}`)
+    }
+  }
+}
+
 const command = defineCommand({
   meta: {
     name: 'install',
@@ -70,7 +92,7 @@ const command = defineCommand({
       description: 'Show what would be installed without writing files or invoking provider CLIs.',
       default: false,
     },
-    noEnable: {
+    'no-enable': {
       type: 'boolean',
       description: 'Codex only: install the plugin but leave it disabled.',
       default: false,
@@ -82,8 +104,9 @@ const command = defineCommand({
       default: false,
     },
   },
-  async run({ args }) {
+  async run({ args, rawArgs }) {
     if (args.help) return showUsage(command)
+    assertKnownInstallFlags(rawArgs)
 
     const cwd = args.cwd ? path.resolve(args.cwd) : process.cwd()
     const provider = parsePluginProviderSelector(String(args.provider))
@@ -139,7 +162,7 @@ const command = defineCommand({
         scope,
         force: args.force,
         dryRun: args.dryRun,
-        enable: !args.noEnable,
+        enable: !rawArgs?.includes('--no-enable'),
       })
 
       printInstallPlanSummary(plan)
