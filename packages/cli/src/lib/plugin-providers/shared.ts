@@ -3,7 +3,11 @@ import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import type { PluginFeatures } from '@agentrig/sdk'
+import {
+  sanitizeProviderPluginName,
+  type PluginFeatures,
+  type ProviderPluginNameTarget,
+} from '@agentrig/sdk'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
@@ -372,6 +376,14 @@ export function pluginAuthor(meta: PluginSourceManifest, owner: PluginOwner) {
   return normalizeAuthorObject(meta.author ?? owner.name, owner.email)
 }
 
+export function providerPluginName(
+  plugin: PluginEntry,
+  target: ProviderPluginNameTarget,
+  pluginPrefix = DEFAULT_CONFIG.pluginPrefix
+) {
+  return `${pluginPrefix}${sanitizeProviderPluginName(plugin.manifest.id, target)}`
+}
+
 export async function readPluginManifest(pluginSourceDir: string) {
   const manifestPath = path.join(pluginSourceDir, '.plugin', 'plugin.json')
   const raw = await readJsonFile<unknown>(manifestPath)
@@ -664,6 +676,12 @@ async function pruneEmptyDirectories(rootDir: string, filePaths: string[], dryRu
   const orderedDirs = [...candidateDirs].sort((left, right) => right.length - left.length)
   for (const directory of orderedDirs) {
     if (!(await pathExists(directory))) continue
+    const dsStorePath = path.join(directory, '.DS_Store')
+    if (await pathExists(dsStorePath)) {
+      if (!dryRun) {
+        await fs.rm(dsStorePath, { force: true })
+      }
+    }
     const contents = await fs.readdir(directory)
     if (contents.length > 0) continue
     if (!dryRun) {
