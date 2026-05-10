@@ -156,6 +156,7 @@ describe('command:plugin install', () => {
         scope: undefined,
         force: false,
         dryRun: false,
+        noEnable: false,
         help: false,
       },
     })
@@ -239,6 +240,7 @@ describe('command:plugin install', () => {
         scope: undefined,
         force: false,
         dryRun: false,
+        noEnable: false,
         help: false,
       },
     })).resolves.toBeUndefined()
@@ -264,10 +266,32 @@ describe('command:plugin install', () => {
           scope: undefined,
           force: false,
           dryRun: false,
+          noEnable: false,
           help: false,
         },
       }),
     ).rejects.toThrow(/sha256_mismatch/i)
     expect(mocks.cleanupMaterializedPlugin).not.toHaveBeenCalled()
+  })
+
+  it('plumbs --no-enable to provider install planning', async () => {
+    await run({
+      args: {
+        provider: 'codex',
+        spec: 'agentrig/demo-plugin',
+        cwd: '/repo',
+        scope: undefined,
+        force: false,
+        dryRun: false,
+        noEnable: true,
+        help: false,
+      },
+    })
+
+    expect(mocks.preparePluginInstall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        enable: false,
+      }),
+    )
   })
 })

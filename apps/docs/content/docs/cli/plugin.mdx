@@ -36,6 +36,10 @@ ledger records the resolved concrete version, marketplace identity, and
 snapshot digest even when you use the unversioned latest ref. The CLI resolves
 the ref by fetching an AgentRig `InstallBundle` from `agentrig.ai`.
 
+For Codex, installs are enabled automatically through `codex app-server` when
+Codex `0.113.0` or newer is available. Use `--no-enable` to install the plugin
+but leave it disabled for manual opt-in from the Codex TUI `/plugins` view.
+
 ## Selected artifact install
 
 Use top-level `install --pick` when you want only specific artifacts from an

@@ -147,6 +147,7 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
     clean: options.clean ?? true,
     force: Boolean(options.force),
     dryRun: Boolean(options.dryRun),
+    enable: options.enable ?? true,
     installMetadataByPluginId,
     requestedScope,
     providers,
@@ -194,6 +195,7 @@ export async function installPreparedPluginProviders(plan: PreparedPluginInstall
           installMetadataByPluginId: plan.installMetadataByPluginId,
           force: plan.force,
           dryRun: plan.dryRun,
+          enable: plan.enable,
           runner: plan.commandRunner,
         })
       )

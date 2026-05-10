@@ -1,10 +1,12 @@
+import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
-import { ensureDir, pathExists, readJsonFile, writeJsonFile } from '../fs'
-import { getAgentRigHome } from '../paths'
+import { ensureDir, pathExists, readJsonFile, removeIfExists, writeJsonFile } from '../fs'
+import { getAgentRigHome, getCodexMarketplaceCacheRoot } from '../paths'
 import { getPluginInstallRecordId, loadPluginInstallLedger } from '../plugin-install-ledger'
 import { isSamePluginInstallSpecIdentity } from '../plugin-install-spec'
 import type { CodexPluginInstallRecord } from '../types'
+import { codexInstallPlugin, codexUninstallPlugin, type CodexInstallResult } from './codex-app-server'
 import type {
   FileRemovalSummary,
   PluginEntry,
@@ -113,6 +115,49 @@ function resolveCodexInstallPaths(cwd: string, scope: PluginInstallScope) {
   }
 }
 
+async function stageCodexMarketplaceForInstall(outRoot: string, marketplaceName: string) {
+  const persistentRoot = getCodexMarketplaceCacheRoot(marketplaceName)
+  await ensureDir(path.dirname(persistentRoot))
+  const stagingParent = path.dirname(persistentRoot)
+  const stagingDir = await fs.mkdtemp(path.join(stagingParent, `.${path.basename(persistentRoot)}.staging-`))
+  let backupDir: string | undefined
+  let backupPath: string | undefined
+
+  try {
+    await fs.cp(path.join(outRoot, 'plugins'), path.join(stagingDir, 'plugins'), { recursive: true, force: true })
+    const marketplacePath = path.join(stagingDir, '.agents', 'plugins', 'marketplace.json')
+    await ensureDir(path.dirname(marketplacePath))
+    await fs.copyFile(path.join(outRoot, '.agents', 'plugins', 'marketplace.json'), marketplacePath)
+
+    if (await pathExists(persistentRoot)) {
+      backupDir = await fs.mkdtemp(path.join(stagingParent, `.${path.basename(persistentRoot)}.backup-`))
+      backupPath = path.join(backupDir, path.basename(persistentRoot))
+      await fs.rename(persistentRoot, backupPath)
+      await fs.rename(stagingDir, persistentRoot)
+      await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {})
+      backupDir = undefined
+      backupPath = undefined
+    } else {
+      await fs.rename(stagingDir, persistentRoot)
+    }
+  } catch (error) {
+    await removeIfExists(stagingDir)
+    if (backupPath && await pathExists(backupPath)) {
+      await removeIfExists(persistentRoot)
+      await fs.rename(backupPath, persistentRoot)
+    }
+    if (backupDir) {
+      await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {})
+    }
+    throw error
+  }
+
+  return {
+    root: persistentRoot,
+    marketplacePath: path.join(persistentRoot, '.agents', 'plugins', 'marketplace.json'),
+  }
+}
+
 const codexMutableMarketplaceInterfaceSchema = z.looseObject({
   displayName: z.string().trim().min(1),
 })
@@ -125,7 +170,7 @@ const codexMutableMarketplacePluginSchema = z.looseObject({
   }),
   policy: z.looseObject({
     installation: z.enum(['AVAILABLE', 'INSTALLED_BY_DEFAULT', 'NOT_AVAILABLE']),
-    authentication: z.enum(['ON_INSTALL', 'ON_FIRST_USE']),
+    authentication: z.enum(['ON_INSTALL', 'ON_USE']),
   }),
   category: z.string().trim().min(1),
 })
@@ -269,6 +314,28 @@ function summarizePluginRemoval(removal: FileRemovalSummary, marketplaceOutcome:
   return 'missing' as const
 }
 
+function shouldFallBackFromAppServer(result: Exclude<CodexInstallResult, { ok: true }>) {
+  return result.reason === 'codex_not_installed' || result.reason === 'codex_too_old'
+}
+
+function warnCodexAppServerFallback(result: Exclude<CodexInstallResult, { ok: true }>) {
+  if (result.reason === 'codex_too_old') {
+    console.warn(`${result.detail} Falling back to the legacy Codex marketplace write; upgrade Codex to >= 0.113.0 for automatic enable.`)
+    return
+  }
+  console.warn(`Codex JSON-RPC install unavailable (${result.detail}). Falling back to the legacy Codex marketplace write.`)
+}
+
+function failCodexAppServer(result: Exclude<CodexInstallResult, { ok: true }>): never {
+  throw new Error(result.detail)
+}
+
+async function readCodexMarketplaceName(marketplacePath: string) {
+  const rawMarketplace = await readJsonFile<unknown>(marketplacePath)
+  const parsedMarketplace = rawMarketplace == null ? undefined : parseMutableMarketplace(rawMarketplace, marketplacePath)
+  return parsedMarketplace?.name?.trim() || 'agentrig-local'
+}
+
 export const codexProvider: PluginProviderAdapter = {
   id: 'codex',
   async exportMarketplace({ outRoot, cfg, plugins }) {
@@ -310,7 +377,89 @@ export const codexProvider: PluginProviderAdapter = {
       ],
     }
   },
-  async install({ cwd, result, cfg, scope, requestedScope, installMetadataByPluginId, force, dryRun }) {
+  async install({ cwd, result, cfg, scope, requestedScope, installMetadataByPluginId, force, dryRun, enable }) {
+    if (!dryRun) {
+      const staged = await stageCodexMarketplaceForInstall(result.outRoot, result.marketplaceName)
+      const installed: string[] = []
+      const ledgerEntries: CodexPluginInstallRecord[] = []
+
+      for (const plugin of result.plugins) {
+        const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
+        const installMetadata = installMetadataByPluginId[plugin.manifest.id]
+        if (!installMetadata) {
+          throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
+        }
+        const entry = codexMarketplacePluginSchema.parse({
+          name: pluginName,
+          source: {
+            source: 'local',
+            path: `./plugins/${pluginName}`,
+          },
+          policy: {
+            installation: cfg.providers.codex.installationPolicy,
+            authentication: cfg.providers.codex.authenticationPolicy,
+          },
+          category: cfg.providers.codex.category,
+        })
+        const installResult = await codexInstallPlugin({
+          marketplaceName: result.marketplaceName,
+          pluginName,
+          version: plugin.manifest.version,
+          sourcePath: staged.marketplacePath,
+          enable,
+        })
+
+        if (!installResult.ok) {
+          if (installed.length === 0 && shouldFallBackFromAppServer(installResult)) {
+            warnCodexAppServerFallback(installResult)
+            break
+          }
+          failCodexAppServer(installResult)
+        }
+
+        installed.push(pluginName)
+        if (enable) {
+          console.log(`Installed and enabled ${pluginName} in Codex (${installResult.installPath}).`)
+        } else {
+          console.log(`Installed ${pluginName} in Codex (disabled). Press Space in Codex TUI under /plugins to enable.`)
+        }
+        ledgerEntries.push({
+          id: getPluginInstallRecordId('codex', scope, pluginName),
+          provider: 'codex',
+          requestedScope,
+          specIdentity: installMetadata.specIdentity,
+          registry: installMetadata.registry,
+          scope,
+          pluginId: plugin.manifest.id,
+          pluginVersion: plugin.manifest.version,
+          snapshotDigest: installMetadata.snapshotDigest,
+          pluginName,
+          targetPaths: [installResult.installPath, staged.marketplacePath],
+          installedAt: new Date().toISOString(),
+          files: [],
+          metadata: {
+            pluginPath: installResult.installPath,
+            marketplacePath: staged.marketplacePath,
+            marketplaceEntry: entry,
+            marketplaceName: result.marketplaceName,
+            pluginRef: `${pluginName}@${result.marketplaceName}`,
+            appServerInstalled: true,
+          },
+        })
+      }
+
+      if (installed.length > 0) {
+        return {
+          provider: 'codex',
+          scope,
+          installed,
+          skipped: [],
+          locations: [staged.root, ...ledgerEntries.map((entry) => entry.metadata.pluginPath)],
+          ledgerEntries,
+        }
+      }
+    }
+
     const installed: string[] = []
     const skipped: string[] = []
     const ledgerEntries: CodexPluginInstallRecord[] = []
@@ -446,6 +595,34 @@ export const codexProvider: PluginProviderAdapter = {
 
     for (const entry of entries) {
       if (entry.provider !== 'codex') continue
+      for (const targetPath of entry.targetPaths) {
+        locations.add(targetPath)
+      }
+      if (!dryRun) {
+        const marketplaceName = entry.metadata.marketplaceName ??
+          await readCodexMarketplaceName(entry.metadata.marketplacePath).catch(() => 'agentrig-local')
+        const uninstallResult = await codexUninstallPlugin({
+          marketplaceName,
+          pluginName: entry.pluginName,
+        })
+        if (uninstallResult.ok) {
+          removed.push(entry.pluginName)
+          clearedRecordIds.push(entry.id)
+          continue
+        }
+        const canDirectCleanup =
+          shouldFallBackFromAppServer(uninstallResult) ||
+          (!entry.metadata.appServerInstalled && /not found|not installed/i.test(uninstallResult.detail))
+        if (!canDirectCleanup) {
+          failCodexAppServer(uninstallResult)
+        }
+        if (entry.metadata.appServerInstalled) {
+          console.warn(`Codex JSON-RPC uninstall unavailable (${uninstallResult.detail}). Keeping the AgentRig ledger entry because Codex owns the app-server install cache.`)
+          kept.push(entry.pluginName)
+          continue
+        }
+        console.warn(`Codex JSON-RPC uninstall unavailable (${uninstallResult.detail}). Falling back to the legacy Codex file cleanup.`)
+      }
       const { pluginRoot, marketplacePath } = resolveCodexInstallPaths(cwd, entry.scope)
       const pluginPath = assertContainedPath(
         pluginRoot,

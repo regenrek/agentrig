@@ -1,7 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+
+const codexAppServerMocks = vi.hoisted(() => ({
+  codexInstallPlugin: vi.fn(),
+  codexUninstallPlugin: vi.fn(),
+}))
+
+vi.mock('../../src/lib/plugin-providers/codex-app-server', () => codexAppServerMocks)
+
 import { sha256Hex } from '../../src/lib/hash'
 import { installPluginProviders, uninstallPluginProviders } from '../../src/lib/plugin-providers'
 import { loadPluginInstallLedgers, savePluginInstallLedger } from '../../src/lib/plugin-install-ledger'
@@ -15,6 +23,8 @@ const originalHome = process.env.HOME
 describe('plugin provider command runner', () => {
   afterEach(async () => {
     vi.restoreAllMocks()
+    codexAppServerMocks.codexInstallPlugin.mockReset()
+    codexAppServerMocks.codexUninstallPlugin.mockReset()
     vi.unstubAllEnvs()
     if (originalHome === undefined) {
       delete process.env.HOME
@@ -99,6 +109,11 @@ describe('plugin provider command runner', () => {
     const cwd = path.join(root, 'workspace')
     const pluginsRoot = path.join(root, 'plugins')
     await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+    codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
+      ok: false,
+      reason: 'codex_not_installed',
+      detail: 'missing codex',
+    })
 
     const result = await installPluginProviders({
       cwd,
@@ -132,6 +147,142 @@ describe('plugin provider command runner', () => {
         pluginId: 'regenrek.agent-skills',
       },
     })
+  })
+
+  it('stages Codex marketplaces persistently and installs through app-server', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const home = path.join(root, 'home')
+    const pluginsRoot = path.join(root, 'plugins')
+    await fs.mkdir(home, { recursive: true })
+    vi.stubEnv('AGENTRIG_HOME', home)
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+    codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
+      ok: true,
+      installPath: path.join(home, '.codex', 'plugins', 'cache', 'agentrig-local', 'agentrig-regenrek-agent-skills', '1.0.0'),
+      authPolicy: 'ON_INSTALL',
+      appsNeedingAuth: [],
+    })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    const result = await installPluginProviders({
+      cwd,
+      agent: 'codex',
+      pluginsDir: pluginsRoot,
+      scope: 'personal',
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+    })
+
+    const providerName = 'agentrig-regenrek-agent-skills'
+    const persistentRoot = path.join(home, '.agentrig', 'cache', 'codex-marketplaces', 'agentrig-local')
+    expect(codexAppServerMocks.codexInstallPlugin).toHaveBeenCalledWith({
+      marketplaceName: 'agentrig-local',
+      pluginName: providerName,
+      version: '1.0.0',
+      sourcePath: path.join(persistentRoot, '.agents', 'plugins', 'marketplace.json'),
+      enable: true,
+    })
+    await expect(fs.access(path.join(persistentRoot, '.agents', 'plugins', 'marketplace.json'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(persistentRoot, 'plugins', providerName, '.codex-plugin', 'plugin.json'))).resolves.toBeUndefined()
+    expect(result[0]?.installed).toEqual([providerName])
+    expect(result[0]?.locations[0]).toBe(persistentRoot)
+    const ledgers = await loadPluginInstallLedgers(cwd)
+    expect(Object.values(ledgers.personal.installs)[0]).toMatchObject({
+      provider: 'codex',
+      pluginId: 'regenrek.agent-skills',
+      pluginName: providerName,
+      files: [],
+      metadata: {
+        marketplaceName: 'agentrig-local',
+        pluginRef: `${providerName}@agentrig-local`,
+        appServerInstalled: true,
+      },
+    })
+  })
+
+  it('passes Codex no-enable through to app-server installs', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const home = path.join(root, 'home')
+    const pluginsRoot = path.join(root, 'plugins')
+    await fs.mkdir(home, { recursive: true })
+    vi.stubEnv('AGENTRIG_HOME', home)
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+    codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
+      ok: true,
+      installPath: path.join(home, '.codex', 'plugins', 'cache', 'agentrig-local', 'agentrig-regenrek-agent-skills', '1.0.0'),
+      authPolicy: 'ON_INSTALL',
+      appsNeedingAuth: [],
+    })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await installPluginProviders({
+      cwd,
+      agent: 'codex',
+      pluginsDir: pluginsRoot,
+      scope: 'personal',
+      enable: false,
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+    })
+
+    expect(codexAppServerMocks.codexInstallPlugin).toHaveBeenCalledWith(
+      expect.objectContaining({ enable: false })
+    )
+  })
+
+  it('falls back to legacy Codex writes when app-server is missing or too old', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const pluginsRoot = path.join(root, 'plugins')
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+    codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
+      ok: false,
+      reason: 'codex_too_old',
+      detail: 'Codex 0.113.0 or newer is required; detected 0.109.0.',
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const result = await installPluginProviders({
+      cwd,
+      agent: 'codex',
+      pluginsDir: pluginsRoot,
+      scope: 'workspace',
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+    })
+
+    const providerName = 'agentrig-regenrek-agent-skills'
+    expect(result[0]?.installed).toEqual([providerName])
+    await expect(readJson(path.join(cwd, '.agents', 'plugins', 'marketplace.json'))).resolves.toMatchObject({
+      plugins: [expect.objectContaining({ name: providerName })],
+    })
+  })
+
+  it('hard-fails Codex installs on app-server rpc errors', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const pluginsRoot = path.join(root, 'plugins')
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+    codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
+      ok: false,
+      reason: 'rpc_error',
+      detail: 'plugin/install failed (-32001): boom',
+    })
+
+    await expect(installPluginProviders({
+      cwd,
+      agent: 'codex',
+      pluginsDir: pluginsRoot,
+      scope: 'workspace',
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+    })).rejects.toThrow(/boom/)
   })
 
   it('claude install stages marketplace into a persistent agentrig cache and registers via that path', async () => {

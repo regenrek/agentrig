@@ -51,7 +51,7 @@ export type CodexMarketplaceConfig = {
   displayName?: string
   category?: string
   installationPolicy?: 'AVAILABLE' | 'INSTALLED_BY_DEFAULT' | 'NOT_AVAILABLE'
-  authenticationPolicy?: 'ON_INSTALL' | 'ON_FIRST_USE'
+  authenticationPolicy?: 'ON_INSTALL' | 'ON_USE'
   pluginRoot?: string
 }
 
@@ -153,6 +153,7 @@ export type PluginInstallOptions = PluginExportOptions & {
   installMetadataByPluginId: Record<string, ResolvedPluginInstallMetadata>
   force?: boolean
   dryRun?: boolean
+  enable?: boolean
   commandRunner?: ExternalCommandRunner
 }
 
@@ -172,6 +173,7 @@ export type PreparedPluginInstall = {
   clean: boolean
   force: boolean
   dryRun: boolean
+  enable: boolean
   installMetadataByPluginId: Record<string, ResolvedPluginInstallMetadata>
   requestedScope: PluginInstallScopeSelector
   providers: PreparedProviderInstall[]
@@ -216,6 +218,7 @@ export type ProviderInstallContext = {
   installMetadataByPluginId: Record<string, ResolvedPluginInstallMetadata>
   force: boolean
   dryRun: boolean
+  enable: boolean
   runner: ExternalCommandRunner
 }
 
@@ -264,7 +267,7 @@ const codexMarketplaceConfigSchema = z.object({
   displayName: optionalStringSchema,
   category: optionalStringSchema,
   installationPolicy: z.enum(['AVAILABLE', 'INSTALLED_BY_DEFAULT', 'NOT_AVAILABLE']).optional(),
-  authenticationPolicy: z.enum(['ON_INSTALL', 'ON_FIRST_USE']).optional(),
+  authenticationPolicy: z.enum(['ON_INSTALL', 'ON_USE']).optional(),
   pluginRoot: optionalStringSchema,
 }).strict()
 const cursorMarketplaceConfigSchema = z.object({

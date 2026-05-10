@@ -24,7 +24,17 @@ Refs resolve to the latest installable registry version by default; add
 agentrig plugin install codex agentrig/agentrig.core-committer --scope personal
 ```
 
-This copies plugins into `~/.codex/plugins/` and updates `~/.agents/plugins/marketplace.json`.
+With Codex `0.113.0` or newer, AgentRig asks `codex app-server` to install and
+enable the plugin automatically. If Codex is missing or older, AgentRig falls
+back to the legacy marketplace write (`~/.codex/plugins/` plus
+`~/.agents/plugins/marketplace.json`) so the plugin can still be enabled later
+from Codex.
+
+To install without enabling immediately:
+
+```bash
+agentrig plugin install codex agentrig/agentrig.core-committer --scope personal --no-enable
+```
 
 ## Install for the current repo
 
@@ -33,6 +43,8 @@ agentrig plugin install codex agentrig/agentrig.core-committer --scope workspace
 ```
 
 This writes a repo-local marketplace at `.agents/plugins/marketplace.json` and copies plugins into `./plugins/`.
+When automatic Codex app-server install is available, AgentRig stages the local
+marketplace in its persistent cache and Codex owns the enabled plugin state.
 
 ## Uninstall Codex plugins
 

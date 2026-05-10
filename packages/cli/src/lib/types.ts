@@ -108,7 +108,7 @@ export type CodexMarketplacePluginSource = {
 
 export type CodexMarketplacePluginPolicy = {
   installation: 'AVAILABLE' | 'INSTALLED_BY_DEFAULT' | 'NOT_AVAILABLE'
-  authentication: 'ON_INSTALL' | 'ON_FIRST_USE'
+  authentication: 'ON_INSTALL' | 'ON_USE'
 }
 
 export type CodexMarketplacePluginRecord = {
@@ -195,6 +195,9 @@ export type CodexPluginInstallRecord = PluginInstallRecordBase & {
     pluginPath: string
     marketplacePath: string
     marketplaceEntry: CodexMarketplacePluginRecord
+    marketplaceName?: string
+    pluginRef?: string
+    appServerInstalled?: boolean
   }
 }
 
