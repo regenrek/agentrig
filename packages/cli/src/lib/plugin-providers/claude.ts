@@ -44,21 +44,30 @@ async function stageClaudeMarketplaceForInstall(
   // matches what we just exported. Atomic replace via mkdtemp -> rename.
   const stagingParent = path.dirname(persistentRoot)
   const stagingDir = await fs.mkdtemp(path.join(stagingParent, `.${path.basename(persistentRoot)}.staging-`))
+  let backupDir: string | undefined
+  let backupPath: string | undefined
   try {
     await fs.cp(outRoot, stagingDir, { recursive: true, force: true })
     if (await pathExists(persistentRoot)) {
-      const backupDir = await fs.mkdtemp(path.join(stagingParent, `.${path.basename(persistentRoot)}.backup-`))
-      await fs.rename(persistentRoot, path.join(backupDir, path.basename(persistentRoot)))
-        .catch(async () => {
-          await fs.rm(persistentRoot, { recursive: true, force: true })
-        })
+      backupDir = await fs.mkdtemp(path.join(stagingParent, `.${path.basename(persistentRoot)}.backup-`))
+      backupPath = path.join(backupDir, path.basename(persistentRoot))
+      await fs.rename(persistentRoot, backupPath)
       await fs.rename(stagingDir, persistentRoot)
       await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {})
+      backupDir = undefined
+      backupPath = undefined
     } else {
       await fs.rename(stagingDir, persistentRoot)
     }
   } catch (error) {
     await removeIfExists(stagingDir)
+    if (backupPath && await pathExists(backupPath)) {
+      await removeIfExists(persistentRoot)
+      await fs.rename(backupPath, persistentRoot)
+    }
+    if (backupDir) {
+      await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {})
+    }
     throw error
   }
   return persistentRoot
@@ -261,6 +270,7 @@ export const claudeProvider: PluginProviderAdapter = {
     const knownClaudeEntries = [...entries, ...remainingEntries].filter(
       (entry): entry is ClaudePluginInstallRecord => entry.provider === 'claude'
     )
+    const keptEntries: ClaudePluginInstallRecord[] = []
 
     for (const entry of entries) {
       if (entry.provider !== 'claude') continue
@@ -282,9 +292,11 @@ export const claudeProvider: PluginProviderAdapter = {
           continue
         }
         kept.push(entry.pluginName)
+        keptEntries.push(entry)
       }
     }
 
+    const stillInstalledEntries = [...remainingEntries, ...keptEntries]
     const marketplacesToRemove = [...new Set(
       entries
         .filter((entry): entry is ClaudePluginInstallRecord => entry.provider === 'claude')
@@ -294,7 +306,7 @@ export const claudeProvider: PluginProviderAdapter = {
             knownClaudeEntries.some(
               (entry) => entry.metadata.marketplaceName === marketplaceName && entry.metadata.marketplaceAdded
             ) &&
-            !remainingEntries.some(
+            !stillInstalledEntries.some(
               (entry) => entry.provider === 'claude' && entry.metadata.marketplaceName === marketplaceName
             )
         )

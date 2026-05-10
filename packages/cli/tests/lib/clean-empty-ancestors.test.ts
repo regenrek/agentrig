@@ -66,6 +66,19 @@ describe('cleanEmptyAncestors', () => {
 
     await expect(fs.access(path.join(root, 'unrelated.txt'))).resolves.toBeUndefined()
   })
+
+  it('does not treat sibling prefix paths as contained in the ancestorRoot', async () => {
+    const root = await tempRoot()
+    const ancestor = path.join(root, 'plugins')
+    const siblingPrefix = path.join(root, 'plugins2', 'leaf')
+    await fs.mkdir(siblingPrefix, { recursive: true })
+    await fs.writeFile(path.join(siblingPrefix, '.DS_Store'), Buffer.alloc(0))
+
+    await cleanEmptyAncestors(siblingPrefix, ancestor, false)
+
+    await expect(fs.access(siblingPrefix)).resolves.toBeUndefined()
+    await expect(fs.access(path.join(siblingPrefix, '.DS_Store'))).resolves.toBeUndefined()
+  })
 })
 
 async function tempRoot() {

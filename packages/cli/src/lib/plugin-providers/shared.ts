@@ -711,7 +711,8 @@ export async function cleanEmptyAncestors(
 ) {
   const safeRoot = path.resolve(ancestorRoot)
   let current = path.resolve(startDir)
-  if (!current.startsWith(safeRoot)) {
+  const relative = path.relative(safeRoot, current)
+  if (relative !== '' && (relative.startsWith('..') || path.isAbsolute(relative))) {
     return
   }
   while (true) {

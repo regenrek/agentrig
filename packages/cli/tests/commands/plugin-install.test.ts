@@ -1,5 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
-import type { RegistryRef } from '../../src/lib/types'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { savePluginInstallLedger } from '../../src/lib/plugin-install-ledger'
+import type { PluginInstallRecord, RegistryRef } from '../../src/lib/types'
+
+const tempDirs: string[] = []
 
 const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
@@ -136,6 +142,11 @@ describe('command:plugin install', () => {
     ])
   })
 
+  afterEach(async () => {
+    vi.restoreAllMocks()
+    await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  })
+
   it('prepares installs from canonical latest-first registry install refs and cleans up materialized plugins', async () => {
     await run({
       args: {
@@ -163,6 +174,82 @@ describe('command:plugin install', () => {
     )
     expect(mocks.installPreparedPluginProviders).toHaveBeenCalledTimes(1)
     expect(mocks.cleanupMaterializedPlugin).toHaveBeenCalledWith('/tmp/materialized-plugins')
+  })
+
+  it('returns before resolving the install graph when the plugin is already installed without --force', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'agentrig-plugin-install-test-'))
+    tempDirs.push(root)
+    const cwd = path.join(root, 'workspace')
+    const installPath = path.join(cwd, '.codex', 'plugins', 'demo-plugin')
+    await mkdir(installPath, { recursive: true })
+    await writeFile(path.join(installPath, 'marker.txt'), 'installed')
+    const record: PluginInstallRecord = {
+      id: 'codex:workspace:demo-plugin',
+      provider: 'codex',
+      requestedScope: 'auto',
+      specIdentity: {
+        kind: 'registry',
+        registryAlias: 'agentrig',
+        registryUrl: 'https://agentrig.ai/registry',
+        pluginId: 'demo-plugin',
+        version: '1.2.3',
+      },
+      registry: {
+        registryAlias: 'agentrig',
+        registryUrl: 'https://agentrig.ai/registry',
+        sourceRepository: 'https://github.com/agentrig/agentrig-registry',
+        contractVersion: '1',
+        generatedAt: '2026-04-16T11:00:00Z',
+        signature: {
+          algorithm: 'sha256-json-envelope',
+          keyId: 'agentrig-registry',
+          signedDigest: 'sha256:registry',
+        },
+      },
+      scope: 'workspace',
+      pluginId: 'demo-plugin',
+      pluginVersion: '1.2.3',
+      snapshotDigest: 'sha256:snapshot',
+      pluginName: 'demo-plugin',
+      targetPaths: [installPath],
+      installedAt: '2026-05-10T17:59:54.123Z',
+      files: [],
+      metadata: {
+        pluginPath: installPath,
+        marketplacePath: path.join(cwd, '.codex', 'plugins', 'marketplace.json'),
+        marketplaceEntry: {
+          name: 'demo-plugin',
+          source: { source: 'local', path: './plugins/demo-plugin' },
+          policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+          category: 'productivity',
+        },
+      },
+    }
+    await savePluginInstallLedger(cwd, 'workspace', {
+      schemaVersion: 3,
+      installs: { [record.id]: record },
+      selections: {},
+    })
+
+    await expect(run({
+      args: {
+        provider: 'codex',
+        spec: 'agentrig/demo-plugin',
+        cwd,
+        scope: undefined,
+        force: false,
+        dryRun: false,
+        help: false,
+      },
+    })).resolves.toBeUndefined()
+
+    expect(console.log).toHaveBeenCalledWith(
+      `Already installed: demo-plugin@1.2.3 (codex, workspace) at ${installPath}.`
+    )
+    expect(console.log).toHaveBeenCalledWith('Use --force to reinstall.')
+    expect(mocks.loadConfig).not.toHaveBeenCalled()
+    expect(mocks.resolvePluginGraph).not.toHaveBeenCalled()
+    expect(mocks.materializeResolvedPluginGraph).not.toHaveBeenCalled()
   })
 
   it('fails fast when materialization rejects a resolved install bundle', async () => {
