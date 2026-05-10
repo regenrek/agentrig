@@ -234,10 +234,13 @@ describe('plugin provider command runner', () => {
     )
   })
 
-  it('falls back to legacy Codex writes when app-server is missing or too old', async () => {
+  it('falls back to direct Codex cache writes when app-server is missing or too old', async () => {
     const root = await tempRoot()
     const cwd = path.join(root, 'workspace')
+    const home = path.join(root, 'home')
     const pluginsRoot = path.join(root, 'plugins')
+    await fs.mkdir(home, { recursive: true })
+    vi.stubEnv('AGENTRIG_HOME', home)
     await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
     codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
       ok: false,
@@ -250,7 +253,7 @@ describe('plugin provider command runner', () => {
       cwd,
       agent: 'codex',
       pluginsDir: pluginsRoot,
-      scope: 'workspace',
+      scope: 'personal',
       installMetadataByPluginId: {
         'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
       },
@@ -258,8 +261,17 @@ describe('plugin provider command runner', () => {
 
     const providerName = 'agentrig-regenrek-agent-skills'
     expect(result[0]?.installed).toEqual([providerName])
-    await expect(readJson(path.join(cwd, '.agents', 'plugins', 'marketplace.json'))).resolves.toMatchObject({
-      plugins: [expect.objectContaining({ name: providerName })],
+    const cachePath = path.join(home, '.codex', 'plugins', 'cache', 'agentrig-local', providerName, '1.0.0')
+    await expect(readJson(path.join(cachePath, '.codex-plugin', 'plugin.json'))).resolves.toMatchObject({
+      name: providerName,
+    })
+    await expect(readJson(path.join(home, '.agents', 'plugins', 'marketplace.json'))).resolves.toMatchObject({
+      plugins: [
+        expect.objectContaining({
+          name: providerName,
+          source: { source: 'local', path: `./.codex/plugins/cache/agentrig-local/${providerName}/1.0.0` },
+        }),
+      ],
     })
   })
 
