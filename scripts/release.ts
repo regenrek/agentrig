@@ -40,11 +40,20 @@ function ensureCleanWorkingTree(repoRoot: string) {
 function ensureOnBranch(repoRoot: string, branch: string) {
   const current = runCapture("git", ["branch", "--show-current"], repoRoot);
   if (current !== branch) {
-    const allowed = process.env.ALLOW_NON_MAIN === "1" || process.env.ALLOW_NON_MAIN === "true";
+    const allowed = allowNonMainOverride(process.env.ALLOW_NON_MAIN);
     if (!allowed) {
       throw new Error(`Refusing to release from branch "${current}". Checkout "${branch}" or set ALLOW_NON_MAIN=1.`);
     }
   }
+}
+
+export function allowNonMainOverride(value: string | undefined): boolean {
+  if (value === undefined || value === "") return false;
+  if (value === "1") return true;
+  if (value === "true") {
+    throw new Error("ALLOW_NON_MAIN=true is not supported. Set ALLOW_NON_MAIN=1 to release away from main.");
+  }
+  return false;
 }
 
 export type VersionBump =
@@ -141,10 +150,18 @@ async function releasePackages(bump: VersionBump) {
   stageReleaseFiles(repoRoot);
   createGitCommitTagAndPush(repoRoot, newVersion);
 
+  const releaseStartedAt = new Date(Date.now() - 5_000);
   try {
     createGithubRelease(repoRoot, newVersion);
+    await waitForNpmReleaseWorkflow(repoRoot, releaseStartedAt);
   } catch (e) {
-    console.warn("Skipping GitHub Release creation:", e);
+    const notesFile = releaseNotesFilePath(newVersion);
+    console.error(
+      `Tag was pushed but Release was not created. Run \`${formatGhReleaseCreateCommand(newVersion, notesFile)}\` to recover, then trigger npm publish via \`workflow_dispatch\`.`,
+    );
+    console.error(`Recovery command: ${formatGhReleaseCreateCommand(newVersion, notesFile)}`);
+    console.error(e);
+    process.exit(1);
   }
 }
 
@@ -190,6 +207,16 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_./:@-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+export function formatGhReleaseCreateCommand(version: string, notesFile: string): string {
+  const tag = version.startsWith("v") ? version : `v${version}`;
+  return `gh release create ${tag} --notes-file ${shellQuote(notesFile)}`;
+}
+
 export function extractChangelogSection(
   changelogText: string,
   versionLike: string,
@@ -197,11 +224,17 @@ export function extractChangelogSection(
   const text = changelogText;
   const lines = text.split(/\r?\n/);
 
-  const headerRe = new RegExp(`^## \\[${escapeRegExp(versionLike)}\\](?:\\s|$)`);
+  const headerRe = new RegExp(`^## \\[${escapeRegExp(versionLike)}\\] - \\d{4}-\\d{2}-\\d{2}$`);
+  const malformedHeaderRe = new RegExp(`^## \\[${escapeRegExp(versionLike)}\\](?:\\s|$)`);
   const nextHeaderRe = /^## \[/;
 
   const start = lines.findIndex((l) => headerRe.test(l));
-  if (start === -1) return null;
+  if (start === -1) {
+    if (lines.some((l) => malformedHeaderRe.test(l))) {
+      throw new Error(`CHANGELOG.md section for ${versionLike} is malformed. Expected header: ## [${versionLike}] - YYYY-MM-DD`);
+    }
+    return null;
+  }
 
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
@@ -233,7 +266,7 @@ function ghReleaseExists(tag: string): boolean {
 }
 
 function createGithubRelease(repoRoot: string, version: string) {
-  if (!hasGhCLI()) return;
+  if (!hasGhCLI()) throw new Error("GitHub CLI not found; cannot create GitHub Release.");
   const tag = `v${version}`;
   const title = `${CLI_NAME} ${tag}`;
   let notes: string | undefined = changelogSection(repoRoot, version) ?? undefined;
@@ -243,8 +276,8 @@ function createGithubRelease(repoRoot: string, version: string) {
     notes = changelogSection(repoRoot, alt) ?? undefined;
   }
 
-  const tmp = path.join(os.tmpdir(), `release-notes-${version}.md`);
-  if (notes) fs.writeFileSync(tmp, notes);
+  const tmp = releaseNotesFilePath(version);
+  fs.writeFileSync(tmp, notes ?? `Release ${tag}\n`);
 
   const exists = ghReleaseExists(tag);
   console.log(`${exists ? "Updating" : "Creating"} GitHub Release ${tag}...`);
@@ -254,4 +287,43 @@ function createGithubRelease(repoRoot: string, version: string) {
   if (notes) args.push("--notes-file", tmp);
   else args.push("--generate-notes");
   execFileSync("gh", args, { stdio: "inherit", cwd: repoRoot });
+}
+
+function releaseNotesFilePath(version: string): string {
+  return path.join(os.tmpdir(), `release-notes-${version}.md`);
+}
+
+async function waitForNpmReleaseWorkflow(repoRoot: string, startedAfter: Date) {
+  if (!hasGhCLI()) {
+    console.warn("GitHub CLI not found; skipping npm-release.yml workflow start check.");
+    return;
+  }
+
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    try {
+      const raw = runCapture("gh", [
+        "run",
+        "list",
+        "--workflow=npm-release.yml",
+        "--limit",
+        "1",
+        "--json",
+        "databaseId,createdAt,event,status,conclusion,url",
+      ], repoRoot);
+      const runs = JSON.parse(raw) as Array<{ createdAt?: string; url?: string; status?: string }>;
+      const latest = runs[0];
+      if (latest?.createdAt && new Date(latest.createdAt).getTime() >= startedAfter.getTime()) {
+        console.log(`npm-release.yml workflow started: ${latest.url ?? latest.status ?? latest.createdAt}`);
+        return;
+      }
+    } catch (error) {
+      console.warn("Could not check npm-release.yml workflow start:", error);
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, Math.min(5_000, deadline - Date.now())));
+  }
+
+  console.warn("npm-release.yml workflow did not appear within 90s after GitHub Release creation. If it does not start, trigger it with workflow_dispatch.");
 }

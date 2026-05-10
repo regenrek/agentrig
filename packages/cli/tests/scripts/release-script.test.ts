@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  allowNonMainOverride,
   bumpSemver,
   extractChangelogSection,
+  formatGhReleaseCreateCommand,
   parseVersionBumpArg,
 } from "../../../../scripts/release";
 
@@ -29,6 +31,13 @@ describe("scripts/release", () => {
     expect(bumpSemver("0.1.0", "major")).toBe("1.0.0");
   });
 
+  it("accepts only ALLOW_NON_MAIN=1", () => {
+    expect(allowNonMainOverride("1")).toBe(true);
+    expect(allowNonMainOverride(undefined)).toBe(false);
+    expect(allowNonMainOverride("0")).toBe(false);
+    expect(() => allowNonMainOverride("true")).toThrow(/ALLOW_NON_MAIN=true is not supported/);
+  });
+
   it("extracts a changelog section", () => {
     const text = [
       "# Changelog",
@@ -46,5 +55,26 @@ describe("scripts/release", () => {
     expect(section).toContain("## [0.2.0]");
     expect(section).toContain("Feature X");
     expect(section).not.toContain("## [0.1.9]");
+  });
+
+  it("rejects malformed changelog headers for the requested version", () => {
+    const text = [
+      "# Changelog",
+      "",
+      "## [0.2.0]",
+      "- Missing date",
+      "",
+    ].join("\n");
+
+    expect(() => extractChangelogSection(text, "0.2.0")).toThrow(/Expected header: ## \[0\.2\.0\] - YYYY-MM-DD/);
+  });
+
+  it("formats a recoverable GitHub Release create command", () => {
+    expect(formatGhReleaseCreateCommand("0.7.2", "/tmp/release-notes-0.7.2.md")).toBe(
+      "gh release create v0.7.2 --notes-file /tmp/release-notes-0.7.2.md",
+    );
+    expect(formatGhReleaseCreateCommand("v0.7.2", "/tmp/release notes.md")).toBe(
+      "gh release create v0.7.2 --notes-file '/tmp/release notes.md'",
+    );
   });
 });
