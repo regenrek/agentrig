@@ -132,6 +132,64 @@ describe('plugin provider command runner', () => {
       },
     })
   })
+
+  it('claude install stages marketplace into a persistent agentrig cache and registers via that path', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const home = path.join(root, 'home')
+    const pluginsRoot = path.join(root, 'plugins')
+    await fs.mkdir(home, { recursive: true })
+    vi.stubEnv('AGENTRIG_HOME', home)
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+
+    const runnerCalls: Array<{ command: string; args: string[] }> = []
+    const recordingRunner = async (command: string, args: string[]) => {
+      runnerCalls.push({ command, args })
+    }
+
+    const installResults = await installPluginProviders({
+      cwd,
+      agent: 'claude',
+      pluginsDir: pluginsRoot,
+      scope: 'personal',
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+      commandRunner: recordingRunner,
+    })
+
+    const providerName = 'agentrig-regenrek-agent-skills'
+    const persistentRoot = path.join(home, '.agentrig', 'cache', 'claude-marketplaces', 'agentrig-community')
+
+    // Persistent staging exists with the rendered marketplace contents.
+    await expect(fs.access(persistentRoot)).resolves.toBeUndefined()
+    await expect(fs.access(path.join(persistentRoot, '.claude-plugin', 'marketplace.json'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(persistentRoot, 'plugins', providerName, '.claude-plugin', 'plugin.json'))).resolves.toBeUndefined()
+
+    // The Claude CLI was invoked against the persistent path, never /tmp.
+    const marketplaceAddCall = runnerCalls.find(
+      (call) => call.command === 'claude' && call.args[0] === 'plugin' && call.args[1] === 'marketplace' && call.args[2] === 'add'
+    )
+    expect(marketplaceAddCall).toBeDefined()
+    expect(marketplaceAddCall?.args[3]).toBe(persistentRoot)
+    expect(marketplaceAddCall?.args[3].startsWith('/tmp/')).toBe(false)
+
+    expect(installResults[0]?.installed).toEqual([providerName])
+    expect(installResults[0]?.locations).toEqual([persistentRoot])
+
+    const ledgers = await loadPluginInstallLedgers(cwd)
+    const ledgerRecord = Object.values(ledgers.personal.installs)[0]
+    expect(ledgerRecord).toMatchObject({
+      provider: 'claude',
+      pluginId: 'regenrek.agent-skills',
+      pluginName: providerName,
+      targetPaths: [persistentRoot],
+      metadata: {
+        marketplaceName: 'agentrig-community',
+        marketplaceSourcePath: persistentRoot,
+      },
+    })
+  })
 })
 
 async function tempRoot() {

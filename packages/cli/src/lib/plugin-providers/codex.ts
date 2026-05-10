@@ -23,6 +23,7 @@ import {
   type CodexPluginManifest,
 } from './schemas'
 import {
+  cleanEmptyAncestors,
   copyEntries,
   copyInstalledPlugin,
   detectPluginFeatures,
@@ -494,6 +495,13 @@ export const codexProvider: PluginProviderAdapter = {
         clearedRecordIds.push(entry.id)
       } else {
         kept.push(entry.pluginName)
+      }
+
+      if (outcome !== 'kept' && !dryRun) {
+        // Strip residual `.DS_Store` and empty parent dirs left behind by file
+        // removal. We bound the ancestor walk to the codex plugin root so we
+        // never touch user-owned siblings outside the agentrig-managed scope.
+        await cleanEmptyAncestors(pluginPath, pluginRoot, dryRun).catch(() => {})
       }
     }
 
