@@ -1,23 +1,14 @@
 # Changelog
 
-## [0.7.4] - 2026-05-10
+## [0.7.5] - 2026-05-10
 
-### Fixed
-- **Claude marketplace registration is now persistent.** Previously `agentrig plugin install claude …` registered the marketplace from a `/tmp/agentrig-plugins-XXXXX` directory that got cleaned up immediately after install, so subsequent `claude plugin list` runs printed `Status: ✘ failed to load — Plugin … not found in marketplace agentrig-community`. The CLI now stages the rendered Claude marketplace into a stable persistent path under `<agentRigHome>/.agentrig/cache/claude-marketplaces/<marketplaceName>/` before calling `claude plugin marketplace add`. The Claude install ledger now records that persistent path, and `claude plugin marketplace remove` cleans up the persistent staging dir on uninstall.
-- **Self-heal for pre-0.7.4 Claude installs.** On `agentrig plugin install` and `agentrig list`, the CLI now detects ledger entries whose `marketplaceSourcePath` points at a stale `/tmp/agentrig-plugins-…` (or other tmpdir) location and rewrites both the install ledger and `~/.claude/plugins/known_marketplaces.json` to the new persistent path. If no persistent staging exists for the marketplace, a clear warning is printed asking the user to re-run the install with `--force`.
-- **Re-installing without `--force` is now a graceful no-op** instead of a non-deterministic "Install bundle hash verification failed" error. `agentrig plugin install <provider> <pluginId>` checks the install ledger first and prints `Already installed at <path>. Use --force to reinstall.` when the same `pluginId` is already registered for the requested provider/scope. Stale ledger entries (target path missing) are ignored so the normal install path can heal them.
-- **Plugin uninstall no longer leaves residual `.DS_Store` files or empty parent directories.** Provider uninstall paths now share a `cleanEmptyAncestors(installRoot, ancestorRoot)` helper that walks upward from the removed plugin directory toward the provider-owned ancestor root, deleting `.DS_Store` files and any directories that become empty. Cursor's uninstall now also runs the cleanup pass, matching Codex/Claude.
-- **`agentrig list` now shows installed skill / mcp / hook selections.** Standalone `agentrig skill install …` (and the MCP/hook variants) write to the existing `selections` ledger; `agentrig list` previously only rendered the `installs` ledger and skipped them. The list output now has a dedicated "Installed skill/mcp/hook selections" section that prints the kind, plugin id, version, provider, scope, and selected selectors for each entry.
+### Added
+- Codex plugin installs now use `codex app-server --listen stdio://` to install and enable AgentRig plugins automatically, so new installs no longer require toggling the plugin in the Codex TUI.
+- Added `agentrig plugin install codex ... --no-enable` to install a Codex plugin while leaving it disabled for manual opt-in under `/plugins`.
 
-### Deferred (tracked separately)
-- **Codex `~/.codex/config.toml` mutation + cache placement is not in this release.** Marking a plugin as "Installed" in the Codex TUI (so the marketplace counter shows `Installed N of M` instead of `Installed 0 of M`) requires writing both `[marketplaces.<name>]` and `[plugins."<plugin>@<marketplace>"]` entries to `~/.codex/config.toml` and copying the plugin payload into `~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/`. That change adds a direct TOML editing dependency, mutates user config, and needs migration of pre-0.7.4 Codex installs that currently live at the wrong path. It is being scoped as a follow-up PR (`fix/codex-installed-state`) on top of `fix/native-install-state` so the TOML edit path can land with its own dedicated test surface and backup/rollback semantics.
-
-## [0.7.3] - 2026-05-10
-
-### Fixed
-- Provider plugin installs now sanitize canonical dotted AgentRig artifact IDs at the Codex, Claude, and Cursor provider boundary. For example, `regenrek.agent-skills` installs as `agentrig-regenrek-agent-skills` while the install ledger keeps the canonical `artifactId` for uninstall tracking.
-- Codex marketplace entries and `.codex-plugin/plugin.json` manifests no longer use dotted plugin names, preventing Codex from silently dropping AgentRig Local marketplace entries.
-- Provider uninstall now resolves plugin directories from AgentRig ledger metadata and prunes residual `.DS_Store` files from removed plugin trees.
+### Changed
+- Codex installs now stage local marketplaces under the persistent AgentRig cache before handing them to Codex. If Codex is missing or older than `0.113.0`, the CLI falls back to the legacy direct marketplace write and explains how to upgrade for automatic enablement.
+- Codex uninstalls now try Codex app-server first and preserve the legacy direct cleanup fallback when automatic uninstall is unavailable.
 
 ## [0.7.2] - 2026-05-10
 

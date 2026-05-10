@@ -17,3 +17,7 @@ export function getAgentRigCacheDir() {
 export function getClaudeMarketplaceCacheRoot(marketplaceName: string) {
   return path.join(getAgentRigCacheDir(), 'claude-marketplaces', marketplaceName)
 }
+
+export function getCodexMarketplaceCacheRoot(marketplaceName: string) {
+  return path.join(getAgentRigCacheDir(), 'codex-marketplaces', marketplaceName)
+}

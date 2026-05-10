@@ -87,7 +87,7 @@ export const codexMarketplacePluginSchema = z
     }),
     policy: z.strictObject({
       installation: z.enum(['AVAILABLE', 'INSTALLED_BY_DEFAULT', 'NOT_AVAILABLE']),
-      authentication: z.enum(['ON_INSTALL', 'ON_FIRST_USE']),
+      authentication: z.enum(['ON_INSTALL', 'ON_USE']),
     }),
     category: nonEmptyStringSchema,
   })

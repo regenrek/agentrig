@@ -70,6 +70,11 @@ const command = defineCommand({
       description: 'Show what would be installed without writing files or invoking provider CLIs.',
       default: false,
     },
+    noEnable: {
+      type: 'boolean',
+      description: 'Codex only: install the plugin but leave it disabled.',
+      default: false,
+    },
     help: {
       type: 'boolean',
       alias: 'h',
@@ -134,6 +139,7 @@ const command = defineCommand({
         scope,
         force: args.force,
         dryRun: args.dryRun,
+        enable: !args.noEnable,
       })
 
       printInstallPlanSummary(plan)

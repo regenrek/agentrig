@@ -102,6 +102,9 @@ const codexPluginInstallRecordSchema = pluginInstallRecordBaseSchema.extend({
     pluginPath: z.string().min(1),
     marketplacePath: z.string().min(1),
     marketplaceEntry: codexMarketplacePluginSchema,
+    marketplaceName: z.string().min(1).optional(),
+    pluginRef: z.string().min(1).optional(),
+    appServerInstalled: z.boolean().optional(),
   }),
 })
 const cursorPluginInstallRecordSchema = pluginInstallRecordBaseSchema.extend({
