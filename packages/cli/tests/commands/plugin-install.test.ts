@@ -180,11 +180,11 @@ describe('command:plugin install', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'agentrig-plugin-install-test-'))
     tempDirs.push(root)
     const cwd = path.join(root, 'workspace')
-    const installPath = path.join(cwd, '.codex', 'plugins', 'demo-plugin')
+    const installPath = path.join(cwd, '.codex', 'plugins', 'cache', 'agentrig-local', 'demo-plugin', '1.2.3')
     await mkdir(installPath, { recursive: true })
     await writeFile(path.join(installPath, 'marker.txt'), 'installed')
     const record: PluginInstallRecord = {
-      id: 'codex:workspace:demo-plugin',
+      id: 'codex:personal:demo-plugin',
       provider: 'codex',
       requestedScope: 'auto',
       specIdentity: {
@@ -206,7 +206,7 @@ describe('command:plugin install', () => {
           signedDigest: 'sha256:registry',
         },
       },
-      scope: 'workspace',
+      scope: 'personal',
       pluginId: 'demo-plugin',
       pluginVersion: '1.2.3',
       snapshotDigest: 'sha256:snapshot',
@@ -216,7 +216,10 @@ describe('command:plugin install', () => {
       files: [],
       metadata: {
         pluginPath: installPath,
-        marketplacePath: path.join(cwd, '.codex', 'plugins', 'marketplace.json'),
+        marketplacePath: path.join(cwd, '.agentrig', 'cache', 'codex-marketplaces', 'agentrig-local', '.agents', 'plugins', 'marketplace.json'),
+        marketplaceName: 'agentrig-local',
+        pluginRef: 'demo-plugin@agentrig-local',
+        appServerInstalled: true,
         marketplaceEntry: {
           name: 'demo-plugin',
           source: { source: 'local', path: './plugins/demo-plugin' },
@@ -225,7 +228,7 @@ describe('command:plugin install', () => {
         },
       },
     }
-    await savePluginInstallLedger(cwd, 'workspace', {
+    await savePluginInstallLedger(cwd, 'personal', {
       schemaVersion: 3,
       installs: { [record.id]: record },
       selections: {},
@@ -244,7 +247,7 @@ describe('command:plugin install', () => {
     })).resolves.toBeUndefined()
 
     expect(console.log).toHaveBeenCalledWith(
-      `Already installed: demo-plugin@1.2.3 (codex, workspace) at ${installPath}.`
+      `Already installed: demo-plugin@1.2.3 (codex, personal) at ${installPath}.`
     )
     expect(console.log).toHaveBeenCalledWith('Use --force to reinstall.')
     expect(mocks.loadConfig).not.toHaveBeenCalled()

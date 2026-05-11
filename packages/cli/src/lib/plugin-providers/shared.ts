@@ -348,7 +348,7 @@ export function resolveInstallScope(
   requestedScope: PluginInstallScopeSelector = 'auto'
 ): PluginInstallScope {
   if (requestedScope !== 'auto') return requestedScope
-  return provider === 'cursor' ? 'personal' : 'workspace'
+  return provider === 'claude' ? 'workspace' : 'personal'
 }
 
 export function toPosixPath(value: string) {

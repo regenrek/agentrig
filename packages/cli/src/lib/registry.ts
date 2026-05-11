@@ -248,7 +248,7 @@ export async function readInstallBundleFile(
 ): Promise<Uint8Array> {
   const url = installBundleFileUrl(bundle, file)
   const res = await fetchWithTimeout(url, {})
-  if (!res.ok) throw new Error(`Request failed (${res.status}) for ${url}`)
+  if (!res.ok) throw new InstallBundleFileFetchError(url, res.status)
   return new Uint8Array(await res.arrayBuffer())
 }
 
@@ -278,6 +278,15 @@ export async function fetchInstallBundleFiles(bundle: InstallBundle): Promise<Fe
           bytes: await readInstallBundleFile(bundle, file),
         }
       } catch (error) {
+        if (error instanceof InstallBundleFileFetchError) {
+          return {
+            path: file.path,
+            missing: true,
+            error: error.message,
+            status: error.status,
+            url: error.url,
+          }
+        }
         return {
           path: file.path,
           missing: true,
@@ -286,6 +295,13 @@ export async function fetchInstallBundleFiles(bundle: InstallBundle): Promise<Fe
       }
     })
   )
+}
+
+class InstallBundleFileFetchError extends Error {
+  constructor(readonly url: string, readonly status: number) {
+    super(`Request failed (${status}) for ${url}`)
+    this.name = 'InstallBundleFileFetchError'
+  }
 }
 
 function decodeBase64(value: string): Uint8Array {

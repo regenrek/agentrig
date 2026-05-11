@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
@@ -221,8 +221,25 @@ describe('install bundle resolution and materialization', () => {
     const writeFile = vi.spyOn(fs, 'writeFile')
 
     await expect(materializeResolvedPluginGraph(graph))
-      .rejects.toThrow(/skills\/typescript\/SKILL\.md: missing/)
+      .rejects.toThrow(/Failed to fetch skills\/typescript\/SKILL\.md: HTTP 404/)
     expect(writeFile).not.toHaveBeenCalled()
+  })
+
+  it('reports GitHub raw rate limits as fetch failures instead of bundle corruption', async () => {
+    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const skill = '# TypeScript skill\n'
+    const current = bundle('https://raw.githubusercontent.com/acme/repo/main', pluginJson, skill)
+
+    await expect(verifyFetchedInstallBundleFiles(current, [
+      { path: '.plugin/plugin.json', bytes: pluginJson },
+      {
+        path: 'skills/typescript/SKILL.md',
+        missing: true,
+        error: 'Request failed (429) for https://raw.githubusercontent.com/acme/repo/main/skills/typescript/SKILL.md',
+        status: 429,
+        url: 'https://raw.githubusercontent.com/acme/repo/main/skills/typescript/SKILL.md',
+      },
+    ])).rejects.toThrow(/Failed to fetch skills\/typescript\/SKILL\.md: HTTP 429 \(rate-limited by github\.com\).*GITHUB_TOKEN/)
   })
 
   it('aborts before writing when fetched install files include an unlisted extra file', async () => {

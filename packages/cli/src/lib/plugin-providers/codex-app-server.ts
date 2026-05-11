@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import * as fsSync from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
@@ -27,6 +28,10 @@ type CodexUninstallResult =
   | { ok: false; reason: 'codex_not_installed' | 'codex_too_old' | 'rpc_error' | 'timeout'; detail: string }
 
 type JsonObject = Record<string, unknown>
+type CodexBinaryResolverOptions = {
+  fileSystem?: Pick<typeof fsSync, 'existsSync' | 'accessSync'>
+  resolveBinary?: () => string | null
+}
 
 type PendingRequest = {
   method: string
@@ -101,8 +106,8 @@ class CodexAppServerClient {
   private readonly exitWaiters = new Set<() => void>()
   private codexVersion: string | undefined
 
-  constructor() {
-    this.child = spawn('codex', ['app-server', '--listen', 'stdio://'], {
+  constructor(codexBinary: string) {
+    this.child = spawn(codexBinary, ['app-server', '--listen', 'stdio://'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env,
     })
@@ -344,8 +349,15 @@ class CodexAppServerClient {
   }
 }
 
-export async function codexInstallPlugin(params: CodexInstallParams): Promise<CodexInstallResult> {
-  const client = new CodexAppServerClient()
+export async function codexInstallPlugin(
+  params: CodexInstallParams,
+  options: CodexBinaryResolverOptions = {}
+): Promise<CodexInstallResult> {
+  const codexBinary = (options.resolveBinary ?? resolveCodexBinary)()
+  if (!codexBinary) {
+    return codexFailure(new CodexUnavailableError('Codex CLI is not installed or not executable.'))
+  }
+  const client = new CodexAppServerClient(codexBinary)
   try {
     await client.initialize()
     const result = await client.install(params)
@@ -360,8 +372,12 @@ export async function codexInstallPlugin(params: CodexInstallParams): Promise<Co
 export async function codexUninstallPlugin(params: {
   marketplaceName: string
   pluginName: string
-}): Promise<CodexUninstallResult> {
-  const client = new CodexAppServerClient()
+}, options: CodexBinaryResolverOptions = {}): Promise<CodexUninstallResult> {
+  const codexBinary = (options.resolveBinary ?? resolveCodexBinary)()
+  if (!codexBinary) {
+    return codexFailure(new CodexUnavailableError('Codex CLI is not installed or not executable.'))
+  }
+  const client = new CodexAppServerClient(codexBinary)
   try {
     await client.initialize()
     await client.uninstall(params)
@@ -371,6 +387,13 @@ export async function codexUninstallPlugin(params: {
   } finally {
     await client.close().catch(() => {})
   }
+}
+
+export function resolveCodexBinary(options: CodexBinaryResolverOptions = {}): string | null {
+  for (const candidate of pathCandidates()) {
+    if (isExecutableFile(candidate, options.fileSystem ?? fsSync)) return candidate
+  }
+  return null
 }
 
 function codexFailure(error: unknown): Exclude<CodexInstallResult, { ok: true }> {
@@ -399,6 +422,28 @@ function codexFailure(error: unknown): Exclude<CodexInstallResult, { ok: true }>
     ok: false,
     reason: 'rpc_error',
     detail: error instanceof Error ? error.message : String(error),
+  }
+}
+
+function pathCandidates() {
+  const pathEntries = (process.env.PATH ?? '')
+    .split(path.delimiter)
+    .filter((entry) => entry.trim().length > 0)
+    .map((entry) => path.join(entry, 'codex'))
+  return [
+    ...pathEntries,
+    '/Applications/Codex.app/Contents/Resources/codex',
+    path.join(homedir(), 'Applications', 'Codex.app', 'Contents', 'Resources', 'codex'),
+  ]
+}
+
+function isExecutableFile(candidate: string, fileSystem: Pick<typeof fsSync, 'existsSync' | 'accessSync'>) {
+  if (!fileSystem.existsSync(candidate)) return false
+  try {
+    fileSystem.accessSync(candidate, fsSync.constants.X_OK)
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -465,4 +510,5 @@ export const __testing = {
   readCodexVersionFromUserAgent,
   compareVersions,
   deriveCodexInstallPath,
+  resolveCodexBinary,
 }

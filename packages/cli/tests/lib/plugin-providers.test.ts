@@ -15,7 +15,7 @@ import { installPluginProviders, uninstallPluginProviders } from '../../src/lib/
 import { loadPluginInstallLedgers, savePluginInstallLedger } from '../../src/lib/plugin-install-ledger'
 import { defaultCommandRunner } from '../../src/lib/plugin-providers/shared'
 import type { ResolvedPluginInstallMetadata } from '../../src/lib/plugin-providers/shared'
-import type { ClaudePluginInstallRecord, PluginInstallRecord } from '../../src/lib/types'
+import type { ClaudePluginInstallRecord, CodexPluginInstallRecord, PluginInstallRecord } from '../../src/lib/types'
 
 const tempDirs: string[] = []
 const originalHome = process.env.HOME
@@ -107,19 +107,24 @@ describe('plugin provider command runner', () => {
   it('installs dotted artifact IDs into Codex with provider-safe plugin names', async () => {
     const root = await tempRoot()
     const cwd = path.join(root, 'workspace')
+    const home = path.join(root, 'home')
     const pluginsRoot = path.join(root, 'plugins')
+    await fs.mkdir(home, { recursive: true })
+    vi.stubEnv('AGENTRIG_HOME', home)
     await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
     codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
-      ok: false,
-      reason: 'codex_not_installed',
-      detail: 'missing codex',
+      ok: true,
+      installPath: path.join(home, '.codex', 'plugins', 'cache', 'agentrig-local', 'agentrig-regenrek-agent-skills', '1.0.0'),
+      authPolicy: 'ON_INSTALL',
+      appsNeedingAuth: [],
     })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
 
     const result = await installPluginProviders({
       cwd,
       agent: 'codex',
       pluginsDir: pluginsRoot,
-      scope: 'workspace',
+      scope: 'personal',
       installMetadataByPluginId: {
         'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
       },
@@ -127,19 +132,11 @@ describe('plugin provider command runner', () => {
 
     const providerName = 'agentrig-regenrek-agent-skills'
     expect(result[0]?.installed).toEqual([providerName])
-    await expect(readJson(path.join(cwd, 'plugins', providerName, '.codex-plugin', 'plugin.json'))).resolves.toMatchObject({
-      name: providerName,
-    })
-    await expect(readJson(path.join(cwd, '.agents', 'plugins', 'marketplace.json'))).resolves.toMatchObject({
-      plugins: [
-        expect.objectContaining({
-          name: providerName,
-          source: { source: 'local', path: `./plugins/${providerName}` },
-        }),
-      ],
-    })
+    expect(codexAppServerMocks.codexInstallPlugin).toHaveBeenCalledWith(expect.objectContaining({
+      pluginName: providerName,
+    }))
     const ledgers = await loadPluginInstallLedgers(cwd)
-    expect(Object.values(ledgers.workspace.installs)[0]).toMatchObject({
+    expect(Object.values(ledgers.personal.installs)[0]).toMatchObject({
       pluginId: 'regenrek.agent-skills',
       pluginName: providerName,
       specIdentity: {
@@ -234,7 +231,33 @@ describe('plugin provider command runner', () => {
     )
   })
 
-  it('falls back to direct Codex cache writes when app-server is missing or too old', async () => {
+  it('requires Codex CLI when app-server is missing', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const home = path.join(root, 'home')
+    const pluginsRoot = path.join(root, 'plugins')
+    await fs.mkdir(home, { recursive: true })
+    vi.stubEnv('AGENTRIG_HOME', home)
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+    codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
+      ok: false,
+      reason: 'codex_not_installed',
+      detail: 'missing codex',
+    })
+
+    await expect(installPluginProviders({
+      cwd,
+      agent: 'codex',
+      pluginsDir: pluginsRoot,
+      scope: 'personal',
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+    })).rejects.toThrow(/Codex CLI >= 0\.113\.0 is required/)
+    await expect(fs.access(path.join(home, '.agents', 'plugins', 'marketplace.json'))).rejects.toThrow()
+  })
+
+  it('requires Codex CLI when app-server is too old', async () => {
     const root = await tempRoot()
     const cwd = path.join(root, 'workspace')
     const home = path.join(root, 'home')
@@ -247,9 +270,8 @@ describe('plugin provider command runner', () => {
       reason: 'codex_too_old',
       detail: 'Codex 0.113.0 or newer is required; detected 0.109.0.',
     })
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-    const result = await installPluginProviders({
+    await expect(installPluginProviders({
       cwd,
       agent: 'codex',
       pluginsDir: pluginsRoot,
@@ -257,22 +279,61 @@ describe('plugin provider command runner', () => {
       installMetadataByPluginId: {
         'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
       },
-    })
+    })).rejects.toThrow(/AgentRig does not edit ~\/\.agents\/plugins\/marketplace\.json directly/)
+  })
 
-    const providerName = 'agentrig-regenrek-agent-skills'
-    expect(result[0]?.installed).toEqual([providerName])
-    const cachePath = path.join(home, '.codex', 'plugins', 'cache', 'agentrig-local', providerName, '1.0.0')
-    await expect(readJson(path.join(cachePath, '.codex-plugin', 'plugin.json'))).resolves.toMatchObject({
-      name: providerName,
-    })
-    await expect(readJson(path.join(home, '.agents', 'plugins', 'marketplace.json'))).resolves.toMatchObject({
-      plugins: [
-        expect.objectContaining({
-          name: providerName,
-          source: { source: 'local', path: `./.codex/plugins/cache/agentrig-local/${providerName}/1.0.0` },
-        }),
-      ],
-    })
+  it('rejects workspace-scoped Codex plugin installs', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const pluginsRoot = path.join(root, 'plugins')
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+
+    await expect(installPluginProviders({
+      cwd,
+      agent: 'codex',
+      pluginsDir: pluginsRoot,
+      scope: 'workspace',
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+    })).rejects.toThrow(/Codex plugins only support --scope personal/)
+    expect(codexAppServerMocks.codexInstallPlugin).not.toHaveBeenCalled()
+  })
+
+  it('rejects workspace-scoped Codex plugin uninstalls', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const record: CodexPluginInstallRecord = {
+      id: 'codex:workspace:agentrig-regenrek-agent-skills',
+      provider: 'codex',
+      requestedScope: 'workspace',
+      specIdentity: installMetadata('regenrek.agent-skills').specIdentity,
+      scope: 'workspace',
+      pluginId: 'regenrek.agent-skills',
+      pluginVersion: '1.0.0',
+      snapshotDigest: 'b'.repeat(64),
+      pluginName: 'agentrig-regenrek-agent-skills',
+      targetPaths: ['/tmp/codex-plugin'],
+      installedAt: '2026-05-10T17:59:54.123Z',
+      files: [],
+      metadata: {
+        pluginPath: '/tmp/codex-plugin',
+        marketplacePath: '/tmp/marketplace.json',
+        marketplaceName: 'agentrig-local',
+        pluginRef: 'agentrig-regenrek-agent-skills@agentrig-local',
+        appServerInstalled: true,
+        marketplaceEntry: {
+          name: 'agentrig-regenrek-agent-skills',
+          source: { source: 'local', path: './plugins/agentrig-regenrek-agent-skills' },
+          policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+          category: 'productivity',
+        },
+      },
+    }
+
+    await expect(uninstallPluginProviders([record], { cwd }))
+      .rejects.toThrow(/Codex plugins only support --scope personal/)
+    expect(codexAppServerMocks.codexUninstallPlugin).not.toHaveBeenCalled()
   })
 
   it('hard-fails Codex installs on app-server rpc errors', async () => {
@@ -290,7 +351,7 @@ describe('plugin provider command runner', () => {
       cwd,
       agent: 'codex',
       pluginsDir: pluginsRoot,
-      scope: 'workspace',
+      scope: 'personal',
       installMetadataByPluginId: {
         'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
       },
