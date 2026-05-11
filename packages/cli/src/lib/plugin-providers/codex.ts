@@ -9,6 +9,7 @@ import type {
   PluginEntry,
   PluginFeatures,
   PluginInstallScope,
+  PluginInstallScopeSelector,
   PluginOwner,
   PluginProviderAdapter,
   ProviderExportContext,
@@ -156,7 +157,7 @@ const CODEX_CLI_REQUIRED_ERROR = [
   'If you already installed Codex.app, run `which codex` to check that the codex CLI is on your $PATH.',
 ].join('\n')
 
-function assertCodexPluginPersonalScope(scope: PluginInstallScope) {
+export function assertCodexPluginPersonalScope(scope: PluginInstallScope | PluginInstallScopeSelector) {
   if (scope !== 'personal') {
     throw new Error(CODEX_PLUGIN_SCOPE_ERROR)
   }

@@ -147,6 +147,36 @@ describe('command:plugin install', () => {
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
   })
 
+  it('rejects codex workspace scope before registry resolution or bundle materialization', async () => {
+    mocks.parsePluginInstallScopeSelector.mockReturnValueOnce('workspace')
+
+    await expect(run({
+      rawArgs: [
+        'codex',
+        'agentrig/demo-plugin',
+        '--scope',
+        'workspace',
+        '--force',
+      ],
+      args: {
+        provider: 'codex',
+        spec: 'agentrig/demo-plugin',
+        cwd: '/repo',
+        scope: 'workspace',
+        force: true,
+        dryRun: false,
+        help: false,
+      },
+    })).rejects.toThrow(/Codex plugins only support --scope personal/)
+
+    expect(mocks.loadConfig).not.toHaveBeenCalled()
+    expect(mocks.resolvePluginGraph).not.toHaveBeenCalled()
+    expect(mocks.materializeResolvedPluginGraph).not.toHaveBeenCalled()
+    expect(mocks.preparePluginInstall).not.toHaveBeenCalled()
+    expect(mocks.installPreparedPluginProviders).not.toHaveBeenCalled()
+    expect(mocks.cleanupMaterializedPlugin).not.toHaveBeenCalled()
+  })
+
   it('prepares installs from canonical latest-first registry install refs and cleans up materialized plugins', async () => {
     await run({
       args: {

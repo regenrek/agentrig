@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.8] - 2026-05-11
+
+### Fixed
+- Codex plugin installs now reject unsupported workspace scope during command preflight before registry resolution or bundle materialization, preserving the clean scope error without network activity.
+
 ## [0.7.7] - 2026-05-11
 
 ### Fixed

@@ -15,6 +15,7 @@ import {
 } from '../../lib/plugin-providers'
 import { resolveInstallScope } from '../../lib/plugin-providers/shared'
 import { selfHealClaudeInstalls } from '../../lib/plugin-providers/claude-self-heal'
+import { assertCodexPluginPersonalScope } from '../../lib/plugin-providers/codex'
 import { buildResolvedPluginInstallMetadataMap } from '../../lib/plugin-install-spec'
 import { listPluginInstallRecords, loadPluginInstallLedgers } from '../../lib/plugin-install-ledger'
 import { parseRegistryPluginSpec } from '../../lib/registry-spec'
@@ -117,6 +118,10 @@ const command = defineCommand({
     const scope = args.scope
       ? parsePluginInstallScopeSelector(String(args.scope))
       : 'auto'
+
+    if (provider === 'codex') {
+      assertCodexPluginPersonalScope(resolveInstallScope(provider, scope))
+    }
 
     // Heal pre-0.7.4 Claude installs whose marketplace source path is stale
     // (typically `/tmp/agentrig-plugins-*`) before we make install decisions.
