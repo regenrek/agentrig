@@ -9,7 +9,7 @@ import {
   verifyFetchedInstallBundleFiles,
   type ResolvedPluginGraph,
 } from '../../src/lib/plugin-consumer'
-import { canonicalInstallTokenFromSlug, resolvePluginFromRegistryAlias } from '../../src/lib/registry'
+import { canonicalInstallTokenFromSlug, fetchInstallBundleFiles, resolvePluginFromRegistryAlias } from '../../src/lib/registry'
 import { startFixtureServer, type FixtureServer } from '../helpers/harness'
 import type { InstallBundle } from '@agentrig/sdk'
 
@@ -181,18 +181,18 @@ describe('install bundle resolution and materialization', () => {
     )).rejects.toThrow(/taken down.*Policy violation/i)
   })
 
-  it('aborts materialization on sha256 mismatches', async () => {
+  it('aborts materialization on hash mismatches', async () => {
     const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
     const expected = '# TypeScript skill\n'
     const server = await installBundleServer(pluginJson, 'tampered\n', expected)
     const graph = { requestedPlugin: bundle(server.baseUrl, pluginJson, expected), resolvedPlugins: [bundle(server.baseUrl, pluginJson, expected)] }
     const writeFile = vi.spyOn(fs, 'writeFile')
 
-    await expect(materializeResolvedPluginGraph(graph)).rejects.toThrow(/sha256_mismatch/)
+    await expect(materializeResolvedPluginGraph(graph)).rejects.toThrow(/hash_mismatch.*expected=.*got=/)
     expect(writeFile).not.toHaveBeenCalled()
   })
 
-  it('reports missing remote files through install bundle verification before writing files', async () => {
+  it('reports HTTP fetch failures as not_fetched before writing files', async () => {
     const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
     const skill = '# TypeScript skill\n'
     const server = await startFixtureServer({
@@ -221,7 +221,7 @@ describe('install bundle resolution and materialization', () => {
     const writeFile = vi.spyOn(fs, 'writeFile')
 
     await expect(materializeResolvedPluginGraph(graph))
-      .rejects.toThrow(/Failed to fetch skills\/typescript\/SKILL\.md: HTTP 404/)
+      .rejects.toThrow(/Failed to fetch skills\/typescript\/SKILL\.md: HTTP 404.*code=not_fetched.*No fixture route/)
     expect(writeFile).not.toHaveBeenCalled()
   })
 
@@ -238,8 +238,39 @@ describe('install bundle resolution and materialization', () => {
         error: 'Request failed (429) for https://raw.githubusercontent.com/acme/repo/main/skills/typescript/SKILL.md',
         status: 429,
         url: 'https://raw.githubusercontent.com/acme/repo/main/skills/typescript/SKILL.md',
+        bodySnippet: 'API rate limit exceeded',
       },
-    ])).rejects.toThrow(/Failed to fetch skills\/typescript\/SKILL\.md: HTTP 429 \(rate-limited by github\.com\).*GITHUB_TOKEN/)
+    ])).rejects.toThrow(/Failed to fetch skills\/typescript\/SKILL\.md: HTTP 429 \(rate-limited by github\.com\).*GITHUB_TOKEN.*code=not_fetched.*API rate limit exceeded/)
+  })
+
+  it('reports one failed bundle fetch without converting successful peers to missing files', async () => {
+    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const files = ['# Skill 1\n', '# Skill 2\n', '# Skill 3\n']
+    const current = {
+      ...bundle('https://example.test', pluginJson, files.join('')),
+      file_list: [
+        { path: '.plugin/plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
+        ...files.map((content, index) => ({
+          path: `skills/typescript/file-${index + 1}.md`,
+          sha256: sha256Hex(content),
+          size: Buffer.byteLength(content),
+        })),
+      ],
+    } satisfies InstallBundle
+
+    await expect(verifyFetchedInstallBundleFiles(current, [
+      { path: '.plugin/plugin.json', bytes: pluginJson },
+      { path: 'skills/typescript/file-1.md', bytes: files[0]! },
+      {
+        path: 'skills/typescript/file-2.md',
+        missing: true,
+        error: 'Request failed (503) for https://example.test/file-2.md',
+        status: 503,
+        url: 'https://example.test/file-2.md',
+        bodySnippet: 'slow down',
+      },
+      { path: 'skills/typescript/file-3.md', bytes: files[2]! },
+    ])).rejects.toThrow(/file-2\.md: HTTP 503.*code=not_fetched.*slow down/)
   })
 
   it('aborts before writing when fetched install files include an unlisted extra file', async () => {
@@ -288,6 +319,71 @@ describe('install bundle resolution and materialization', () => {
     ])).rejects.toThrow(/extra.txt: extra/)
   })
 
+  it('limits remote install bundle fetch concurrency to deterministic fanout', async () => {
+    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const files = Array.from({ length: 8 }, (_, index) => `# Skill ${index + 1}\n`)
+    let activeRequests = 0
+    let maxActiveRequests = 0
+    const server = await startFixtureServer({
+      routes: [
+        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        {
+          pathname: /^\/raw\/skills\/typescript\/file-(\d+)\.md$/,
+          handler: async (_request, match) => {
+            activeRequests += 1
+            maxActiveRequests = Math.max(maxActiveRequests, activeRequests)
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            activeRequests -= 1
+            return { body: files[Number(match?.[1]) - 1] ?? '' }
+          },
+        },
+      ],
+    })
+    servers.push(server)
+    const current = {
+      ...bundle(server.baseUrl, pluginJson, files.join('')),
+      file_list: [
+        { path: '.plugin/plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
+        ...files.map((content, index) => ({
+          path: `skills/typescript/file-${index + 1}.md`,
+          sha256: sha256Hex(content),
+          size: Buffer.byteLength(content),
+        })),
+      ],
+    } satisfies InstallBundle
+
+    const fetched = await fetchInstallBundleFiles(current)
+
+    expect(fetched.every((file) => !file.missing)).toBe(true)
+    expect(maxActiveRequests).toBeLessThanOrEqual(4)
+  })
+
+  it('materializes URL-backed install bundle files when no inline bytes are present', async () => {
+    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const skill = '# URL-only skill\n'
+    const server = await startFixtureServer({
+      routes: [
+        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        { pathname: '/signed/skills/typescript/SKILL.md', handler: () => ({ body: skill }) },
+      ],
+    })
+    servers.push(server)
+    const resolved = bundle(server.baseUrl, pluginJson, skill, {
+      skillFile: { url: `${server.baseUrl}/signed/skills/typescript/SKILL.md` },
+    })
+    const graph = { requestedPlugin: resolved, resolvedPlugins: [resolved] } satisfies ResolvedPluginGraph
+    const materialized = await materializeResolvedPluginGraph(graph)
+
+    try {
+      await expect(
+        fs.readFile(path.join(materialized.pluginDir, 'skills', 'typescript', 'SKILL.md'), 'utf-8')
+      ).resolves.toBe(skill)
+      expect(server.requests.some((request) => request.pathname === '/signed/skills/typescript/SKILL.md')).toBe(true)
+    } finally {
+      await cleanupMaterializedPlugin(materialized.pluginsRoot)
+    }
+  })
+
   it('materializes mixed URL-backed and inline-base64 install bundle files, preferring inline over url', async () => {
     const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
     const inlineSkill = '# Inline skill\n'
@@ -331,7 +427,7 @@ describe('install bundle resolution and materialization', () => {
     const graph = { requestedPlugin: resolved, resolvedPlugins: [resolved] } satisfies ResolvedPluginGraph
 
     await expect(materializeResolvedPluginGraph(graph))
-      .rejects.toThrow(/skills\/typescript\/SKILL\.md: missing/)
+      .rejects.toThrow(/skills\/typescript\/SKILL\.md: not_written.*Install bundle source cannot provide bytes/)
   })
 })
 

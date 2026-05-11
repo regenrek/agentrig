@@ -127,7 +127,7 @@ describe('verifyInstallBundleHashes', () => {
       .resolves.toEqual({ ok: true, checked: 1, issues: [] })
   })
 
-  it('reports missing files', async () => {
+  it('reports expected files omitted by the fetcher as not_written', async () => {
     const result = await verifyInstallBundleHashes(
       {
         ...bundle,
@@ -144,23 +144,39 @@ describe('verifyInstallBundleHashes', () => {
     )
 
     expect(result.ok).toBe(false)
-    expect(result.issues.map((issue) => issue.code)).toEqual(['missing'])
+    expect(result.issues.map((issue) => issue.code)).toEqual(['not_written'])
   })
 
-  it('reports not-retrieved fetch results as missing files', async () => {
+  it('reports HTTP fetch failures as not_fetched', async () => {
     const result = await verifyInstallBundleHashes(bundle, [
-      { path: 'README.md', missing: true, error: 'Request failed (404)' },
+      {
+        path: 'README.md',
+        missing: true,
+        error: 'Request failed (404)',
+        status: 404,
+        url: 'https://example.test/README.md',
+        bodySnippet: 'Not found',
+      },
     ])
 
     expect(result.ok).toBe(false)
-    expect(result.issues).toEqual([{ path: 'README.md', code: 'missing' }])
+    expect(result.issues).toEqual([
+      {
+        path: 'README.md',
+        code: 'not_fetched',
+        error: 'Request failed (404)',
+        status: 404,
+        url: 'https://example.test/README.md',
+        bodySnippet: 'Not found',
+      },
+    ])
   })
 
   it('reports sha256 mismatches', async () => {
     const result = await verifyInstallBundleHashes(bundle, [{ path: 'README.md', bytes: 'jello' }])
 
     expect(result.ok).toBe(false)
-    expect(result.issues.map((issue) => issue.code)).toEqual(['sha256_mismatch'])
+    expect(result.issues.map((issue) => issue.code)).toEqual(['hash_mismatch'])
   })
 
   it('reports size mismatches', async () => {
@@ -212,6 +228,6 @@ describe('verifyInstallBundleHashes', () => {
     )
 
     expect(result.ok).toBe(false)
-    expect(result.issues.map((issue) => issue.code)).toEqual(['missing', 'extra'])
+    expect(result.issues.map((issue) => issue.code)).toEqual(['not_written', 'extra'])
   })
 })

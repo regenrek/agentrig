@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
@@ -77,7 +77,7 @@ describe('command:rig apply', () => {
   })
 
   it('fails before install planning when materialization rejects a rig bundle', async () => {
-    mocks.materializeResolvedPluginGraph.mockRejectedValueOnce(new Error('sha256_mismatch'))
+    mocks.materializeResolvedPluginGraph.mockRejectedValueOnce(new Error('hash_mismatch'))
 
     await expect(
       run({
@@ -92,7 +92,7 @@ describe('command:rig apply', () => {
           help: false,
         },
       }),
-    ).rejects.toThrow(/sha256_mismatch/i)
+    ).rejects.toThrow(/hash_mismatch/i)
 
     expect(mocks.preparePluginInstall).not.toHaveBeenCalled()
   })
