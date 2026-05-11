@@ -642,7 +642,16 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
     throw new Error(`Fetched install bundle file hash mismatch: ${verified.issues.map((issue) => `${issue.path}:${issue.code}`).join(', ')}`)
   }
 
-  const fileDigests = bundle.file_list
+  const licenseBytes = new TextEncoder().encode(`${listing.license?.trim() || 'NOASSERTION'}\n`)
+  const mirroredPayloadFiles = payloadFiles.some((file) => file.path === 'LICENSE')
+    ? payloadFiles
+    : payloadFiles.concat({
+        path: 'LICENSE',
+        sha256: await sha256Hex(licenseBytes),
+        size: licenseBytes.byteLength,
+        bytes: licenseBytes,
+      })
+  const fileDigests = mirroredPayloadFiles
     .map((file) => ({
       path: file.path,
       digest: sha256Digest(file.sha256),
@@ -788,7 +797,7 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
   }))
 
   const generatedFiles = [
-    ...payloadFiles.map((file) => ({
+    ...mirroredPayloadFiles.map((file) => ({
       path: `${versionRoot}/${file.path}`,
       content: new TextDecoder().decode(file.bytes),
     })),

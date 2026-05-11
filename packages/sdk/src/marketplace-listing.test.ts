@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
+  buildRegistryMirrorArtifactsFromInstallBundle,
   InstallBundleSchema,
   MarketplaceListingPublicSchema,
   MarketplaceListingSchema,
@@ -18,6 +19,7 @@ const listing: MarketplaceListing = MarketplaceListingSchema.parse({
   name: 'Demo plugin',
   description: 'A demo plugin.',
   version: '1.0.0',
+  license: 'MIT',
   source: 'registry',
   installability: 'available',
   publishedAt: 1,
@@ -147,6 +149,31 @@ describe('marketplace listing contracts', () => {
   it('validates Open Plugins name and version syntax', () => {
     expect(() => PluginManifestSchema.parse({ name: 'agentrig--core' })).toThrow()
     expect(() => PluginManifestSchema.parse({ name: 'agentrig.core', version: 'latest' })).toThrow()
+  })
+
+  it('emits the required registry LICENSE file from listing license metadata', async () => {
+    const artifacts = await buildRegistryMirrorArtifactsFromInstallBundle({
+      bundle,
+      files: [{ path: 'README.md', bytes: 'hello' }],
+      submissionId: 'submission-1',
+      reviewedAt: 1,
+      advisoriesDocument: { generated_at: '1970-01-01T00:00:00Z', items: [] },
+      registryDocument: { items: [] } as any,
+    })
+
+    const licenseFile = artifacts.generatedFiles.find((file) => file.path.endsWith('/LICENSE'))
+    const lockFile = artifacts.generatedFiles.find((file) => file.path.endsWith('/AGENTRIG_LOCK.json'))
+
+    expect(licenseFile).toMatchObject({ content: 'MIT\n' })
+    expect(JSON.parse(lockFile!.content).file_digests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'LICENSE',
+          digest: 'sha256:adc37366f403835c1470ab2df93d3837d4719372fc1ef8593d922e06f033f8b2',
+          size: 4,
+        }),
+      ])
+    )
   })
 })
 
