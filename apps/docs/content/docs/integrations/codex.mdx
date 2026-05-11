@@ -9,12 +9,11 @@ icon: Bot
 Install a resolved plugin into Codex:
 
 ```bash
-agentrig plugin install codex agentrig/agentrig.core-committer
-agentrig plugin install codex georg/georg.ts-master-plugin --scope workspace
+agentrig plugin install codex agentrig/agentrig.core-committer --scope personal
 ```
 
 `--scope auto` is the default selector.
-For Codex, `auto` resolves to `workspace`.
+For Codex plugins, `auto` resolves to `personal`.
 Refs resolve to the latest installable registry version by default; add
 `@<version>` only for an explicit reproducibility or rollback pin.
 
@@ -24,12 +23,10 @@ Refs resolve to the latest installable registry version by default; add
 agentrig plugin install codex agentrig/agentrig.core-committer --scope personal
 ```
 
-With Codex `0.113.0` or newer, AgentRig asks `codex app-server` to install and
-enable the plugin automatically. If Codex is missing or older, AgentRig writes
-the plugin payload to the canonical Codex cache
-(`~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/`) and updates
-`~/.agents/plugins/marketplace.json` so the plugin can still be enabled later
-from Codex.
+AgentRig asks `codex app-server` to install and enable the plugin automatically.
+Codex CLI `0.113.0` or newer is required. AgentRig does not edit
+`~/.agents/plugins/marketplace.json` directly because that file is shared user
+state.
 
 To install without enabling immediately:
 
@@ -37,15 +34,11 @@ To install without enabling immediately:
 agentrig plugin install codex agentrig/agentrig.core-committer --scope personal --no-enable
 ```
 
-## Install for the current repo
+## Workspace scope
 
-```bash
-agentrig plugin install codex agentrig/agentrig.core-committer --scope workspace
-```
-
-This writes a repo-local marketplace at `.agents/plugins/marketplace.json` and copies plugins into `./plugins/`.
-When automatic Codex app-server install is available, AgentRig stages the local
-marketplace in its persistent cache and Codex owns the enabled plugin state.
+Codex itself has no workspace-scoped plugin concept, so Codex plugin installs
+reject `--scope workspace`. For workspace-scoped Codex skills, use
+`agentrig skill install codex <skill> --scope workspace`.
 
 ## Uninstall Codex plugins
 
@@ -55,10 +48,7 @@ agentrig plugin uninstall codex agentrig/agentrig.core-committer
 
 Uninstall is ledger-backed and hash-guarded:
 
-- AgentRig removes only files it previously installed
-- modified plugin files are kept instead of being deleted
-- unrelated marketplace entries are preserved
-- existing extra metadata in `marketplace.json` is preserved when AgentRig updates its managed entry
+- AgentRig delegates removal to Codex app-server
 - install records include the concrete resolved version and registry snapshot digest
 
 ## What Codex plugins include

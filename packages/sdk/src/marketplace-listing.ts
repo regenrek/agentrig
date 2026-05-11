@@ -192,6 +192,8 @@ export type FetchedInstallFile =
       path: string
       missing: true
       error?: string
+      status?: number
+      url?: string
     }
 
 export async function verifyInstallBundleHashes(

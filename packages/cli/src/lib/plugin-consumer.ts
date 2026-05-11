@@ -62,7 +62,7 @@ export async function verifyFetchedInstallBundleFiles(
 
   throw new Error(
     `Install bundle hash verification failed for ${bundle.listing.artifactId}@${bundle.listing.version}:\n` +
-      result.issues.map(formatVerifyIssue).join('\n')
+      result.issues.map((issue) => formatVerifyIssue(issue, fetchedFiles)).join('\n')
   )
 }
 
@@ -178,11 +178,41 @@ function bytesFromFetchedFile(value: FetchedInstallFileWithBytes['bytes']) {
   return new Uint8Array(value)
 }
 
-function formatVerifyIssue(issue: VerifyIssue) {
+function formatVerifyIssue(issue: VerifyIssue, fetchedFiles: readonly FetchedInstallFile[]) {
+  if (issue.code === 'missing') {
+    const failedFetch = fetchedFiles.find(
+      (file): file is Extract<FetchedInstallFile, { missing: true }> =>
+        file.path === issue.path && file.missing === true
+    )
+    const status = failedFetch?.status
+    if (failedFetch && typeof status === 'number') {
+      return formatFetchFailure(issue.path, status, failedFetch.url)
+    }
+  }
   const parts = [`  - ${issue.path}: ${issue.code}`]
   if (issue.expected != null) parts.push(`expected=${issue.expected}`)
   if (issue.actual != null) parts.push(`actual=${issue.actual}`)
   return parts.join(' ')
+}
+
+function formatFetchFailure(filePath: string, status: number, url: string | undefined) {
+  const host = url ? safeHostname(url) : undefined
+  if (status === 429 && host && isGithubHost(host)) {
+    return `  - Failed to fetch ${filePath}: HTTP 429 (rate-limited by github.com). Retry in ~30s, or set GITHUB_TOKEN to increase rate limit.`
+  }
+  return `  - Failed to fetch ${filePath}: HTTP ${status}${host ? ` from ${host}` : ''}.`
+}
+
+function safeHostname(url: string) {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return undefined
+  }
+}
+
+function isGithubHost(host: string) {
+  return host === 'github.com' || host.endsWith('.github.com') || host === 'githubusercontent.com' || host.endsWith('.githubusercontent.com')
 }
 
 function standaloneSourceRoot(bundle: InstallBundle) {

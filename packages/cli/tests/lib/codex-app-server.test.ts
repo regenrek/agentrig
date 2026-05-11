@@ -3,13 +3,18 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import packageJson from '../../package.json'
-import { codexInstallPlugin, codexUninstallPlugin } from '../../src/lib/plugin-providers/codex-app-server'
+import {
+  codexInstallPlugin,
+  codexUninstallPlugin,
+  resolveCodexBinary,
+} from '../../src/lib/plugin-providers/codex-app-server'
 
 const tempDirs: string[] = []
 const originalPath = process.env.PATH
 
 describe('codex app-server JSON-RPC driver', () => {
   afterEach(async () => {
+    vi.restoreAllMocks()
     vi.unstubAllEnvs()
     if (originalPath === undefined) {
       delete process.env.PATH
@@ -138,12 +143,55 @@ describe('codex app-server JSON-RPC driver', () => {
       version: '1.2.3',
       sourcePath: path.join(root, 'marketplace.json'),
       enable: true,
+    }, {
+      resolveBinary: () => null,
     })
 
     expect(result).toMatchObject({
       ok: false,
       reason: 'codex_not_installed',
     })
+  })
+
+  it('resolves codex from PATH before known app locations', async () => {
+    const root = await tempRoot()
+    const binDir = path.join(root, 'bin')
+    const codexPath = path.join(binDir, 'codex')
+    await fs.mkdir(binDir, { recursive: true })
+    await fs.writeFile(codexPath, '#!/bin/sh\n')
+    await fs.chmod(codexPath, 0o755)
+    vi.stubEnv('PATH', binDir)
+
+    expect(resolveCodexBinary()).toBe(codexPath)
+  })
+
+  it('resolves Codex.app when PATH lacks codex', async () => {
+    const root = await tempRoot()
+    const appBinary = '/Applications/Codex.app/Contents/Resources/codex'
+    vi.stubEnv('PATH', root)
+    expect(resolveCodexBinary({
+      fileSystem: {
+        existsSync: (candidate) => candidate === appBinary,
+        accessSync: (candidate) => {
+          if (candidate === appBinary) return
+          throw Object.assign(new Error('not executable'), { code: 'EACCES' })
+        },
+      },
+    })).toBe(appBinary)
+  })
+
+  it('returns null when neither PATH nor known app locations contain executable codex', async () => {
+    const root = await tempRoot()
+    vi.stubEnv('PATH', root)
+
+    expect(resolveCodexBinary({
+      fileSystem: {
+        existsSync: () => false,
+        accessSync: () => {
+          throw Object.assign(new Error('not executable'), { code: 'EACCES' })
+        },
+      },
+    })).toBeNull()
   })
 
   it('times out when the server does not answer a request', async () => {

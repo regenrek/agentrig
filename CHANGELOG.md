@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.7] - 2026-05-11
+
+### Fixed
+- Hard-cut Codex plugin installs and uninstalls to the single Codex JSON-RPC path; AgentRig no longer writes `~/.agents/plugins/marketplace.json` directly when Codex is missing or too old.
+- Codex plugin installs now discover the embedded CLI in `/Applications/Codex.app` and `~/Applications/Codex.app` when `codex` is not on `$PATH`.
+- GitHub raw install-bundle rate limits now report an HTTP 429 rate-limit message instead of a misleading missing-file hash verification failure.
+
+### Changed
+- Codex plugins now support only `--scope personal`; workspace-scoped Codex installs remain supported for skills through `agentrig skill install`.
+
 ## [0.7.6] - 2026-05-10
 
 ### Fixed
