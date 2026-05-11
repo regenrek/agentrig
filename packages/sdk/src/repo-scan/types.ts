@@ -1,3 +1,5 @@
+import type { PluginManifest } from '../marketplace-listing'
+
 export const SIGNAL_KINDS = [
   'skill',
   'command',
@@ -97,11 +99,20 @@ export type RepoScanPluginCandidateFile = {
   bytes?: number
 }
 
+export type RepoScanPluginManifestFile = {
+  path: string
+  digest: string
+  bytes: number
+  content: string
+}
+
 export type RepoScanPluginCandidate = {
   artifactId: string
   version?: string
   sourcePath: string
   manifestPath: string
+  manifest: PluginManifest
+  manifestFile: RepoScanPluginManifestFile
   files: RepoScanPluginCandidateFile[]
 }
 

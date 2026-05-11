@@ -313,13 +313,14 @@ const OpenPluginAuthorSchema = z.object({
   name: z.string().trim().min(1).optional(),
   email: z.string().trim().min(1).optional(),
   url: z.string().trim().min(1).optional(),
-}).strict()
+})
 
 const AgentRigPluginExtensionSchema = z.object({
   displayName: z.string().optional(),
   kind: z.string().optional(),
   configSchema: z.record(z.string(), z.any()).optional(),
   pluginDependencies: z.array(z.string()).optional(),
+  source: z.any().optional(),
 })
 
 export const PluginManifestSchema = z.object({
@@ -335,6 +336,14 @@ export const PluginManifestSchema = z.object({
   homepage: z.string().optional(),
   repository: z.string().optional(),
   logo: z.string().optional(),
+  commands: z.any().optional(),
+  agents: z.any().optional(),
+  skills: z.any().optional(),
+  rules: z.any().optional(),
+  hooks: z.any().optional(),
+  mcpServers: z.any().optional(),
+  lspServers: z.any().optional(),
+  outputStyles: z.any().optional(),
   keywords: z.array(z.string()).optional(),
   'x-agentrig': AgentRigPluginExtensionSchema.optional(),
 })

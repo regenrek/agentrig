@@ -1,4 +1,5 @@
 import { normalizeVirtualPath, type VirtualTreeFile } from '../virtual-tree'
+import { PluginManifestSchema, type PluginManifest } from '../../marketplace-listing'
 import type { DetectorInput, PluginCandidate, PluginProviderId } from './common'
 
 const PLUGIN_MANIFEST_DIRS: Record<string, PluginProviderId> = {
@@ -49,18 +50,20 @@ export function scanPluginCandidatesFromDetected(candidates: readonly PluginCand
 function scanPluginCandidateFromManifest(
   input: Pick<DetectorInput, 'files'>,
   candidate: Pick<PluginCandidate, 'provider' | 'manifestPath' | 'rootPath'>,
-  manifest: { artifactId: string; version?: string }
+  manifest: ParsedAgentrigPluginManifestCandidate
 ) {
   if (candidate.provider !== 'agentrig') return undefined
   const files = filesForPluginRoot(input.files, candidate.rootPath)
   if (!files.length) return undefined
   return {
-    artifactId: manifest.artifactId,
-    ...(manifest.version ? { version: manifest.version } : {}),
+    artifactId: manifest.manifest.name,
+    ...(manifest.manifest.version ? { version: manifest.manifest.version } : {}),
     sourcePath: candidate.rootPath || '.',
     manifestPath: candidate.manifestPath,
-    files: files.map((file) => ({
-      path: normalizeVirtualPath(file.path),
+    manifest: manifest.manifest,
+    manifestFile: manifest.manifestFile,
+    files: files.map(({ file, relativePath }) => ({
+      path: relativePath,
       digest: file.sha256,
       bytes: file.bytes,
     })),
@@ -82,7 +85,7 @@ async function candidateFromPluginManifest(input: Pick<DetectorInput, 'files' | 
     manifestPath: path,
     rootPath: parts.slice(0, -2).join('/'),
   }
-  const manifest = provider === 'agentrig' ? parseAgentrigPluginManifestCandidate(await readJson(input, path)) : undefined
+  const manifest = provider === 'agentrig' ? await parseAgentrigPluginManifestCandidate(input, path) : undefined
   const scanCandidate = manifest ? scanPluginCandidateFromManifest(input, candidate, manifest) : undefined
   return {
     ...candidate,
@@ -132,23 +135,62 @@ function normalizeMarketplaceSource(source: string, rootPath: string) {
   return rootPath ? normalizeVirtualPath(`${rootPath}/${cleaned}`) : normalizeVirtualPath(cleaned)
 }
 
-function parseAgentrigPluginManifestCandidate(raw: unknown) {
-  if (!isRecord(raw)) return undefined
-  const artifactId = typeof raw.name === 'string' ? raw.name.trim() : ''
-  if (!artifactId) return undefined
-  const version = typeof raw.version === 'string' && raw.version.trim() ? raw.version.trim() : undefined
-  return { artifactId, ...(version ? { version } : {}) }
+type ParsedAgentrigPluginManifestCandidate = {
+  manifest: PluginManifest
+  manifestFile: {
+    path: string
+    digest: string
+    bytes: number
+    content: string
+  }
+}
+
+async function parseAgentrigPluginManifestCandidate(
+  input: Pick<DetectorInput, 'files' | 'tree'>,
+  path: string
+): Promise<ParsedAgentrigPluginManifestCandidate | undefined> {
+  const manifestFile = input.files.find((file) => normalizeVirtualPath(file.path) === path)
+  if (!manifestFile) return undefined
+  return parseAgentrigPluginManifestText(input.tree.readText(path), path, manifestFile)
+}
+
+async function parseAgentrigPluginManifestText(
+  textPromise: Promise<string | null>,
+  path: string,
+  file: VirtualTreeFile
+): Promise<ParsedAgentrigPluginManifestCandidate | undefined> {
+  const text = await textPromise
+  if (!text) return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return undefined
+  }
+  const result = PluginManifestSchema.safeParse(parsed)
+  if (!result.success) return undefined
+  return {
+    manifest: result.data,
+    manifestFile: {
+      path,
+      digest: file.sha256,
+      bytes: file.bytes,
+      content: text,
+    },
+  }
 }
 
 function filesForPluginRoot(files: readonly VirtualTreeFile[], rootPath: string) {
   const root = rootPath ? normalizeVirtualPath(rootPath) : ''
   const prefix = root ? `${root}/` : ''
   return files
-    .filter((file) => {
+    .flatMap((file) => {
       const path = normalizeVirtualPath(file.path)
-      return !root || path === root || path.startsWith(prefix)
+      if (root && path !== root && !path.startsWith(prefix)) return []
+      const relativePath = root ? path.slice(prefix.length) : path
+      return relativePath ? [{ file, relativePath }] : []
     })
-    .sort((left, right) => normalizeVirtualPath(left.path).localeCompare(normalizeVirtualPath(right.path)))
+    .sort((left, right) => left.relativePath.localeCompare(right.relativePath))
 }
 
 function deduplicateCandidates(candidates: readonly PluginCandidate[]) {
