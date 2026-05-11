@@ -90,7 +90,7 @@ const command = defineCommand({
     },
     artifactId: {
       type: 'string',
-      description: 'Plugin artifact id for trusted publishing (defaults to .plugin/plugin.json id)',
+      description: 'Plugin artifact id for trusted publishing (defaults to .plugin/plugin.json name)',
     },
     trustedPublish: {
       type: 'boolean',
@@ -142,9 +142,9 @@ const command = defineCommand({
     }
 
     const manifest = trustedPublish ? await readLocalPluginManifest(payload.plugin_path) : null
-    const artifactId = optionalArg(args.artifactId) ?? manifest?.id
+    const artifactId = optionalArg(args.artifactId) ?? manifest?.name
     if (trustedPublish && !artifactId) {
-      throw new Error('Trusted publishing requires --artifactId or a readable .plugin/plugin.json with an id.')
+      throw new Error('Trusted publishing requires --artifactId or a readable .plugin/plugin.json with a name.')
     }
     const accessToken = trustedPublish
       ? (await mintPublishToken(baseUrl, {

@@ -35,7 +35,7 @@ describe('selfHealClaudeInstalls', () => {
 
     const stalePath = '/tmp/agentrig-plugins-AbCdEf'
     await savePluginInstallLedger(cwd, 'personal', {
-      schemaVersion: 3,
+      schemaVersion: 4,
       installs: {
         'claude:personal:agentrig-regenrek-agent-skills': makeStaleClaudeRecord(stalePath),
       },
@@ -94,7 +94,7 @@ describe('selfHealClaudeInstalls', () => {
 
     const stalePath = '/tmp/agentrig-plugins-InvalidStaging'
     await savePluginInstallLedger(cwd, 'personal', {
-      schemaVersion: 3,
+      schemaVersion: 4,
       installs: {
         'claude:personal:agentrig-regenrek-agent-skills': makeStaleClaudeRecord(stalePath),
       },
@@ -132,7 +132,7 @@ describe('selfHealClaudeInstalls', () => {
     const ledgerStalePath = '/tmp/agentrig-plugins-LedgerPath'
     const knownStalePath = '/var/folders/zz/agentrig-plugins-KnownPath'
     await savePluginInstallLedger(cwd, 'personal', {
-      schemaVersion: 3,
+      schemaVersion: 4,
       installs: {
         'claude:personal:agentrig-regenrek-agent-skills': makeStaleClaudeRecord(ledgerStalePath),
       },
@@ -175,7 +175,7 @@ describe('selfHealClaudeInstalls', () => {
 
     const stalePath = '/tmp/agentrig-plugins-NoKnownFile'
     await savePluginInstallLedger(cwd, 'personal', {
-      schemaVersion: 3,
+      schemaVersion: 4,
       installs: {
         'claude:personal:agentrig-regenrek-agent-skills': makeStaleClaudeRecord(stalePath),
       },
@@ -201,7 +201,7 @@ describe('selfHealClaudeInstalls', () => {
 
     const stalePath = '/tmp/agentrig-plugins-NoStaging'
     await savePluginInstallLedger(cwd, 'personal', {
-      schemaVersion: 3,
+      schemaVersion: 4,
       installs: {
         'claude:personal:agentrig-regenrek-agent-skills': makeStaleClaudeRecord(stalePath),
       },

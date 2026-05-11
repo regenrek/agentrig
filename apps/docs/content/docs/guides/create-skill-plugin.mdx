@@ -21,6 +21,27 @@ Place your skill under `skills/<skill-name>/SKILL.md` and any supporting scripts
 ## 3. Update `.plugin/plugin.json`
 
 The scaffold already creates `.plugin/plugin.json`. Edit it in place after you add your real metadata and files.
+It uses the Open Plugins manifest shape:
+
+```json
+{
+  "$schema": "https://agentrig.ai/schema/plugin.v1.json",
+  "name": "acme.my-skill-plugin",
+  "version": "0.1.0",
+  "description": "A reusable skill plugin.",
+  "author": { "name": "Your Name" },
+  "license": "MIT",
+  "keywords": [],
+  "x-agentrig": {
+    "displayName": "My Skill Plugin",
+    "kind": "plugin",
+    "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+    "pluginDependencies": []
+  }
+}
+```
+
+AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
 
 ## 4. Test locally
 

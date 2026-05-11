@@ -84,7 +84,7 @@ describe('command:plugin install', () => {
     })
     mocks.resolvePluginGraph.mockResolvedValue({
       requestedPlugin: {
-        manifest: { id: 'demo-plugin', name: 'Demo Plugin', version: '1.2.3' },
+        manifest: { name: 'demo-plugin', description: 'Demo Plugin', version: '1.2.3' },
         source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
         sourceLabel: 'agentrig/demo-plugin@1.2.3',
         trustTier: 'reviewed',
@@ -93,7 +93,7 @@ describe('command:plugin install', () => {
       },
       resolvedPlugins: [
         {
-          manifest: { id: 'dep-plugin', name: 'Dependency Plugin', version: '0.1.0' },
+          manifest: { name: 'dep-plugin', description: 'Dependency Plugin', version: '0.1.0' },
           source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
           sourceLabel: 'agentrig/dep-plugin@0.1.0',
           trustTier: 'official',
@@ -101,7 +101,7 @@ describe('command:plugin install', () => {
           registry: { name: 'agentrig', url: 'https://agentrig.ai/registry' },
         },
         {
-          manifest: { id: 'demo-plugin', name: 'Demo Plugin', version: '1.2.3' },
+          manifest: { name: 'demo-plugin', description: 'Demo Plugin', version: '1.2.3' },
           source: { type: 'url', baseUrl: 'https://agentrig.ai/registry' },
           sourceLabel: 'agentrig/demo-plugin@1.2.3',
           trustTier: 'reviewed',
@@ -116,8 +116,8 @@ describe('command:plugin install', () => {
     })
     mocks.preparePluginInstall.mockResolvedValue({
       plugins: [
-        { manifest: { id: 'dep-plugin' } },
-        { manifest: { id: 'demo-plugin' } },
+        { manifest: { name: 'dep-plugin' } },
+        { manifest: { name: 'demo-plugin' } },
       ],
       requestedScope: 'auto',
       providers: [
@@ -259,7 +259,7 @@ describe('command:plugin install', () => {
       },
     }
     await savePluginInstallLedger(cwd, 'personal', {
-      schemaVersion: 3,
+      schemaVersion: 4,
       installs: { [record.id]: record },
       selections: {},
     })

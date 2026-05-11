@@ -1,27 +1,29 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vite-plus/test'
-import { loadPluginInstallLedger } from '../../src/lib/plugin-install-ledger'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+import { LEDGER_SCHEMA_VERSION, loadPluginInstallLedger } from '../../src/lib/plugin-install-ledger'
 import { ensureDir, writeJsonFile } from '../../src/lib/fs'
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await Promise.all(
     tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
   )
 })
 
 describe('loadPluginInstallLedger', () => {
-  it('archives schemaVersion 1 ledgers and resets them to the canonical v3 shape', async () => {
+  it('archives mismatched schemaVersion ledgers and resets them to the current shape', async () => {
     const cwd = await mkdtemp(path.join(tmpdir(), 'agentrig-ledger-test-'))
     tempDirs.push(cwd)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     const ledgerPath = path.join(cwd, '.agentrig', 'plugin-installs.json')
     await ensureDir(path.dirname(ledgerPath))
     await writeJsonFile(ledgerPath, {
-      schemaVersion: 1,
+      schemaVersion: 3,
       installs: {
         'codex:personal:agentrig-typescript': {
           id: 'codex:personal:agentrig-typescript',
@@ -46,24 +48,25 @@ describe('loadPluginInstallLedger', () => {
 
     const ledger = await loadPluginInstallLedger(cwd, 'workspace')
     expect(ledger).toEqual({
-      schemaVersion: 3,
+      schemaVersion: LEDGER_SCHEMA_VERSION,
       installs: {},
       selections: {},
     })
 
-    const backupPath = path.join(cwd, '.agentrig', 'plugin-installs.v1-backup.json')
+    const backupPath = path.join(cwd, '.agentrig', 'plugin-installs.pre-openplugins-backup.json')
     const backup = JSON.parse(await readFile(backupPath, 'utf8'))
     expect(backup).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 3,
       installs: expect.any(Object),
     })
 
     const rewritten = JSON.parse(await readFile(ledgerPath, 'utf8'))
     expect(rewritten).toEqual({
-      schemaVersion: 3,
+      schemaVersion: LEDGER_SCHEMA_VERSION,
       installs: {},
       selections: {},
     })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Previously installed plugins must be reinstalled'))
   })
 
   it('loads external-repo installs without registry trust metadata', async () => {
@@ -73,7 +76,7 @@ describe('loadPluginInstallLedger', () => {
     const ledgerPath = path.join(cwd, '.agentrig', 'plugin-installs.json')
     await ensureDir(path.dirname(ledgerPath))
     await writeJsonFile(ledgerPath, {
-      schemaVersion: 2,
+      schemaVersion: LEDGER_SCHEMA_VERSION,
       installs: {
         'cursor:workspace:agentrig-community.review': {
           id: 'cursor:workspace:agentrig-community.review',
@@ -103,10 +106,11 @@ describe('loadPluginInstallLedger', () => {
           },
         },
       },
+      selections: {},
     })
 
     const ledger = await loadPluginInstallLedger(cwd, 'workspace')
-    expect(ledger.schemaVersion).toBe(3)
+    expect(ledger.schemaVersion).toBe(LEDGER_SCHEMA_VERSION)
     expect(ledger.selections).toEqual({})
     const record = ledger.installs['cursor:workspace:agentrig-community.review']
     expect(record.registry).toBeUndefined()
@@ -125,7 +129,7 @@ describe('loadPluginInstallLedger', () => {
     const ledgerPath = path.join(cwd, '.agentrig', 'plugin-installs.json')
     await ensureDir(path.dirname(ledgerPath))
     await writeJsonFile(ledgerPath, {
-      schemaVersion: 2,
+      schemaVersion: LEDGER_SCHEMA_VERSION,
       installs: {
         'cursor:workspace:agentrig-community.review': {
           id: 'cursor:workspace:agentrig-community.review',
@@ -151,6 +155,7 @@ describe('loadPluginInstallLedger', () => {
           },
         },
       },
+      selections: {},
     })
 
     await expect(loadPluginInstallLedger(cwd, 'workspace')).rejects.toThrow(/verified registry metadata/i)

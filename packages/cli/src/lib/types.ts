@@ -1,5 +1,5 @@
-import type { ArtifactKind, RegistryRef } from '@agentrig/sdk'
-export type { RegistryRef } from '@agentrig/sdk'
+import type { ArtifactKind, PluginManifest, RegistryRef } from '@agentrig/sdk'
+export type { PluginManifest, RegistryRef } from '@agentrig/sdk'
 
 export type RigDefinition = {
   extends?: string[]
@@ -67,21 +67,6 @@ export type AgentDefinition = {
   skills?: string[]
   /** Hooks for this agent */
   hooks?: HookDefinition[]
-}
-
-export type PluginManifest = {
-  $schema?: string
-  kind: 'agentrig:plugin'
-  id: string
-  name: string
-  description: string
-  version: string
-  author?: string
-  license?: string
-  keywords?: string[]
-  pluginDependencies?: string[]
-  configSchema: Record<string, unknown>
-  'x-agentrig'?: Record<string, unknown>
 }
 
 export type PluginProviderName = 'claude' | 'codex' | 'cursor'
@@ -233,7 +218,7 @@ export type SelectionInstallRecord = {
 }
 
 export type PluginInstallLedger = {
-  schemaVersion: 3
+  schemaVersion: 4
   installs: Record<string, PluginInstallRecord>
   selections: Record<string, SelectionInstallRecord>
 }

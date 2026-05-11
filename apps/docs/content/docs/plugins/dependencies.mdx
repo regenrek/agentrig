@@ -1,18 +1,23 @@
 ---
 title: Dependencies
-description: Plugin dependency chaining with rigDependencies.
+description: Plugin dependency chaining with x-agentrig.pluginDependencies.
 icon: Link
 ---
 
 # Dependencies
 
-Plugins can declare other plugins they depend on using `rigDependencies`.
+Plugins can declare other plugins they depend on using `x-agentrig.pluginDependencies`.
 Plugin installs resolve and install dependencies before the requested plugin.
+
+AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
 
 ```json
 {
-  "name": "core-committer",
-  "rigDependencies": ["security-check"]
+  "name": "agentrig.core-committer",
+  "x-agentrig": {
+    "kind": "plugin",
+    "pluginDependencies": ["agentrig.security-check"]
+  }
 }
 ```
 

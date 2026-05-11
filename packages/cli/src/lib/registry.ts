@@ -131,24 +131,6 @@ export async function resolveInstallBundleFromConvex(
     return InstallBundleSchema.parse(resolution.bundle)
   }
 
-  if (resolution.reason === 'not_found') {
-    const fallbackArtifactId = canonicalInstallTokenFromSlug(input.artifactId)
-    if (fallbackArtifactId !== input.artifactId) {
-      const fallbackResolution = await fetchInstallBundleResolution(registry, {
-        ...input,
-        artifactId: fallbackArtifactId,
-      })
-      if (fallbackResolution.status === 'resolvable') {
-        const bundle = InstallBundleSchema.parse(fallbackResolution.bundle)
-        const canonicalId = bundle.listing.artifactId
-        console.warn(
-          `Resolved by hyphen→dot fallback; canonical id is \`${canonicalId}\`. Update your scripts.`
-        )
-        return bundle
-      }
-    }
-  }
-
   const detail = resolution.message ? ` ${resolution.message}` : ''
   const label = `${input.kind}:${input.artifactId}`
   if (resolution.reason === 'yanked') {
@@ -167,17 +149,6 @@ async function fetchInstallBundleResolution(registry: RegistryRef, input: Instal
   if (input.origin) url.searchParams.set('origin', input.origin)
   const raw = await fetchJson<unknown>(url.toString())
   return ListingInstallResolutionSchema.parse(raw)
-}
-
-export function canonicalInstallTokenFromSlug(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed || trimmed.includes('.')) return trimmed
-  const separatorIndex = trimmed.indexOf('--')
-  const head = separatorIndex === -1 ? trimmed : trimmed.slice(0, separatorIndex)
-  const tail = separatorIndex === -1 ? '' : trimmed.slice(separatorIndex)
-  const firstHyphen = head.indexOf('-')
-  if (firstHyphen === -1) return trimmed
-  return `${head.slice(0, firstHyphen)}.${head.slice(firstHyphen + 1)}${tail}`
 }
 
 export async function resolveInstallBundleFromRegistryAlias(

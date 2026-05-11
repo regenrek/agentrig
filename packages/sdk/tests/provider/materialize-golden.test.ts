@@ -15,8 +15,8 @@ describe('materializePlugin golden fixture', () => {
       tree,
       pickedSignals,
       manifest: {
-        id: 'community.dots-like',
-        name: 'Dots Like',
+        name: 'community.dots-like',
+        displayName: 'Dots Like',
         description: 'Selected workflows from dots-like.',
         version: '1.0.0',
         keywords: ['review', 'debug'],

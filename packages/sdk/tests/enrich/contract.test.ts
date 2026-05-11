@@ -40,7 +40,7 @@ describe('AiEnrichmentDraft contract', () => {
   it('rejects unsafe or non-canonical draft fields', () => {
     expect(validateEnrichmentDraft({ description: '[click](https://example.com)' })).toMatchObject({ ok: false })
     expect(validateEnrichmentDraft({ keywords: ['free'] })).toMatchObject({ ok: false })
-    expect(validateEnrichmentDraft({ suggestedPluginId: 'not-a-plugin-id' })).toMatchObject({ ok: false })
+    expect(validateEnrichmentDraft({ suggestedPluginId: 'not..plugin' })).toMatchObject({ ok: false })
     expect(validateEnrichmentDraft({})).toEqual({
       ok: false,
       reason: 'Enrichment draft must include at least one field',

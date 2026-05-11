@@ -95,33 +95,6 @@ describe('command:search', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('derives the canonical install token from legacy slug-only search responses', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      statusText: 'OK',
-      text: async () =>
-        JSON.stringify({
-          results: [
-            {
-              slug: 'regenrek-agent-skills--skill-pr-commiter',
-              kind: 'skill',
-              origin: 'bundled',
-              displayName: 'PR commiter',
-              version: '0.1.0',
-              score: 0.5,
-            },
-          ],
-        }),
-    })
-
-    await runSearch({ args: { query: 'commiter', cwd: '/repo' } })
-
-    expect(console.log).toHaveBeenCalledWith(
-      'regenrek.agent-skills--skill-pr-commiter  v0.1.0  [skill]  PR commiter  (0.500)'
-    )
-  })
-
   it('throws when the search endpoint returns a non-OK response', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,

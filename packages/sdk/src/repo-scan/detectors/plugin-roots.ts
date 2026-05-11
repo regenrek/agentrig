@@ -134,7 +134,7 @@ function normalizeMarketplaceSource(source: string, rootPath: string) {
 
 function parseAgentrigPluginManifestCandidate(raw: unknown) {
   if (!isRecord(raw)) return undefined
-  const artifactId = typeof raw.id === 'string' ? raw.id.trim() : ''
+  const artifactId = typeof raw.name === 'string' ? raw.name.trim() : ''
   if (!artifactId) return undefined
   const version = typeof raw.version === 'string' && raw.version.trim() ? raw.version.trim() : undefined
   return { artifactId, ...(version ? { version } : {}) }

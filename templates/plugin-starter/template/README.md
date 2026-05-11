@@ -2,6 +2,8 @@
 
 __PLUGIN_DESCRIPTION__
 
+This manifest is compatible with the [Open Plugins specification](https://open-plugins.com/plugin-builders/specification).
+
 ## Publishing
 
 This scaffold is for authoring and local testing. Publish it to a static signed
@@ -49,6 +51,7 @@ __PLUGIN_ID__/
 ### Refresh plugin metadata
 
 Update `.plugin/plugin.json` when plugin identity or public metadata changes.
+AgentRig-specific configuration belongs under `x-agentrig`.
 
 ### Export for Claude Marketplace
 

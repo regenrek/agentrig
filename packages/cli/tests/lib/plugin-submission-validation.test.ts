@@ -96,15 +96,11 @@ describe('validatePluginBundle', () => {
         path: '.plugin/plugin.json',
         content: JSON.stringify({
           $schema: 'https://agentrig.ai/schema/plugin.v1.json',
-          kind: 'agentrig:plugin',
-          id: 'demo.test-plugin',
-          name: 'Test Plugin',
+          name: 'demo.test-plugin',
           description: 'Demo plugin',
           version: '1.0.0',
-          configSchema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {},
+          'x-agentrig': {
+            displayName: 'Test Plugin',
           },
         }),
       },
@@ -121,7 +117,7 @@ describe('validatePluginBundle', () => {
     await expect(validatePluginBundle(zipBytes, LOCAL_PLUGIN_POLICY)).resolves.toMatchObject({
       fileCount: 3,
       manifest: expect.objectContaining({
-        id: 'demo.test-plugin',
+        name: 'demo.test-plugin',
       }),
     })
   })
@@ -132,15 +128,11 @@ describe('validatePluginBundle', () => {
         path: '.plugin/plugin.json',
         content: JSON.stringify({
           $schema: 'https://agentrig.ai/schema/plugin.v1.json',
-          kind: 'agentrig:plugin',
-          id: 'demo.demo-plugin',
-          name: 'Demo Plugin',
+          name: 'demo.demo-plugin',
           description: 'Demo plugin',
           version: '1.0.0',
-          configSchema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {},
+          'x-agentrig': {
+            displayName: 'Demo Plugin',
           },
         }),
       },

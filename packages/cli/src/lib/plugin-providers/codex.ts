@@ -25,7 +25,9 @@ import {
   copyEntries,
   detectPluginFeatures,
   normalizeManifestDescription,
+  normalizeManifestVersion,
   pluginAuthor,
+  pluginDisplayName,
   providerPluginName,
 } from './shared'
 
@@ -48,16 +50,16 @@ function buildCodexPluginManifest(
 ): CodexPluginManifest {
   return codexPluginManifestSchema.parse({
     name: pluginName,
-    version: plugin.manifest.version,
+    version: normalizeManifestVersion(plugin.manifest),
     description: normalizeManifestDescription(plugin.manifest),
     ...(pluginAuthor(plugin.manifest, owner) ? { author: pluginAuthor(plugin.manifest, owner) } : {}),
     ...(features.hasSkills ? { skills: './skills/' } : {}),
     ...(features.hasClaudeMcp ? { mcpServers: './.mcp.json' } : {}),
     ...(features.hasCodexApp ? { apps: './.app.json' } : {}),
     interface: {
-      displayName: plugin.manifest.name,
+      displayName: pluginDisplayName(plugin.manifest),
       shortDescription: normalizeManifestDescription(plugin.manifest),
-      developerName: plugin.manifest.author ?? owner.name,
+      developerName: plugin.manifest.author?.name ?? owner.name,
       category: 'Productivity',
     },
   })
@@ -236,9 +238,9 @@ export const codexProvider: PluginProviderAdapter = {
 
     for (const plugin of result.plugins) {
       const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
-      const installMetadata = installMetadataByPluginId[plugin.manifest.id]
+      const installMetadata = installMetadataByPluginId[plugin.manifest.name]
       if (!installMetadata) {
-        throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
+        throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.name}`)
       }
       const entry = codexMarketplacePluginSchema.parse({
         name: pluginName,
@@ -255,7 +257,7 @@ export const codexProvider: PluginProviderAdapter = {
       const installResult = await codexInstallPlugin({
         marketplaceName: result.marketplaceName,
         pluginName,
-        version: plugin.manifest.version,
+        version: normalizeManifestVersion(plugin.manifest),
         sourcePath: staged.marketplacePath,
         enable,
       })
@@ -277,8 +279,8 @@ export const codexProvider: PluginProviderAdapter = {
         specIdentity: installMetadata.specIdentity,
         registry: installMetadata.registry,
         scope,
-        pluginId: plugin.manifest.id,
-        pluginVersion: plugin.manifest.version,
+        pluginId: plugin.manifest.name,
+        pluginVersion: normalizeManifestVersion(plugin.manifest),
         snapshotDigest: installMetadata.snapshotDigest,
         pluginName,
         targetPaths: [installResult.installPath, staged.marketplacePath],

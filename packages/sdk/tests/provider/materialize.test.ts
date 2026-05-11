@@ -21,8 +21,8 @@ describe('materializePlugin', () => {
       tree,
       pickedSignals,
       manifest: {
-        id: 'community.review',
-        name: 'Review',
+        name: 'community.review',
+        displayName: 'Review',
         description: 'Review workflow.',
         version: '1.0.0',
         keywords: ['review'],
@@ -45,10 +45,13 @@ describe('materializePlugin', () => {
 
     const manifest = JSON.parse(decode(files.find((file) => file.path === '.plugin/plugin.json')?.bytes))
     expect(manifest).toMatchObject({
-      kind: 'agentrig:plugin',
-      id: 'community.review',
-      configSchema: {},
+      $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+      name: 'community.review',
       'x-agentrig': {
+        displayName: 'Review',
+        kind: 'plugin',
+        configSchema: {},
+        pluginDependencies: [],
         source: {
           kind: 'external-repo',
           owner: 'owner',
@@ -73,8 +76,8 @@ describe('materializePlugin', () => {
         tree,
         pickedSignals: scan.signals,
         manifest: {
-          id: 'community.review',
-          name: 'Review',
+          name: 'community.review',
+          displayName: 'Review',
           description: 'Review workflow.',
           version: '1.0.0',
           source: { scanDigest: scan.digest },
@@ -97,8 +100,8 @@ describe('materializePlugin', () => {
         tree: changedTree,
         pickedSignals: scan.signals,
         manifest: {
-          id: 'community.review',
-          name: 'Review',
+          name: 'community.review',
+          displayName: 'Review',
           description: 'Review workflow.',
           version: '1.0.0',
           source: { scanDigest: scan.digest },

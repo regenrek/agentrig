@@ -77,4 +77,9 @@ AgentRig trust tiers are:
 
 ## Manifests
 
+Plugin source directories carry `.plugin/plugin.json`. AgentRig plugin manifests
+are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification)
+conformant. `name` is the canonical plugin id, and AgentRig-specific fields live
+under `x-agentrig`.
+
 The CLI stores installed plugins in `.agentrig/manifest.json` so it can remove or update them safely later.

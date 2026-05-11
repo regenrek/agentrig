@@ -115,7 +115,7 @@ describe('buildAgentrigUseCommand', () => {
     ).toThrow(/Invalid provider/)
   })
 
-  it('rejects malformed plugin ids in as-plugin mode', () => {
+  it('rejects malformed Open Plugins names in as-plugin mode', () => {
     expect(() =>
       buildAgentrigUseCommand({
         repoFullName: 'anthropics/skills',
@@ -123,7 +123,7 @@ describe('buildAgentrigUseCommand', () => {
         picks: ['skills/review'],
         mode: { kind: 'as-plugin', pluginId: 'Invalid Id!' },
       })
-    ).toThrow(/Invalid plugin id/)
+    ).toThrow(/Invalid Open Plugins name/)
   })
 
   it('quotes picks containing spaces', () => {

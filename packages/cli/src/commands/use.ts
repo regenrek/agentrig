@@ -188,8 +188,8 @@ const command = defineCommand({
         tree: resolved.tree,
         pickedSignals,
         manifest: {
-          id: pluginId,
-          name: titleFromPluginId(pluginId),
+          name: pluginId,
+          displayName: titleFromPluginId(pluginId),
           description: enrichment?.description ?? `AgentRig plugin generated from ${report.source.label}.`,
           version: '0.1.0',
           keywords: enrichment?.keywords,
