@@ -163,9 +163,13 @@ export type ListingInstallResolution = z.infer<typeof ListingInstallResolutionSc
 export type VerifyIssue = {
   path: string
   // `extra` is the hard-cut issue code for fetched bytes that are not declared in file_list.
-  code: 'missing' | 'duplicate' | 'size_mismatch' | 'sha256_mismatch' | 'extra'
+  code: 'not_written' | 'not_fetched' | 'duplicate' | 'size_mismatch' | 'hash_mismatch' | 'extra'
   expected?: string | number
   actual?: string | number
+  error?: string
+  status?: number
+  url?: string
+  bodySnippet?: string
 }
 
 export type VerifyResult =
@@ -194,6 +198,7 @@ export type FetchedInstallFile =
       error?: string
       status?: number
       url?: string
+      bodySnippet?: string
     }
 
 export async function verifyInstallBundleHashes(
@@ -201,10 +206,14 @@ export async function verifyInstallBundleHashes(
   fetchedFiles: readonly FetchedInstallFile[]
 ): Promise<VerifyResult> {
   const fetchedByPath = new Map<string, Uint8Array>()
+  const missingByPath = new Map<string, Extract<FetchedInstallFile, { missing: true }>>()
   const duplicatePaths = new Set<string>()
 
   for (const file of fetchedFiles) {
-    if (file.missing) continue
+    if (file.missing) {
+      if (!missingByPath.has(file.path)) missingByPath.set(file.path, file)
+      continue
+    }
     const bytes = bytesFromFetchedFile(file.bytes)
     if (fetchedByPath.has(file.path)) duplicatePaths.add(file.path)
     fetchedByPath.set(file.path, bytes)
@@ -220,7 +229,8 @@ export async function verifyInstallBundleHashes(
   for (const expected of bundle.file_list) {
     const bytes = fetchedByPath.get(expected.path)
     if (!bytes) {
-      issues.push({ path: expected.path, code: 'missing' })
+      const missing = missingByPath.get(expected.path)
+      issues.push(formatMissingInstallFileIssue(expected.path, missing))
       continue
     }
 
@@ -238,7 +248,7 @@ export async function verifyInstallBundleHashes(
     if (actualSha256 !== expected.sha256) {
       issues.push({
         path: expected.path,
-        code: 'sha256_mismatch',
+        code: 'hash_mismatch',
         expected: expected.sha256,
         actual: actualSha256,
       })
@@ -252,6 +262,28 @@ export async function verifyInstallBundleHashes(
   }
 
   return issues.length ? { ok: false, checked, issues } : { ok: true, checked, issues: [] }
+}
+
+function formatMissingInstallFileIssue(
+  path: string,
+  missing: Extract<FetchedInstallFile, { missing: true }> | undefined
+): VerifyIssue {
+  if (!missing) return { path, code: 'not_written' }
+  if (typeof missing.status === 'number' || missing.url) {
+    return {
+      path,
+      code: 'not_fetched',
+      error: missing.error,
+      status: missing.status,
+      url: missing.url,
+      bodySnippet: missing.bodySnippet,
+    }
+  }
+  return {
+    path,
+    code: 'not_written',
+    error: missing.error,
+  }
 }
 
 export function isResolvable(listing: Pick<MarketplaceListingPublic, 'installability'>): boolean {

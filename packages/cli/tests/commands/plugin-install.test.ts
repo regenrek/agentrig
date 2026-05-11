@@ -206,7 +206,7 @@ describe('command:plugin install', () => {
     expect(mocks.cleanupMaterializedPlugin).toHaveBeenCalledWith('/tmp/materialized-plugins')
   })
 
-  it('returns before resolving the install graph when the plugin is already installed without --force', async () => {
+  it('skips an already installed plugin without --force and reinstalls it with --force', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'agentrig-plugin-install-test-'))
     tempDirs.push(root)
     const cwd = path.join(root, 'workspace')
@@ -283,10 +283,32 @@ describe('command:plugin install', () => {
     expect(mocks.loadConfig).not.toHaveBeenCalled()
     expect(mocks.resolvePluginGraph).not.toHaveBeenCalled()
     expect(mocks.materializeResolvedPluginGraph).not.toHaveBeenCalled()
+
+    vi.clearAllMocks()
+    await expect(run({
+      args: {
+        provider: 'codex',
+        spec: 'agentrig/demo-plugin',
+        cwd,
+        scope: undefined,
+        force: true,
+        dryRun: false,
+        help: false,
+      },
+    })).resolves.toBeUndefined()
+
+    expect(mocks.loadConfig).toHaveBeenCalledTimes(1)
+    expect(mocks.resolvePluginGraph).toHaveBeenCalledWith(
+      'agentrig/demo-plugin',
+      cwd,
+      [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }],
+    )
+    expect(mocks.materializeResolvedPluginGraph).toHaveBeenCalledTimes(1)
+    expect(mocks.preparePluginInstall).toHaveBeenCalledWith(expect.objectContaining({ force: true }))
   })
 
   it('fails fast when materialization rejects a resolved install bundle', async () => {
-    mocks.materializeResolvedPluginGraph.mockRejectedValueOnce(new Error('sha256_mismatch'))
+    mocks.materializeResolvedPluginGraph.mockRejectedValueOnce(new Error('hash_mismatch'))
 
     await expect(
       run({
@@ -300,7 +322,7 @@ describe('command:plugin install', () => {
           help: false,
         },
       }),
-    ).rejects.toThrow(/sha256_mismatch/i)
+    ).rejects.toThrow(/hash_mismatch/i)
     expect(mocks.cleanupMaterializedPlugin).not.toHaveBeenCalled()
   })
 

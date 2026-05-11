@@ -94,6 +94,7 @@ export const LOCAL_PLUGIN_POLICY: PluginUploadPolicySnapshot = {
 }
 
 const DEFAULT_FETCH_TIMEOUT_MS = 15000
+const INSTALL_BUNDLE_FETCH_CONCURRENCY = 4
 const MAX_RETRIES = 1
 const RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504])
 
@@ -248,7 +249,9 @@ export async function readInstallBundleFile(
 ): Promise<Uint8Array> {
   const url = installBundleFileUrl(bundle, file)
   const res = await fetchWithTimeout(url, {})
-  if (!res.ok) throw new InstallBundleFileFetchError(url, res.status)
+  if (!res.ok) {
+    throw new InstallBundleFileFetchError(url, res.status, await readResponseSnippet(res))
+  }
   return new Uint8Array(await res.arrayBuffer())
 }
 
@@ -259,49 +262,75 @@ export async function readSourceFile(source: SourceBase, relPath: string): Promi
 }
 
 export async function fetchInstallBundleFiles(bundle: InstallBundle): Promise<FetchedInstallFile[]> {
-  return Promise.all(
-    bundle.file_list.map(async (file) => {
-      if (file.inline) {
-        try {
-          return { path: file.path, bytes: decodeBase64(file.inline) }
-        } catch (error) {
-          return {
-            path: file.path,
-            missing: true,
-            error: `Invalid inline payload: ${error instanceof Error ? error.message : String(error)}`,
-          }
-        }
-      }
+  return mapWithConcurrency(bundle.file_list, INSTALL_BUNDLE_FETCH_CONCURRENCY, async (file) => {
+    if (file.inline) {
       try {
-        return {
-          path: file.path,
-          bytes: await readInstallBundleFile(bundle, file),
-        }
+        return { path: file.path, bytes: decodeBase64(file.inline) }
       } catch (error) {
-        if (error instanceof InstallBundleFileFetchError) {
-          return {
-            path: file.path,
-            missing: true,
-            error: error.message,
-            status: error.status,
-            url: error.url,
-          }
-        }
         return {
           path: file.path,
           missing: true,
-          error: error instanceof Error ? error.message : String(error),
+          error: `Invalid inline payload: ${error instanceof Error ? error.message : String(error)}`,
         }
       }
-    })
-  )
+    }
+    try {
+      return {
+        path: file.path,
+        bytes: await readInstallBundleFile(bundle, file),
+      }
+    } catch (error) {
+      if (error instanceof InstallBundleFileFetchError) {
+        return {
+          path: file.path,
+          missing: true,
+          error: error.message,
+          status: error.status,
+          url: error.url,
+          bodySnippet: error.bodySnippet,
+        }
+      }
+      return {
+        path: file.path,
+        missing: true,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+  })
+}
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await mapper(items[index]!)
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  return results
 }
 
 class InstallBundleFileFetchError extends Error {
-  constructor(readonly url: string, readonly status: number) {
+  constructor(readonly url: string, readonly status: number, readonly bodySnippet?: string) {
     super(`Request failed (${status}) for ${url}`)
     this.name = 'InstallBundleFileFetchError'
   }
+}
+
+async function readResponseSnippet(res: Response) {
+  const text = await res.text()
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  return normalized ? normalized.slice(0, 500) : undefined
 }
 
 function decodeBase64(value: string): Uint8Array {

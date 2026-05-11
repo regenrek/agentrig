@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.9] - 2026-05-11
+
+### Fixed
+- Fixed non-deterministic install-bundle hash verification by capping remote bundle fetch concurrency and preserving the real failure mode from each file fetch. HTTP failures now report `not_fetched` with status, URL, and response snippet instead of being folded into misleading missing-file output.
+- Hash verification now distinguishes `hash_mismatch` from `not_written`, so corrupt bytes, failed downloads, and bundle entries without retrievable bytes surface as separate deterministic errors.
+- URL-backed install-bundle files are now fetched directly when no inline bytes are present, matching the public bundle contract.
+
 ## [0.7.8] - 2026-05-11
 
 ### Fixed
