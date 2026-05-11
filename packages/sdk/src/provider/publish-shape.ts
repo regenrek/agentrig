@@ -1,7 +1,7 @@
 import type { RepoScanPluginCandidate, RepoScanReport } from '../repo-scan/types'
 import type { ArtifactClosure, ArtifactClosureStatus, ArtifactFileDigest, ExtractedArtifact } from './extract-artifacts'
 import { extractArtifactsFromRepoScan } from './extract-artifacts'
-import { formatArtifactSelector, parseArtifactSelector, type ArtifactKind, type SelectableArtifactKind } from './artifact-kinds'
+import { parseArtifactSelector, type ArtifactKind } from './artifact-kinds'
 import { destinationPathForSignalFile } from './materialize'
 
 export const PUBLISH_SHAPE_KINDS = [
@@ -300,6 +300,7 @@ function blockedReasonForShape(
   }
   if (selectedArtifacts.length === 0) return `${shape} requires at least one selected artifact.`
   if (shape === 'generated_plugin') {
+    if (scan.pluginCandidate) return 'generated_plugin is only available when no .plugin/plugin.json candidate exists.'
     return transformPlan?.includedSelectors.length ? undefined : 'generated_plugin requires at least one transformable selected artifact.'
   }
   const notClosed = selectedArtifacts.filter((artifact) => artifact.closureStatus !== 'closed')
@@ -323,7 +324,7 @@ function outputsForShape(
   if (shape === 'generated_plugin') {
     return [{
       kind: 'plugin',
-      artifactId: scan.pluginCandidate?.artifactId ?? fallbackPluginArtifactId(scan.source),
+      artifactId: fallbackPluginArtifactId(scan.source),
       installability: allowed ? 'installable' : 'blocked',
     }]
   }
@@ -460,7 +461,23 @@ function artifactsBySelector(
 }
 
 function defaultSelectedSelectors(scan: PublishScanResult) {
-  return scan.artifacts.map((artifact) => formatArtifactSelector(artifact.kind as SelectableArtifactKind, artifact.name))
+  return artifactsInPluginRoot(scan).map((artifact) => artifact.selector)
+}
+
+function artifactsInPluginRoot(scan: PublishScanResult) {
+  const sourcePath = scan.pluginCandidate?.sourcePath
+  if (sourcePath === undefined) return scan.artifacts
+  const root = normalizePluginRoot(sourcePath)
+  if (!root) return scan.artifacts
+  const prefix = `${root}/`
+  return scan.artifacts.filter((artifact) =>
+    artifact.sourcePath === root || artifact.sourcePath.startsWith(prefix)
+  )
+}
+
+function normalizePluginRoot(sourcePath: string) {
+  const trimmed = sourcePath.trim().replace(/\/+$/g, '')
+  return trimmed === '.' ? '' : trimmed
 }
 
 function fallbackPluginArtifactId(source: SubmitSource) {

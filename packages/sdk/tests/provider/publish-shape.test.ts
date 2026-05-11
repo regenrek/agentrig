@@ -25,6 +25,24 @@ const pluginCandidate: PublishPluginCandidate = {
   version: '1.0.0',
   sourcePath: '.',
   manifestPath: '.plugin/plugin.json',
+  manifest: {
+    name: 'acme.tools',
+    version: '1.0.0',
+    description: 'Acme tools.',
+    author: { name: 'Acme' },
+    'x-agentrig': {
+      displayName: 'Acme Tools',
+      kind: 'plugin',
+      configSchema: {},
+      pluginDependencies: [],
+    },
+  },
+  manifestFile: {
+    path: '.plugin/plugin.json',
+    digest: 'sha256:plugin',
+    bytes: 42,
+    content: '{"name":"acme.tools","version":"1.0.0"}',
+  },
   files: [{ path: '.plugin/plugin.json', digest: 'sha256:plugin' }],
 }
 
@@ -74,6 +92,52 @@ describe('publish shape primitives', () => {
       review: { provenanceVerified: true, ownershipVerified: true },
     })
     expect(payload.publishShape.includedSelectors).toEqual(['mcp:mcp', 'skill:review'])
+    expect(candidates.find((candidate) => candidate.shape === 'generated_plugin')).toMatchObject({
+      allowed: false,
+      blockedReason: expect.stringMatching(/no \.plugin\/plugin\.json/i),
+    })
+  })
+
+  it('scopes plugin_all default selectors to the detected plugin root', async () => {
+    const report = await scanRepo({
+      source: { type: 'virtual', label: 'fixture', ref: source.ref, commitSha: source.commitSha },
+      tree: createMemoryTree({
+        'plugins/regenrek.agentic-engineer-core/.plugin/plugin.json': JSON.stringify({
+          $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+          name: 'regenrek.agentic-engineer-core',
+          description: 'Agentic engineer core workflow skills.',
+          version: '0.3.0',
+          author: { name: 'Regenrek' },
+          keywords: ['agentic', 'engineering'],
+          'x-agentrig': {
+            displayName: 'Agentic Engineer Core',
+            kind: 'plugin',
+            configSchema: {},
+            pluginDependencies: [],
+          },
+        }),
+        'plugins/regenrek.agentic-engineer-core/skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+        'skills/standalone/SKILL.md': '---\nname: Standalone\ndescription: Outside plugin root.\n---\nBody',
+      }),
+    })
+    const scan = buildPublishScanResult({
+      source,
+      report,
+      scannerVersion: 'repo-scan-v1',
+    })
+
+    const pluginAll = buildPublishShapeCandidates(scan)
+      .find((candidate) => candidate.shape === 'plugin_all')
+    const payload = buildSubmitPublishPayload({
+      source,
+      scan,
+      requestedShape: 'plugin_all',
+      review: { provenanceVerified: true, ownershipVerified: true },
+    })
+
+    expect(pluginAll?.includedSelectors).toEqual(['skill:review'])
+    expect(pluginAll?.includedSelectors).not.toContain('skill:standalone')
+    expect(payload.publishShape.includedSelectors).toEqual(['skill:review'])
   })
 
   it('uses plugin identity lifted from the repo scan report', async () => {
@@ -108,6 +172,16 @@ describe('publish shape primitives', () => {
       version: '0.2.0',
       sourcePath: '.',
       manifestPath: '.plugin/plugin.json',
+      manifest: {
+        name: 'regenrek.test-submission',
+        version: '0.2.0',
+        description: 'Reference plugin.',
+        author: { name: 'AgentRig' },
+      },
+      manifestFile: {
+        path: '.plugin/plugin.json',
+        content: expect.stringContaining('regenrek.test-submission'),
+      },
     })
     expect(scan.pluginCandidate?.files.map((file) => file.path)).toEqual([
       '.plugin/plugin.json',

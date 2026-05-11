@@ -141,7 +141,7 @@ describe('marketplace listing contracts', () => {
     })
     expect(manifest.version).toBeUndefined()
     expect(manifest.description).toBeUndefined()
-    expect((manifest as Record<string, unknown>).commands).toBeUndefined()
+    expect((manifest as Record<string, unknown>).commands).toEqual({ review: './commands/review.md' })
   })
 
   it('validates Open Plugins name and version syntax', () => {

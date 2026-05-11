@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.1] - 2026-05-11
+
+### Fixed
+- Repo scans now surface existing `.plugin/plugin.json` manifests as the canonical plugin identity, including nested plugin roots, so hosted submit flows no longer synthesize `<owner>.<repo>` when an authoritative manifest is present.
+
 ## [0.8.0] - 2026-05-11
 
 ### BREAKING: Open Plugins 1.0.0 manifest contract
