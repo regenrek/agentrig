@@ -1,17 +1,15 @@
 {
   "$schema": "https://agentrig.ai/schema/plugin.v1.json",
-  "kind": "agentrig:plugin",
-  "id": "__PLUGIN_ID__",
-  "name": "__PLUGIN_NAME__",
-  "description": "__PLUGIN_DESCRIPTION__",
+  "name": "__PLUGIN_ID__",
   "version": "0.1.0",
-  "author": "__PLUGIN_AUTHOR__",
+  "description": "__PLUGIN_DESCRIPTION__",
+  "author": { "name": "__PLUGIN_AUTHOR__" },
   "license": "MIT",
   "keywords": [],
-  "pluginDependencies": [],
-  "configSchema": {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {}
+  "x-agentrig": {
+    "displayName": "__PLUGIN_NAME__",
+    "kind": "plugin",
+    "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+    "pluginDependencies": []
   }
 }

@@ -86,10 +86,10 @@ describe('commands: inspect/use', () => {
     })
 
     const manifest = JSON.parse(await fs.readFile(path.join(outDir, '.plugin', 'plugin.json'), 'utf-8')) as {
-      id: string
+      name: string
       'x-agentrig': { source: { kind: string; repoUrl: string; pickedSignalPaths: string[] } }
     }
-    expect(manifest.id).toBe('community.review')
+    expect(manifest.name).toBe('community.review')
     expect(manifest['x-agentrig'].source.kind).toBe('external-repo')
     expect(manifest['x-agentrig'].source.repoUrl).toBe(pathToFileURL(fixture).href)
     expect(manifest['x-agentrig'].source.pickedSignalPaths).toEqual(['.mcp.json', 'skills/review'])

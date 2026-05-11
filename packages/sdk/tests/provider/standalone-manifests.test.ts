@@ -68,7 +68,7 @@ describe('standalone artifact manifests', () => {
   it('rejects unknown standalone kinds', () => {
     expect(() =>
       parseStandaloneArtifactManifest({
-        kind: 'agentrig:plugin',
+        kind: 'agentrig:unknown',
         id: 'community.review',
         name: 'Review',
         description: 'Reviews code.',

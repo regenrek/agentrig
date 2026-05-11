@@ -183,6 +183,14 @@ describe('plugin provider command runner', () => {
     })
     await expect(fs.access(path.join(persistentRoot, '.agents', 'plugins', 'marketplace.json'))).resolves.toBeUndefined()
     await expect(fs.access(path.join(persistentRoot, 'plugins', providerName, '.codex-plugin', 'plugin.json'))).resolves.toBeUndefined()
+    await expect(
+      readJson(path.join(persistentRoot, 'plugins', providerName, '.codex-plugin', 'plugin.json'))
+    ).resolves.toMatchObject({
+      name: providerName,
+      interface: {
+        displayName: 'Agent Skills',
+      },
+    })
     expect(result[0]?.installed).toEqual([providerName])
     expect(result[0]?.locations[0]).toBe(persistentRoot)
     const ledgers = await loadPluginInstallLedgers(cwd)
@@ -465,7 +473,7 @@ describe('plugin provider command runner', () => {
     await fs.writeFile(path.join(persistentRoot, 'marketplace-marker.txt'), 'still installed')
     const record = claudeInstallRecord(persistentRoot)
     await savePluginInstallLedger(cwd, 'personal', {
-      schemaVersion: 3,
+      schemaVersion: 4,
       installs: { [record.id]: record },
       selections: {},
     })
@@ -502,12 +510,12 @@ async function writePluginSource(pluginsRoot: string, pluginId: string) {
   const pluginDir = path.join(pluginsRoot, pluginId)
   await fs.mkdir(path.join(pluginDir, '.plugin'), { recursive: true })
   await fs.writeFile(path.join(pluginDir, '.plugin', 'plugin.json'), `${JSON.stringify({
-    kind: 'agentrig:plugin',
-    id: pluginId,
     name: pluginId,
     description: 'Dotted artifact plugin for provider install tests.',
     version: '1.0.0',
-    configSchema: {},
+    'x-agentrig': {
+      displayName: 'Agent Skills',
+    },
   }, null, 2)}\n`)
 }
 

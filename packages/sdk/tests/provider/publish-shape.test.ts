@@ -81,12 +81,17 @@ describe('publish shape primitives', () => {
       source: { type: 'virtual', label: 'fixture', ref: source.ref, commitSha: source.commitSha },
       tree: createMemoryTree({
         '.plugin/plugin.json': JSON.stringify({
-          kind: 'agentrig:plugin',
-          id: 'regenrek.test-submission',
-          name: 'Test Submission',
+          $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+          name: 'regenrek.test-submission',
           description: 'Reference plugin.',
           version: '0.2.0',
-          configSchema: {},
+          author: { name: 'AgentRig' },
+          'x-agentrig': {
+            displayName: 'Test Submission',
+            kind: 'plugin',
+            configSchema: {},
+            pluginDependencies: [],
+          },
         }),
         'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
       }),

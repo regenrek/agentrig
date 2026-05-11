@@ -1,3 +1,5 @@
+import { isValidPluginName } from './plugin-names'
+
 export type AgentrigUseProvider = 'claude' | 'codex' | 'cursor' | 'all'
 
 export type AgentrigUseMode =
@@ -19,7 +21,6 @@ const COMMIT_SHA_RE = /^[a-f0-9]{7,40}$/i
 const REF_RE = /^[A-Za-z0-9_./-]{1,200}$/
 const SUBDIR_RE = /^[A-Za-z0-9_./-]{1,200}$/
 const PICK_RE = /^[A-Za-z0-9_./@-][A-Za-z0-9_./@ -]{0,300}$/
-const PLUGIN_ID_RE = /^[a-z0-9][a-z0-9._-]{0,80}$/
 const PROVIDERS = new Set<AgentrigUseProvider>(['claude', 'codex', 'cursor', 'all'])
 
 /**
@@ -48,8 +49,8 @@ export function buildAgentrigUseCommand(input: BuildAgentrigUseCommandInput): st
   if (!PROVIDERS.has(provider)) throw new Error(`Invalid provider: ${provider}`)
 
   const mode: AgentrigUseMode = input.mode ?? { kind: 'install' }
-  if (mode.kind === 'as-plugin' && !PLUGIN_ID_RE.test(mode.pluginId)) {
-    throw new Error(`Invalid plugin id: ${mode.pluginId}`)
+  if (mode.kind === 'as-plugin' && !isValidPluginName(mode.pluginId)) {
+    throw new Error(`Invalid Open Plugins name: ${mode.pluginId}`)
   }
 
   const refValue = input.commitSha?.trim() || input.ref?.trim() || ''

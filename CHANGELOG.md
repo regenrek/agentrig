@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.8.0] - 2026-05-11
+
+### BREAKING: Open Plugins 1.0.0 manifest contract
+
+AgentRig now requires Open Plugins 1.0.0 conformant `.plugin/plugin.json` manifests. All plugins authored against the previous AgentRig-proprietary shape must be rewritten by hand. There is no automatic migration.
+
+Spec: https://open-plugins.com/plugin-builders/specification
+
+#### Field mapping
+
+| Old (Root) | New |
+|---|---|
+| `id` | `name` |
+| `name` (display) | `x-agentrig.displayName` |
+| `kind` value `"agentrig:plugin"` | `x-agentrig.kind: "plugin"` |
+| `configSchema` | `x-agentrig.configSchema` |
+| `pluginDependencies` | `x-agentrig.pluginDependencies` |
+| `author: "..."` (string) | `author: { "name": "..." }` (object) |
+
+Root also accepts standard Open Plugins metadata fields: `homepage`, `repository`, `logo`, `license`, plus `commands`, `agents`, `skills`, `rules`, `hooks`, `mcpServers`, `lspServers`, `outputStyles` (metadata-only in this release).
+
+#### CLI install ledger reset
+
+The local plugin install ledger schemaVersion bumped. On first run after upgrading, the CLI will back up and reset `~/.agentrig/plugin-installs.json` and workspace `.agentrig/plugin-installs.json`. Previously installed plugins must be reinstalled. Provider-native marketplace state in Claude/Codex/Cursor is not reset and may need manual cleanup.
+
+#### Convex data reset
+
+The hosted marketplace dev and prod databases were wiped as part of this release. Existing artifact listings, submissions, inspect saves, enrichment drafts, publish tokens, and trusted publisher records are gone. Re-submit your plugins via the standard submit flow.
+
+#### Schema URL
+
+`https://agentrig.ai/schema/plugin.v1.json` is now Open Plugins 1.0.0 conformant. The URL itself is unchanged; the body is new.
+
 ## [0.7.9] - 2026-05-11
 
 ### Fixed

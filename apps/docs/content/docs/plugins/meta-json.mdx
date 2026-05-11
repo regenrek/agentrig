@@ -6,26 +6,26 @@ icon: FileBraces
 
 # .plugin/plugin.json
 
-`.plugin/plugin.json` defines a plugin's identity and the files it installs.
-It also powers registry indexing and trust validation.
+`.plugin/plugin.json` defines a plugin's identity and metadata. It also powers
+registry indexing and trust validation.
+
+AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
 
 ```json
 {
-  "$schema": "https://agentrig.ai/schema/plugin.json",
-  "kind": "agentrig:plugin",
-  "name": "core-committer",
-  "title": "Committer skill",
-  "description": "Adds a committer skill with a safe commit helper script.",
+  "$schema": "https://agentrig.ai/schema/plugin.v1.json",
+  "name": "agentrig.core-committer",
   "version": "0.1.0",
-  "author": "agentrig",
-  "tags": ["git", "workflow"],
-  "rigDependencies": ["security-check"],
-  "files": [
-    {
-      "path": "skills/committer/SKILL.md",
-      "target": "{{skillsDir}}/committer/SKILL.md"
-    }
-  ]
+  "description": "Adds a committer skill with a safe commit helper script.",
+  "author": { "name": "AgentRig" },
+  "license": "MIT",
+  "keywords": ["git", "workflow"],
+  "x-agentrig": {
+    "displayName": "Committer Skill",
+    "kind": "plugin",
+    "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+    "pluginDependencies": []
+  }
 }
 ```
 
@@ -33,19 +33,19 @@ It also powers registry indexing and trust validation.
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `name` | Yes | Plugin identifier (`kebab-case`). |
-| `title` | Yes | Human-readable name. |
-| `description` | Yes | Short summary for registry listings. |
-| `version` | Yes | Semver version (`1.2.3`). |
-| `files` | Yes | Install plan (`path` + `target`). |
-| `$schema` | No | JSON schema URL for editor hints. |
-| `kind` | No | Defaults to `agentrig:plugin`. |
-| `author` | No | Author or organization. |
+| `name` | Yes | Canonical Open Plugins machine identifier (`namespace.plugin`). |
+| `version` | No | Semver version (`1.2.3`). |
+| `description` | No | Short summary for registry listings. |
+| `author` | No | Open Plugins author object, for example `{ "name": "AgentRig" }`. |
 | `license` | No | SPDX identifier. |
-| `tags` | No | Keywords for filtering. |
-| `rigDependencies` | No | Plugins installed before this one. |
-| `components` | No | Claude plugin metadata. |
+| `keywords` | No | Open Plugins keywords for filtering. |
+| `homepage`, `repository`, `logo` | No | Standard Open Plugins metadata. |
+| `commands`, `agents`, `skills`, `rules`, `hooks`, `mcpServers`, `lspServers`, `outputStyles` | No | Standard Open Plugins metadata-only fields in this release. |
+| `x-agentrig.displayName` | No | AgentRig display label. |
+| `x-agentrig.kind` | No | AgentRig artifact kind, usually `plugin`. |
+| `x-agentrig.configSchema` | No | AgentRig-specific plugin configuration schema. |
+| `x-agentrig.pluginDependencies` | No | AgentRig plugin dependencies installed before this plugin. |
 
 <Callout title="Schemas">
-The CLI generates `$schema` using `https://agentrig.ai/schema/plugin.json`.
+The CLI generates `$schema` using `https://agentrig.ai/schema/plugin.v1.json`.
 </Callout>

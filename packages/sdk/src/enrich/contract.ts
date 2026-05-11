@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isValidPluginName } from '../provider/plugin-names'
 import type { Signal } from '../repo-scan/types'
 
 export const ENRICHMENT_PROMPT_VERSION = 'enrich-v1' as const
@@ -8,7 +9,6 @@ const MAX_PROMPT_SIGNALS = 200
 const MAX_README_EXCERPT_CHARS = 4000
 
 const MARKDOWN_LINK_RE = /\[[^\]]+\]\([^)]+\)/
-const PLUGIN_ID_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 const KEYWORD_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/
 const SPAM_KEYWORDS = new Set(['best', 'free', 'top', 'download', 'hack', 'hacked', 'cracked'])
 
@@ -50,7 +50,7 @@ export const aiEnrichmentDraftSchema: z.ZodType<AiEnrichmentDraft> = z
       .string()
       .trim()
       .toLowerCase()
-      .refine((value) => PLUGIN_ID_RE.test(value), 'Suggested plugin id must be namespace.plugin')
+      .refine(isValidPluginName, 'Suggested plugin name must be a valid Open Plugins name')
       .optional(),
   })
   .strict()
@@ -109,7 +109,7 @@ export function buildEnrichmentPrompt(input: EnrichmentPromptInput) {
     'You fill missing AgentRig plugin metadata from deterministic evidence.',
     'Return only JSON matching: { "description"?: string, "keywords"?: string[], "suggestedPluginId"?: string }.',
     'Keywords must be lowercase slug tokens: letters, numbers, or hyphens only; no spaces, underscores, punctuation, marketing terms, or duplicates.',
-    'suggestedPluginId must be namespace.plugin with lowercase letters, numbers, dots, and hyphens only.',
+    'suggestedPluginId must be a lowercase Open Plugins name using letters, numbers, dots, and hyphens only.',
     'Do not invent capabilities. Do not include markdown links. Keep output draft-only and evidence-bound.',
   ].join(' ')
 

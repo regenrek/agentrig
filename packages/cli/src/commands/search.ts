@@ -9,14 +9,13 @@ import {
 } from '@agentrig/sdk'
 import { loadConfig } from '../lib/config'
 import {
-  canonicalInstallTokenFromSlug,
   resolveConfiguredRegistry,
   normalizeRegistryUrl,
 } from '../lib/registry'
 
 const SearchHitSchema = z.object({
   slug: z.string().trim().min(1),
-  artifactId: z.string().trim().min(1).optional(),
+  artifactId: z.string().trim().min(1),
   kind: CliSupportedKindSchema,
   origin: z.enum(['standalone', 'bundled']),
   displayName: z.string().trim().min(1),
@@ -117,10 +116,7 @@ const command = defineCommand({
 
 function normalizeSearchResponse(response: z.infer<typeof SearchResponseSchema>): { results: SearchHit[] } {
   return {
-    results: response.results.map((hit) => ({
-      ...hit,
-      artifactId: hit.artifactId ?? canonicalInstallTokenFromSlug(hit.slug),
-    })),
+    results: response.results,
   }
 }
 

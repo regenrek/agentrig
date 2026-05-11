@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { defineCommand, showUsage } from 'citty'
 import { downloadTemplate } from 'giget'
-import { isValidPluginId } from '../../lib/plugin-validation'
+import { isValidPluginName } from '../../lib/plugin-validation'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_TEMPLATE = 'github:regenrek/agentrig/templates/plugin-starter'
@@ -29,7 +29,7 @@ const TEXT_BASENAMES = new Set(['Justfile', 'Makefile', 'Dockerfile', 'LICENSE']
 const args = {
   name: {
     type: 'positional',
-    description: 'Plugin id (will create directory)',
+    description: 'Plugin name (will create directory)',
     required: true,
   },
   template: {
@@ -44,7 +44,7 @@ const args = {
   },
   title: {
     type: 'string',
-    description: 'Plugin display name (default: derived from id)',
+    description: 'Plugin display name (default: derived from name)',
   },
   description: {
     type: 'string',
@@ -192,10 +192,10 @@ async function dirHasAnyFiles(dir: string): Promise<boolean> {
 }
 
 /**
- * Derive display name from plugin id.
+ * Derive display name from plugin name.
  */
-function deriveDisplayName(pluginId: string): string {
-  const slug = pluginId.split('.').at(-1) ?? pluginId
+function deriveDisplayName(pluginName: string): string {
+  const slug = pluginName.split('.').at(-1) ?? pluginName
   return slug
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -211,14 +211,14 @@ const command = defineCommand({
   async run({ args }) {
     if (args.help) return showUsage(command)
 
-    const pluginId = args.name
+    const pluginName = args.name
     const parentDir = args.dir ? path.resolve(args.dir) : process.cwd()
-    const destDir = path.join(parentDir, pluginId)
+    const destDir = path.join(parentDir, pluginName)
 
-    if (!isValidPluginId(pluginId)) {
-      console.error(`Invalid plugin id: ${pluginId}`)
+    if (!isValidPluginName(pluginName)) {
+      console.error(`Invalid plugin name: ${pluginName}`)
       console.error(
-        'Plugin ids must use the canonical namespace.plugin format with lowercase letters, numbers, and hyphens.'
+        'Plugin names must be 1-64 lowercase letters, numbers, dots, or hyphens; start and end alphanumeric; and not contain "--" or "..".'
       )
       process.exit(1)
     }
@@ -243,14 +243,14 @@ const command = defineCommand({
     }
 
     const templateSpec = args.template || DEFAULT_TEMPLATE
-    const pluginSlug = pluginId.split('.').at(-1) ?? pluginId
-    const displayName = args.title || deriveDisplayName(pluginId)
+    const pluginSlug = pluginName.split('.').at(-1) ?? pluginName
+    const displayName = args.title || deriveDisplayName(pluginName)
     const description = args.description || `${displayName} plugin for AgentRig`
     const author = args.author || ''
 
     // Substitution map
     const contentSubs: Record<string, string> = {
-      '__PLUGIN_ID__': pluginId,
+      '__PLUGIN_ID__': pluginName,
       '__PLUGIN_SLUG__': pluginSlug,
       '__PLUGIN_NAME__': displayName,
       '__PLUGIN_DESCRIPTION__': description,
@@ -262,7 +262,7 @@ const command = defineCommand({
       filenameSubs[key] = sanitizeForFilename(value)
     }
 
-    console.log(`Scaffolding plugin "${pluginId}" from ${templateSpec}...`)
+    console.log(`Scaffolding plugin "${pluginName}" from ${templateSpec}...`)
 
     // Determine template source
     let templateRoot: string
@@ -327,11 +327,11 @@ const command = defineCommand({
 
       console.log(`\nCreated ${created.length} file(s) in ${destDir}`)
       console.log('\nNext steps:')
-      console.log(`  cd ${pluginId}`)
+      console.log(`  cd ${pluginName}`)
       console.log('  # Edit .plugin/plugin.json and add optional agents/hooks/scripts directories if needed')
       console.log('  agentrig plugin bundle .')
       console.log('  cd ..')
-      console.log(`  agentrig plugin export --agent all --pluginsDir ./${pluginId} --out dist/plugins`)
+      console.log(`  agentrig plugin export --agent all --pluginsDir ./${pluginName} --out dist/plugins`)
     } finally {
       // Cleanup temp dir if used
       if (tempDir) {

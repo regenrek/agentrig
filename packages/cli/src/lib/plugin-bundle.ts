@@ -9,7 +9,7 @@ import type { PluginBundle, PluginManifest, PluginUploadPolicySnapshot } from '.
 const EXCLUDED_TOP_LEVEL_NAMES = new Set(['node_modules', 'dist', '.git'])
 
 function bundleFileName(manifest: PluginManifest) {
-  return `${manifest.id}-${manifest.version}.zip`
+  return manifest.version ? `${manifest.name}-${manifest.version}.zip` : `${manifest.name}.zip`
 }
 
 function resolveBundlePath(dir: string, fileName: string, outFile?: string, temporary = true) {

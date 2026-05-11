@@ -81,15 +81,11 @@ const command = defineCommand({
 
     const manifest: PluginManifest = {
       $schema: 'https://agentrig.ai/schema/plugin.v1.json',
-      kind: 'agentrig:plugin',
-      id: pluginId,
-      name: args.name ?? deriveDisplayName(pluginId),
+      name: pluginId,
       description: args.description ?? `${deriveDisplayName(pluginId)} plugin for AgentRig`,
       version: args.version,
-      configSchema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {},
+      'x-agentrig': {
+        displayName: args.name ?? deriveDisplayName(pluginId),
       },
     }
 

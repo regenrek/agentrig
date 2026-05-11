@@ -26,6 +26,28 @@ acme.hello-skills/
   README.md
 ```
 
+The scaffolded manifest uses the Open Plugins shape:
+
+```json
+{
+  "$schema": "https://agentrig.ai/schema/plugin.v1.json",
+  "name": "acme.hello-skills",
+  "version": "0.1.0",
+  "description": "A reusable AgentRig plugin.",
+  "author": { "name": "Your Name" },
+  "license": "MIT",
+  "keywords": [],
+  "x-agentrig": {
+    "displayName": "Hello Skills",
+    "kind": "plugin",
+    "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+    "pluginDependencies": []
+  }
+}
+```
+
+AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+
 ## Add files
 
 Add skills, scripts, hooks, agents, or MCP config under the plugin directory.

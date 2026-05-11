@@ -9,17 +9,20 @@ icon: FileBraces
 The plugin schema is served at:
 
 ```
-https://agentrig.ai/schema/plugin.json
+https://agentrig.ai/schema/plugin.v1.json
 ```
+
+AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
 
 It validates:
 
-- `name`, `title`, `description`, `version`
-- `files[]` entries with `path`, `target`, optional `mode` + `sha256`
-- optional `author`, `license`, `tags`, `rigDependencies`
+- `name` as the canonical Open Plugins machine identifier
+- optional Open Plugins metadata such as `version`, `description`, `author`, `license`, `keywords`, `homepage`, `repository`, and `logo`
+- metadata-only Open Plugins root fields including `commands`, `agents`, `skills`, `rules`, `hooks`, `mcpServers`, `lspServers`, and `outputStyles`
+- optional AgentRig-specific metadata under `x-agentrig`
 
 Use `$schema` in your `.plugin/plugin.json` for editor hints:
 
 ```json
-{ "$schema": "https://agentrig.ai/schema/plugin.json" }
+{ "$schema": "https://agentrig.ai/schema/plugin.v1.json" }
 ```

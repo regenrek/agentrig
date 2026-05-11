@@ -24,6 +24,7 @@ import {
   detectPluginFeatures,
   assertContainedPath,
   normalizeManifestDescription,
+  normalizeManifestVersion,
   pluginAuthor,
   providerPluginName,
   removeInstalledFiles,
@@ -60,7 +61,7 @@ function buildCursorPluginManifest(
   return cursorPluginManifestSchema.parse({
     name: pluginName,
     description: normalizeManifestDescription(plugin.manifest),
-    version: plugin.manifest.version,
+    version: normalizeManifestVersion(plugin.manifest),
     ...(pluginAuthor(plugin.manifest, owner) ? { author: pluginAuthor(plugin.manifest, owner) } : {}),
     ...(features.hasRules ? { rules: './rules' } : {}),
     ...(features.hasSkills ? { skills: './skills' } : {}),
@@ -148,9 +149,9 @@ export const cursorProvider: PluginProviderAdapter = {
 
     for (const plugin of result.plugins) {
       const pluginName = providerPluginName(plugin, 'cursor', cfg.pluginPrefix)
-      const installMetadata = installMetadataByPluginId[plugin.manifest.id]
+      const installMetadata = installMetadataByPluginId[plugin.manifest.name]
       if (!installMetadata) {
-        throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
+        throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.name}`)
       }
 
       const destinationDir = path.join(pluginRoot, pluginName)
@@ -186,9 +187,9 @@ export const cursorProvider: PluginProviderAdapter = {
       }
 
       if (changed) {
-        const installMetadata = installMetadataByPluginId[plugin.manifest.id]
+        const installMetadata = installMetadataByPluginId[plugin.manifest.name]
         if (!installMetadata) {
-          throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
+          throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.name}`)
         }
         ledgerEntries.push({
           id: getPluginInstallRecordId('cursor', scope, pluginName),
@@ -197,8 +198,8 @@ export const cursorProvider: PluginProviderAdapter = {
           specIdentity: installMetadata.specIdentity,
           registry: installMetadata.registry,
           scope,
-          pluginId: plugin.manifest.id,
-          pluginVersion: plugin.manifest.version,
+          pluginId: plugin.manifest.name,
+          pluginVersion: normalizeManifestVersion(plugin.manifest),
           snapshotDigest: installMetadata.snapshotDigest,
           pluginName,
           targetPaths: [destinationDir],

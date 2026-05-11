@@ -4,8 +4,10 @@ import {
   CLI_SUPPORTED_ARTIFACT_KINDS,
   type ArtifactKind,
 } from './provider/artifact-kinds'
+import { isValidPluginName } from './provider/plugin-names'
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/
+const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 
 export const SUBMISSION_STATUSES = ['pending_review', 'approved', 'rejected', 'blocked'] as const
 export const REGISTRY_MIRROR_STATUSES = ['queued', 'opened', 'merged', 'failed'] as const
@@ -307,19 +309,34 @@ export type DirectoryEntry = {
   keywords?: string[]
 }
 
+const OpenPluginAuthorSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  email: z.string().trim().min(1).optional(),
+  url: z.string().trim().min(1).optional(),
+}).strict()
+
+const AgentRigPluginExtensionSchema = z.object({
+  displayName: z.string().optional(),
+  kind: z.string().optional(),
+  configSchema: z.record(z.string(), z.any()).optional(),
+  pluginDependencies: z.array(z.string()).optional(),
+})
+
 export const PluginManifestSchema = z.object({
   $schema: z.string().trim().min(1).optional(),
-  kind: z.literal('agentrig:plugin').optional(),
-  id: z.string().trim().min(1),
-  name: z.string().trim().min(1),
-  description: z.string(),
-  version: z.string().trim().min(1),
-  author: z.string().nullable().optional(),
-  license: z.string().nullable().optional(),
+  name: z.string().trim().refine(
+    isValidPluginName,
+    'Open Plugins name must be 1-64 lowercase letters, numbers, dots, or hyphens; start and end alphanumeric; and not contain "--" or ".."',
+  ),
+  description: z.string().optional(),
+  version: z.string().trim().regex(SEMVER_RE, 'Plugin version must be valid semver (x.y.z)').optional(),
+  author: OpenPluginAuthorSchema.optional(),
+  license: z.string().optional(),
+  homepage: z.string().optional(),
+  repository: z.string().optional(),
+  logo: z.string().optional(),
   keywords: z.array(z.string()).optional(),
-  pluginDependencies: z.array(z.string()).optional(),
-  configSchema: z.record(z.string(), z.custom<{}>()).optional(),
-  'x-agentrig': z.record(z.string(), z.custom<{}>()).optional(),
+  'x-agentrig': AgentRigPluginExtensionSchema.optional(),
 })
 
 export type PluginManifest = z.infer<typeof PluginManifestSchema>

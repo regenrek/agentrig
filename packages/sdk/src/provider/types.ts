@@ -21,11 +21,15 @@ export type ExternalRepoSource = {
 }
 
 export type MaterializedPluginManifestInput = {
-  id: string
   name: string
+  displayName?: string
   description: string
   version: string
-  author?: string
+  author?: {
+    name: string
+    email?: string
+    url?: string
+  }
   license?: string
   keywords?: string[]
   source: ExternalRepoSource

@@ -10,6 +10,8 @@ icon: PackagePlus
 distribution unit: a plugin can bundle skills, MCPs, hooks, commands, assets,
 and provider metadata.
 
+AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+
 If you are consuming plugins from registries, use the top-level commands instead:
 
 ```bash
@@ -98,7 +100,7 @@ agentrig use jxnl/dots --install --provider codex --pick prompts/review
 `inspect` and `use` scan third-party repos deterministically. The scan digest is
 computed from detector output only; AI output never changes it.
 
-`use --as-plugin <id>` writes a local plugin directory with `x-agentrig.source`
+`use --as-plugin <name>` writes a local plugin directory with `x-agentrig.source`
 provenance. `use --install` stages the same external-repo plugin shape and installs
 it through the provider installer. Both paths record external-repo provenance, not
 marketplace trust.
@@ -132,7 +134,7 @@ adds that path. Some reasoning models spend output budget on hidden reasoning, s
 raise `AGENTRIG_AI_MAX_TOKENS` if the provider reports a token-limit truncation.
 
 The response must pass the shared `AiEnrichmentDraft` schema. Suggested description,
-keywords, and plugin id fields are draft metadata only.
+keywords, and manifest `name` fields are draft metadata only.
 
 Hosted AI enrichment is web-only in v1. The `/submit` flow requires login,
 Turnstile, product quotas, and admin review before any AI-suggested field can be
@@ -145,6 +147,8 @@ agentrig plugin init acme.my-plugin
 ```
 
 `init` requires the canonical plugin id format `namespace.plugin`.
+The scaffold writes that value to `.plugin/plugin.json` as the Open Plugins
+`name`; the display label is stored at `x-agentrig.displayName`.
 
 Options: `--template`, `--dir`, `--title`, `--description`, `--author`, `--force`.
 

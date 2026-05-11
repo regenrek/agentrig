@@ -23,7 +23,7 @@ import { pathExists } from '../../lib/fs'
 
 function printInstallPlanSummary(plan: Awaited<ReturnType<typeof preparePluginInstall>>) {
   console.log('Install plan:')
-  console.log(`  plugins: ${plan.plugins.map((plugin) => plugin.manifest.id).join(', ')}`)
+  console.log(`  plugins: ${plan.plugins.map((plugin) => plugin.manifest.name).join(', ')}`)
   console.log(`  requested scope: ${plan.requestedScope}`)
 
   for (const provider of plan.providers) {

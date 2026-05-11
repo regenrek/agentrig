@@ -11,6 +11,8 @@ import type {
   SelectionInstallRecord,
 } from './types'
 
+export const LEDGER_SCHEMA_VERSION = 4
+
 const pluginProviderSchema = z.enum(['claude', 'codex', 'cursor'])
 const pluginInstallScopeSchema = z.enum(['personal', 'workspace'])
 const pluginInstallScopeSelectorSchema = z.enum(['auto', 'personal', 'workspace'])
@@ -167,14 +169,14 @@ const selectionInstallRecordSchema = z.strictObject({
   }
 })
 const pluginInstallLedgerSchema = z.strictObject({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(LEDGER_SCHEMA_VERSION),
   installs: z.record(z.string(), pluginInstallRecordSchema),
   selections: z.record(z.string(), selectionInstallRecordSchema),
 })
 
-function getLegacyPluginInstallLedgerBackupPath(ledgerPath: string) {
+function getCutOverPluginInstallLedgerBackupPath(ledgerPath: string) {
   const parsed = path.parse(ledgerPath)
-  return path.join(parsed.dir, `${parsed.name}.v1-backup${parsed.ext}`)
+  return path.join(parsed.dir, `${parsed.name}.pre-openplugins-backup${parsed.ext}`)
 }
 
 async function cutOverLegacyPluginInstallLedger(
@@ -183,9 +185,9 @@ async function cutOverLegacyPluginInstallLedger(
   ledgerPath: string,
   raw: unknown
 ): Promise<PluginInstallLedger> {
-  const backupPath = getLegacyPluginInstallLedgerBackupPath(ledgerPath)
+  const backupPath = getCutOverPluginInstallLedgerBackupPath(ledgerPath)
   const emptyLedger: PluginInstallLedger = {
-    schemaVersion: 3,
+    schemaVersion: LEDGER_SCHEMA_VERSION,
     installs: {},
     selections: {},
   }
@@ -196,7 +198,7 @@ async function cutOverLegacyPluginInstallLedger(
   }
   await savePluginInstallLedger(cwd, scope, emptyLedger)
   console.warn(
-    `Archived unsupported schemaVersion 1 plugin install ledger to ${backupPath} and reset ${ledgerPath} to the current registry-only contract.`
+    `AgentRig reset the plugin install ledger for the Open Plugins manifest cut. Previously installed plugins must be reinstalled. Archived the previous ledger to ${backupPath}.`
   )
   return emptyLedger
 }
@@ -222,45 +224,28 @@ export async function loadPluginInstallLedger(
   const raw = await readJsonFile<unknown>(ledgerPath)
   if (!raw) {
     return {
-      schemaVersion: 3,
+      schemaVersion: LEDGER_SCHEMA_VERSION,
       installs: {},
       selections: {},
     }
   }
 
+  const parsed = pluginInstallLedgerSchema.safeParse(raw)
+  if (parsed.success) {
+    return parsed.data as PluginInstallLedger
+  }
+
   if (
     typeof raw === 'object' &&
     raw != null &&
     'schemaVersion' in raw &&
-    (raw as { schemaVersion?: unknown }).schemaVersion === 1
+    (raw as { schemaVersion?: unknown }).schemaVersion !== LEDGER_SCHEMA_VERSION
   ) {
     return cutOverLegacyPluginInstallLedger(cwd, scope, ledgerPath, raw)
   }
 
-  if (
-    typeof raw === 'object' &&
-    raw != null &&
-    'schemaVersion' in raw &&
-    (raw as { schemaVersion?: unknown }).schemaVersion === 2
-  ) {
-    const v2 = z.strictObject({
-      schemaVersion: z.literal(2),
-      installs: z.record(z.string(), pluginInstallRecordSchema),
-    }).parse(raw)
-    return {
-      schemaVersion: 3,
-      installs: v2.installs as Record<string, PluginInstallRecord>,
-      selections: {},
-    }
-  }
-
-  const parsed = pluginInstallLedgerSchema.safeParse(raw)
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0]
-    throw new Error(`Invalid plugin install ledger at ${ledgerPath}: ${issue?.message ?? 'invalid data'}`)
-  }
-
-  return parsed.data as PluginInstallLedger
+  const issue = parsed.error.issues[0]
+  throw new Error(`Invalid plugin install ledger at ${ledgerPath}: ${issue?.message ?? 'invalid data'}`)
 }
 
 export async function savePluginInstallLedger(

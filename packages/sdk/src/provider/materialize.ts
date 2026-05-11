@@ -1,19 +1,26 @@
 import { z } from 'zod'
 import type { SignalKind } from '../repo-scan/types'
 import { joinVirtualPath, normalizeVirtualPath, virtualBasename } from '../repo-scan/virtual-tree'
+import { isValidPluginName } from './plugin-names'
 import type { MaterializedPluginFile, MaterializedPluginManifestInput, MaterializePluginOptions } from './types'
 
-const PLUGIN_ID_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 const PLUGIN_VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 const SIGNAL_ID_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 
 const manifestInputSchema = z
   .object({
-    id: z.string().trim().max(64).regex(PLUGIN_ID_RE),
-    name: z.string().trim().min(1),
+    name: z.string().trim().refine(isValidPluginName),
+    displayName: z.string().trim().min(1).optional(),
     description: z.string().trim().min(1),
     version: z.string().trim().max(64).regex(PLUGIN_VERSION_RE),
-    author: z.string().trim().min(1).optional(),
+    author: z
+      .object({
+        name: z.string().trim().min(1),
+        email: z.string().trim().min(1).optional(),
+        url: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
     license: z.string().trim().min(1).optional(),
     keywords: z.array(z.string().trim().min(1)).optional(),
     source: z
@@ -50,16 +57,18 @@ export async function materializePlugin(options: MaterializePluginOptions): Prom
 export function buildPluginManifest(input: MaterializedPluginManifestInput, pickedSignalPaths: string[]) {
   const parsed = manifestInputSchema.parse(input)
   return {
-    kind: 'agentrig:plugin',
-    id: parsed.id,
+    $schema: 'https://agentrig.ai/schema/plugin.v1.json',
     name: parsed.name,
     description: parsed.description,
     version: parsed.version,
     ...(parsed.author ? { author: parsed.author } : {}),
     ...(parsed.license ? { license: parsed.license } : {}),
     ...(parsed.keywords?.length ? { keywords: parsed.keywords } : {}),
-    configSchema: {},
     'x-agentrig': {
+      displayName: parsed.displayName ?? parsed.name,
+      kind: 'plugin',
+      configSchema: {},
+      pluginDependencies: [],
       source: {
         kind: 'external-repo',
         ...parsed.source,

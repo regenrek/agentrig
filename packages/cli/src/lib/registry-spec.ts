@@ -1,6 +1,6 @@
+export { isValidPluginName } from '@agentrig/sdk'
+
 const NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
-const PLUGIN_ID_PATTERN =
-  /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 const LISTING_ID_PATTERN =
   /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/
 const SEMVER_PATTERN =
@@ -26,10 +26,6 @@ export type ParsedRegistryArtifactSpec = {
 
 export function isValidRegistryAlias(name: string): boolean {
   return NAME_PATTERN.test(name)
-}
-
-export function isValidPluginId(name: string): boolean {
-  return PLUGIN_ID_PATTERN.test(name)
 }
 
 export function isValidListingId(name: string): boolean {

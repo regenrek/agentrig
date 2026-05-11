@@ -4,7 +4,9 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import {
+  PluginManifestSchema as pluginManifestSchema,
   sanitizeProviderPluginName,
+  type PluginManifest,
   type PluginFeatures,
   type ProviderPluginNameTarget,
 } from '@agentrig/sdk'
@@ -12,7 +14,6 @@ import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
 import { getAgentRigHome } from '../paths'
-import { isValidPluginId, isValidPluginVersion } from '../plugin-validation'
 import type {
   PluginInstallRecord,
   PluginInstallSpecIdentity,
@@ -84,7 +85,7 @@ export type ResolvedPluginConfig = {
   }
 }
 
-export type PluginSourceManifest = z.infer<typeof pluginManifestSchema>
+export type PluginSourceManifest = PluginManifest
 
 export type PluginEntry = {
   manifest: PluginSourceManifest
@@ -286,21 +287,6 @@ const pluginConfigFileSchema = z.object({
     .strict()
     .optional(),
 }).strict()
-const pluginManifestSchema = z.object({
-  $schema: z.string().optional(),
-  kind: z.literal('agentrig:plugin'),
-  id: nonEmptyStringSchema.refine(isValidPluginId, 'Plugin id must be lowercase letters, numbers, or hyphens'),
-  name: nonEmptyStringSchema,
-  description: nonEmptyStringSchema,
-  version: nonEmptyStringSchema.refine(isValidPluginVersion, 'Plugin version must be valid semver (x.y.z)'),
-  author: optionalStringSchema,
-  license: optionalStringSchema,
-  keywords: z.array(nonEmptyStringSchema).optional(),
-  pluginDependencies: z.array(nonEmptyStringSchema).optional(),
-  configSchema: z.object({}).passthrough(),
-  'x-agentrig': z.object({}).passthrough().optional(),
-}).strict()
-
 const DEFAULT_CONFIG: ResolvedPluginConfig = {
   pluginPrefix: 'agentrig-',
   owner: {
@@ -369,6 +355,10 @@ export function normalizeManifestDescription(meta: PluginSourceManifest) {
   return meta.description || meta.name
 }
 
+export function normalizeManifestVersion(meta: PluginSourceManifest) {
+  return meta.version || '0.0.0'
+}
+
 export function normalizeAuthorObject(name?: string, email?: string) {
   const authorName = name?.trim()
   if (!authorName) return undefined
@@ -376,7 +366,14 @@ export function normalizeAuthorObject(name?: string, email?: string) {
 }
 
 export function pluginAuthor(meta: PluginSourceManifest, owner: PluginOwner) {
-  return normalizeAuthorObject(meta.author ?? owner.name, owner.email)
+  if (meta.author?.name?.trim()) {
+    return normalizeAuthorObject(meta.author.name, meta.author.email)
+  }
+  return normalizeAuthorObject(owner.name, owner.email)
+}
+
+export function pluginDisplayName(meta: PluginSourceManifest) {
+  return meta['x-agentrig']?.displayName ?? meta.name
 }
 
 export function providerPluginName(
@@ -384,7 +381,7 @@ export function providerPluginName(
   target: ProviderPluginNameTarget,
   pluginPrefix = DEFAULT_CONFIG.pluginPrefix
 ) {
-  return `${pluginPrefix}${sanitizeProviderPluginName(plugin.manifest.id, target)}`
+  return `${pluginPrefix}${sanitizeProviderPluginName(plugin.manifest.name, target)}`
 }
 
 export async function readPluginManifest(pluginSourceDir: string) {
@@ -579,7 +576,7 @@ export async function buildPluginEntries(
       return {
         manifest,
         pluginSourceDir,
-        pluginName: `${pluginPrefix}${manifest.id}`,
+        pluginName: `${pluginPrefix}${manifest.name}`,
       } satisfies PluginEntry
     })
   )

@@ -9,7 +9,7 @@ import {
   verifyFetchedInstallBundleFiles,
   type ResolvedPluginGraph,
 } from '../../src/lib/plugin-consumer'
-import { canonicalInstallTokenFromSlug, fetchInstallBundleFiles, resolvePluginFromRegistryAlias } from '../../src/lib/registry'
+import { fetchInstallBundleFiles, resolvePluginFromRegistryAlias } from '../../src/lib/registry'
 import { startFixtureServer, type FixtureServer } from '../helpers/harness'
 import type { InstallBundle } from '@agentrig/sdk'
 
@@ -21,23 +21,8 @@ afterEach(async () => {
 })
 
 describe('install bundle resolution and materialization', () => {
-  it('converts hyphenated marketplace slugs to canonical install tokens without flattening child separators', () => {
-    expect(canonicalInstallTokenFromSlug('regenrek-agent-skills')).toBe('regenrek.agent-skills')
-    expect(canonicalInstallTokenFromSlug('regenrek-agent-skills--skill-pr-commiter')).toBe(
-      'regenrek.agent-skills--skill-pr-commiter'
-    )
-    expect(canonicalInstallTokenFromSlug('regenrek.agent-skills')).toBe('regenrek.agent-skills')
-  })
-
   it('resolves a marketplace listing slug to an InstallBundle and materializes verified files', async () => {
-    const pluginJson = JSON.stringify({
-      kind: 'agentrig:plugin',
-      id: 'community.typescript',
-      name: 'TypeScript skill',
-      description: 'TypeScript patterns.',
-      version: '0.1.0',
-      configSchema: {},
-    })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const skill = '# TypeScript skill\n'
     const server = await startFixtureServer({
       routes: [
@@ -76,69 +61,6 @@ describe('install bundle resolution and materialization', () => {
     } finally {
       await cleanupMaterializedPlugin(materialized.pluginsRoot)
     }
-  })
-
-  it('retries install resolution with the canonical dotted token after a hyphenated not_found', async () => {
-    const pluginJson = JSON.stringify({
-      kind: 'agentrig:plugin',
-      id: 'regenrek.agent-skills',
-      name: 'Agent skills',
-      description: 'Agent skills.',
-      version: '0.1.0',
-      configSchema: {},
-    })
-    const skill = '# Agent skills\n'
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const server = await startFixtureServer({
-      routes: [
-        {
-          pathname: '/api/cli/install-bundle',
-          handler: (request) => {
-            const artifactId = new URLSearchParams(request.search).get('artifactId')
-            if (artifactId === 'regenrek-agent-skills') {
-              return {
-                status: 404,
-                body: {
-                  status: 'unresolvable',
-                  reason: 'not_found',
-                  message: 'No plugin listing found for regenrek-agent-skills.',
-                },
-              }
-            }
-            return {
-              body: {
-                status: 'resolvable',
-                listing: bundle(server.baseUrl, pluginJson, skill, {
-                  artifactId: 'regenrek.agent-skills',
-                  slug: 'regenrek-agent-skills',
-                }).listing,
-                bundle: bundle(server.baseUrl, pluginJson, skill, {
-                  artifactId: 'regenrek.agent-skills',
-                  slug: 'regenrek-agent-skills',
-                }),
-              },
-            }
-          },
-        },
-        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
-        { pathname: '/raw/skills/typescript/SKILL.md', handler: () => ({ body: skill }) },
-      ],
-    })
-    servers.push(server)
-
-    const resolved = await resolvePluginFromRegistryAlias(
-      'agentrig',
-      'regenrek-agent-skills',
-      undefined,
-      [{ name: 'agentrig', url: server.baseUrl }]
-    )
-
-    expect(resolved.listing.artifactId).toBe('regenrek.agent-skills')
-    expect(server.requests.filter((request) => request.pathname === '/api/cli/install-bundle')).toHaveLength(2)
-    expect(warnSpy).toHaveBeenCalledWith(
-      'Resolved by hyphen→dot fallback; canonical id is `regenrek.agent-skills`. Update your scripts.'
-    )
-    warnSpy.mockRestore()
   })
 
   it('surfaces yanked and taken-down install responses as hard errors', async () => {
@@ -182,7 +104,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('aborts materialization on hash mismatches', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const expected = '# TypeScript skill\n'
     const server = await installBundleServer(pluginJson, 'tampered\n', expected)
     const graph = { requestedPlugin: bundle(server.baseUrl, pluginJson, expected), resolvedPlugins: [bundle(server.baseUrl, pluginJson, expected)] }
@@ -193,7 +115,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('reports HTTP fetch failures as not_fetched before writing files', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const skill = '# TypeScript skill\n'
     const server = await startFixtureServer({
       routes: [
@@ -226,7 +148,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('reports GitHub raw rate limits as fetch failures instead of bundle corruption', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const skill = '# TypeScript skill\n'
     const current = bundle('https://raw.githubusercontent.com/acme/repo/main', pluginJson, skill)
 
@@ -244,7 +166,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('reports one failed bundle fetch without converting successful peers to missing files', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const files = ['# Skill 1\n', '# Skill 2\n', '# Skill 3\n']
     const current = {
       ...bundle('https://example.test', pluginJson, files.join('')),
@@ -274,7 +196,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('aborts before writing when fetched install files include an unlisted extra file', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const skill = '# TypeScript skill\n'
     const server = await startFixtureServer({
       routes: [{
@@ -320,7 +242,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('limits remote install bundle fetch concurrency to deterministic fanout', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const files = Array.from({ length: 8 }, (_, index) => `# Skill ${index + 1}\n`)
     let activeRequests = 0
     let maxActiveRequests = 0
@@ -359,7 +281,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('materializes URL-backed install bundle files when no inline bytes are present', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const skill = '# URL-only skill\n'
     const server = await startFixtureServer({
       routes: [
@@ -385,7 +307,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('materializes mixed URL-backed and inline-base64 install bundle files, preferring inline over url', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const inlineSkill = '# Inline skill\n'
     const urlSkill = '# URL skill\n'
     const server = await startFixtureServer({
@@ -418,7 +340,7 @@ describe('install bundle resolution and materialization', () => {
   })
 
   it('fails loudly when an install bundle file has neither inline bytes nor a readable url/source', async () => {
-    const pluginJson = JSON.stringify({ kind: 'agentrig:plugin', id: 'community.typescript', name: 'TypeScript skill', description: '', version: '0.1.0', configSchema: {} })
+    const pluginJson = pluginManifestJson('community.typescript', 'TypeScript skill')
     const skill = '# TypeScript skill\n'
     const resolved = {
       ...bundle('https://example.test', pluginJson, skill),
@@ -482,4 +404,15 @@ function bundle(
 
 function sha256Hex(input: string) {
   return createHash('sha256').update(Buffer.from(input)).digest('hex')
+}
+
+function pluginManifestJson(name: string, displayName: string) {
+  return JSON.stringify({
+    name,
+    description: `${displayName} patterns.`,
+    version: '0.1.0',
+    'x-agentrig': {
+      displayName,
+    },
+  })
 }

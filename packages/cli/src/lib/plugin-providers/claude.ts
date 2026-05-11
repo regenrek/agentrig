@@ -22,6 +22,7 @@ import {
   copyEntries,
   detectPluginFeatures,
   normalizeManifestDescription,
+  normalizeManifestVersion,
   pluginAuthor,
   providerPluginName,
 } from './shared'
@@ -102,7 +103,7 @@ function buildClaudePluginManifest(
   return claudePluginManifestSchema.parse({
     name: pluginName,
     description: normalizeManifestDescription(plugin.manifest),
-    version: plugin.manifest.version,
+    version: normalizeManifestVersion(plugin.manifest),
     ...(pluginAuthor(plugin.manifest, owner) ? { author: pluginAuthor(plugin.manifest, owner) } : {}),
     ...(features.hasCommands ? { commands: ['./commands'] } : {}),
     ...(features.hasAgents ? { agents: ['./agents'] } : {}),
@@ -221,9 +222,9 @@ export const claudeProvider: PluginProviderAdapter = {
 
     for (const plugin of result.plugins) {
       const pluginName = providerPluginName(plugin, 'claude', cfg.pluginPrefix)
-      const installMetadata = installMetadataByPluginId[plugin.manifest.id]
+      const installMetadata = installMetadataByPluginId[plugin.manifest.name]
       if (!installMetadata) {
-        throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
+        throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.name}`)
       }
       const pluginRef = `${pluginName}@${result.marketplaceName}`
       await runner('claude', ['plugin', 'install', pluginRef, '--scope', scopeArg])
@@ -235,8 +236,8 @@ export const claudeProvider: PluginProviderAdapter = {
         specIdentity: installMetadata.specIdentity,
         registry: installMetadata.registry,
         scope,
-        pluginId: plugin.manifest.id,
-        pluginVersion: plugin.manifest.version,
+        pluginId: plugin.manifest.name,
+        pluginVersion: normalizeManifestVersion(plugin.manifest),
         snapshotDigest: installMetadata.snapshotDigest,
         pluginName,
         targetPaths: [persistentMarketplacePath],

@@ -1,6 +1,7 @@
 # agentrig Plugin Starter Template
 
 This is the default template for creating new agentrig plugins.
+Generated manifests follow the [Open Plugins specification](https://open-plugins.com/plugin-builders/specification), with AgentRig-specific configuration under `x-agentrig`.
 
 ## Usage
 
@@ -16,7 +17,7 @@ The following placeholders are replaced during scaffolding:
 
 | Placeholder | Description |
 |-------------|-------------|
-| `__PLUGIN_ID__` | Canonical plugin id (`namespace.plugin`) |
+| `__PLUGIN_ID__` | Canonical Open Plugins name (`namespace.plugin`) |
 | `__PLUGIN_SLUG__` | Plugin slug (the segment after `.`) |
 | `__PLUGIN_NAME__` | Human-readable plugin name |
 | `__PLUGIN_DESCRIPTION__` | Plugin description |

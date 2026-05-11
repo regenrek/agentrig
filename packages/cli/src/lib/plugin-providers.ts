@@ -113,8 +113,8 @@ export async function preparePluginInstall(options: PluginInstallOptions): Promi
   const plugins = await buildPluginEntries(pluginsRoot, cfg.pluginPrefix, options.plugin)
   const installMetadataByPluginId = options.installMetadataByPluginId
   for (const plugin of plugins) {
-    if (!installMetadataByPluginId[plugin.manifest.id]) {
-      throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.id}`)
+    if (!installMetadataByPluginId[plugin.manifest.name]) {
+      throw new Error(`Missing verified install metadata for plugin: ${plugin.manifest.name}`)
     }
   }
   const requestedScope = options.scope ?? 'auto'

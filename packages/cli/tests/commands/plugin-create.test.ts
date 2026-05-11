@@ -33,18 +33,16 @@ describe('command:plugin create', () => {
 
     const manifestPath = path.join(pluginDir, '.plugin', 'plugin.json')
     const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf-8')) as {
-      id: string
+      name: string
       description: string
-      configSchema: Record<string, unknown>
+      'x-agentrig': {
+        displayName: string
+      }
     }
 
-    expect(manifest.id).toBe('demo-plugin')
+    expect(manifest.name).toBe('demo-plugin')
     expect(manifest.description).toBeTruthy()
     expect(manifest.description).toContain('AgentRig')
-    expect(manifest.configSchema).toEqual({
-      type: 'object',
-      additionalProperties: false,
-      properties: {},
-    })
+    expect(manifest['x-agentrig'].displayName).toBe('Demo Plugin')
   })
 })

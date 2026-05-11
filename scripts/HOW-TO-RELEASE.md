@@ -14,6 +14,7 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - **Important**: The section header must match the exact version format: `## [X.Y.Z] - YYYY-MM-DD`
   - Include detailed descriptions of changes (Added/Changed/Fixed sections) so users can easily see what's included in the release
   - The release script extracts this section automatically for the GitHub Release description
+  - For the Open Plugins 1.0.0 manifest hard cut, keep the 0.8.0 breaking notes in `CHANGELOG.md`; do not pre-bump `packages/cli/package.json` outside the release script.
 - Ensure any user-facing docs (README, templates) are committed.
 - Confirm the repo-local Vite+ toolchain is available:
   - `pnpm exec vp --version`

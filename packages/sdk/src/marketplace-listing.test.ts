@@ -3,6 +3,7 @@ import {
   InstallBundleSchema,
   MarketplaceListingPublicSchema,
   MarketplaceListingSchema,
+  PluginManifestSchema,
   isResolvable,
   verifyInstallBundleHashes,
   type InstallBundle,
@@ -118,6 +119,34 @@ describe('marketplace listing contracts', () => {
     expect(isResolvable(listing)).toBe(true)
     expect(isResolvable({ ...listing, installability: 'yanked' })).toBe(false)
     expect(isResolvable({ ...listing, installability: 'taken_down' })).toBe(false)
+  })
+
+  it('parses the Open Plugins manifest shape with only name required', () => {
+    const manifest = PluginManifestSchema.parse({
+      $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+      name: 'agentrig.core',
+      author: { email: 'plugins@example.com' },
+      homepage: 'https://example.com/agentrig.core',
+      commands: { review: './commands/review.md' },
+      'x-agentrig': {
+        displayName: 'Core',
+      },
+    })
+
+    expect(manifest).toMatchObject({
+      name: 'agentrig.core',
+      author: { email: 'plugins@example.com' },
+      homepage: 'https://example.com/agentrig.core',
+      'x-agentrig': { displayName: 'Core' },
+    })
+    expect(manifest.version).toBeUndefined()
+    expect(manifest.description).toBeUndefined()
+    expect((manifest as Record<string, unknown>).commands).toBeUndefined()
+  })
+
+  it('validates Open Plugins name and version syntax', () => {
+    expect(() => PluginManifestSchema.parse({ name: 'agentrig--core' })).toThrow()
+    expect(() => PluginManifestSchema.parse({ name: 'agentrig.core', version: 'latest' })).toThrow()
   })
 })
 
