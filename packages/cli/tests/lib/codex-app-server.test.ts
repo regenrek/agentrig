@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import packageJson from '../../package.json'
 import { codexInstallPlugin, codexUninstallPlugin } from '../../src/lib/plugin-providers/codex-app-server'
 
 const tempDirs: string[] = []
@@ -46,7 +47,7 @@ describe('codex app-server JSON-RPC driver', () => {
       id: 1,
       method: 'initialize',
       params: {
-        clientInfo: { name: 'agentrig', title: 'AgentRig', version: '0.7.5' },
+        clientInfo: { name: 'agentrig', title: 'AgentRig', version: packageJson.version },
         capabilities: { experimentalApi: false },
       },
     })
