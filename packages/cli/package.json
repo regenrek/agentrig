@@ -1,6 +1,6 @@
 {
   "name": "agentrig",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Compose and apply AI agent skills/workflows via plugins and registries.",
   "license": "MIT",
   "repository": {
