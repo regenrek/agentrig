@@ -1,12 +1,12 @@
 # How To Release agentrig
 
-This project ships via the Node script at `scripts/release.ts`. The script bumps versions, builds, pushes tags, and creates a GitHub Release with notes from `CHANGELOG.md`. Publishing to npm happens automatically via GitHub Actions using npm Trusted Publishing (OIDC).
+This project ships via the Node script at `scripts/release.ts`. The script bumps versions, builds, pushes tags, and creates a GitHub Release with notes from `CHANGELOG.md`. Publishing to npm is a manual maintainer action after local validation.
 
 ## Prerequisites
 - Node 20+
 - pnpm (`corepack enable && corepack prepare pnpm@latest --activate` works too)
 - GitHub CLI (`gh auth status` shows logged in)
-- npm publish is handled by GitHub Actions (Trusted Publishing); no local `npm login` required
+- npm auth for a maintainer with publish rights on the `agentrig` package (`npm whoami` must return that account)
 - Clean `main` branch pushed to origin
 
 ## Prepare
@@ -36,7 +36,6 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - Build the CLI through `vp pack`
   - Commit `chore: release vX.Y.Z`, tag `vX.Y.Z`, push (refuses non-`main` unless `ALLOW_NON_MAIN=1`; `ALLOW_NON_MAIN=true` is rejected)
   - Create/Update a GitHub Release with notes from `CHANGELOG.md`
-  - Trigger the GitHub Actions publish workflow (OIDC) on release publish
 
 ## Production Migration Runbook
 Run these only from an approved prod release window, after confirming the deployed Convex target is prod. The zero-delta verification means mutation-specific write counters return zero on re-run; scan, unchanged, or already-materialized counters may remain nonzero.
@@ -84,15 +83,14 @@ Run these only from an approved prod release window, after confirming the deploy
    - Verification: pending Worker α B2; expected verification is a prod Convex run proving no listing heads retain the dropped field.
    - Idempotency: re-runs must return zero write delta.
 
-## npm Trusted Publishing (automatic)
-- Configure this once in npm:
-  - Go to the package settings → **Access** → **Trusted Publishers**
-  - Add GitHub Actions as a trusted publisher for this repo
-  - Workflow filename: `npm-release.yml` (just the filename, not the full path)
-  - Environment: leave blank unless you use GitHub Environments
-- GitHub Actions will mint short-lived OIDC credentials at publish time; no stored tokens.
-- The workflow pins npm CLI `11.5.1` to satisfy Trusted Publishing requirements.
-- Note: This workflow runs on **GitHub Release published** (draft releases do not publish to npm).
+## Manual npm Publish
+- Publish only after `pnpm test:release:local` passes and the GitHub Release is correct.
+- Inspect the tarball before publishing:
+  - `pnpm --filter ./packages/cli pack`
+  - `tar -tf packages/cli/agentrig-*.tgz | grep -E 'package/(templates/|README.md|LICENSE)'`
+- Publish from the packed CLI package:
+  - `npm publish packages/cli/agentrig-*.tgz --access public --tag latest --ignore-scripts`
+- Do not add npm tokens or Trusted Publishing credentials to GitHub Actions.
 
 ## Sanity Checks (optional but recommended)
 - Build and pack locally:
@@ -116,8 +114,7 @@ Run these only from an approved prod release window, after confirming the deploy
 - **Verification**: After release, check the GitHub Release page to confirm the changelog description appears correctly. If it's missing, verify the CHANGELOG.md format matches `## [X.Y.Z] - YYYY-MM-DD` exactly.
 
 ## Prereleases / Dist-Tags
-- To ship a prerelease, publish a GitHub Release marked **Prerelease**.
-  - The npm workflow will automatically publish with `--tag next`.
+- To ship a prerelease, publish manually with `--tag next`.
 
 ## Rollback / Deprecation
 - Prefer deprecation over unpublish:
@@ -127,12 +124,11 @@ Run these only from an approved prod release window, after confirming the deploy
 - Create a follow-up patch release that fixes the issue.
 
 ## Troubleshooting
-- `npm Release` fails (OIDC / permissions / E403):
-  - Check the `npm Release` workflow run logs in GitHub Actions.
-  - Verify npm package settings → **Trusted Publishers** points to this repo and `npm-release.yml` (and the workflow has `permissions: id-token: write`).
-  - Confirm the GitHub Release is **published** (not draft).
-  - If needed, manually run the workflow via `workflow_dispatch` with `tag=vX.Y.Z` (and `prerelease=true` to publish to `next`).
+- `npm publish` fails:
+  - Confirm `npm whoami` returns the maintainer account with publish rights.
+  - Confirm the package version has not already been published.
+  - Confirm the package is not blocked by npm 2FA or account policy prompts.
 - GitHub Release creation fails after the release commit/tag push:
-  - Treat the release as incomplete. Create the missing Release with the command printed by `scripts/release.ts`, then trigger `npm-release.yml` via `workflow_dispatch` if it did not start automatically.
+  - Treat the release as incomplete. Create the missing Release with the command printed by `scripts/release.ts`.
 - `gh` failures: `gh auth status`; ensure `repo` scope exists.
 - Tag push rejected: pull/rebase or fast-forward `main`, then rerun.

@@ -146,18 +146,16 @@ async function releasePackages(bump: VersionBump) {
   const newVersion = bumpAllVersions(repoRoot, bump);
   run("pnpm", ["-C", CLI_DIR, "build"], repoRoot);
 
-  console.log("Creating release commit + tag (publishing runs via GitHub Actions on GitHub Release)...");
+  console.log("Creating release commit, tag, and GitHub Release. npm publishing is manual.");
   stageReleaseFiles(repoRoot);
   createGitCommitTagAndPush(repoRoot, newVersion);
 
-  const releaseStartedAt = new Date(Date.now() - 5_000);
   try {
     createGithubRelease(repoRoot, newVersion);
-    await waitForNpmReleaseWorkflow(repoRoot, releaseStartedAt);
   } catch (e) {
     const notesFile = releaseNotesFilePath(newVersion);
     console.error(
-      `Tag was pushed but Release was not created. Run \`${formatGhReleaseCreateCommand(newVersion, notesFile)}\` to recover, then trigger npm publish via \`workflow_dispatch\`.`,
+      `Tag was pushed but Release was not created. Run \`${formatGhReleaseCreateCommand(newVersion, notesFile)}\` to recover.`,
     );
     console.error(`Recovery command: ${formatGhReleaseCreateCommand(newVersion, notesFile)}`);
     console.error(e);
@@ -291,39 +289,4 @@ function createGithubRelease(repoRoot: string, version: string) {
 
 function releaseNotesFilePath(version: string): string {
   return path.join(os.tmpdir(), `release-notes-${version}.md`);
-}
-
-async function waitForNpmReleaseWorkflow(repoRoot: string, startedAfter: Date) {
-  if (!hasGhCLI()) {
-    console.warn("GitHub CLI not found; skipping npm-release.yml workflow start check.");
-    return;
-  }
-
-  const deadline = Date.now() + 90_000;
-  while (Date.now() < deadline) {
-    try {
-      const raw = runCapture("gh", [
-        "run",
-        "list",
-        "--workflow=npm-release.yml",
-        "--limit",
-        "1",
-        "--json",
-        "databaseId,createdAt,event,status,conclusion,url",
-      ], repoRoot);
-      const runs = JSON.parse(raw) as Array<{ createdAt?: string; url?: string; status?: string }>;
-      const latest = runs[0];
-      if (latest?.createdAt && new Date(latest.createdAt).getTime() >= startedAfter.getTime()) {
-        console.log(`npm-release.yml workflow started: ${latest.url ?? latest.status ?? latest.createdAt}`);
-        return;
-      }
-    } catch (error) {
-      console.warn("Could not check npm-release.yml workflow start:", error);
-      return;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, Math.min(5_000, deadline - Date.now())));
-  }
-
-  console.warn("npm-release.yml workflow did not appear within 90s after GitHub Release creation. If it does not start, trigger it with workflow_dispatch.");
 }
