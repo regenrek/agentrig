@@ -44,8 +44,8 @@ Trusted publishing lets CI submit through the same canonical review backend with
 
 Flow:
 
-- GitHub Actions requests an OIDC token with audience `agentrig`.
-- AgentRig verifies issuer, audience, repository, repository id, owner, owner id, workflow, optional environment, SHA, ref, run id, and run attempt.
+- GitHub Actions requests an OIDC token with audience `agentrig` from a manually dispatched workflow.
+- AgentRig verifies issuer, audience, `event_name=workflow_dispatch`, `runner_environment=github-hosted`, repository, repository id, owner, owner id, workflow, optional environment, SHA, ref, run id, and run attempt.
 - AgentRig mints a short-lived scoped publish token.
 - The CLI submits the canonical plugin snapshot through the normal submission endpoint.
 - Marketplace approval still requires review. Verified mirroring, when used, is
@@ -56,7 +56,6 @@ Required workflow permissions:
 ```yaml
 permissions:
   contents: read
-  id-token: write
 ```
 
 Example:
@@ -65,32 +64,43 @@ Example:
 name: Publish AgentRig plugin
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@<full-commit-sha>
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: pnpm/action-setup@<full-commit-sha>
+      - uses: actions/setup-node@<full-commit-sha>
         with:
           node-version: 22
-          cache: pnpm
-      - run: pnpm dlx agentrig plugin submit "$GITHUB_REPOSITORY@$GITHUB_REF_NAME" --trustedPublish
+      - run: pnpm dlx agentrig plugin submit "$GITHUB_REPOSITORY@${{ inputs.ref }}" --trustedPublish
 ```
 
 Setup requirements:
 
 - Configure the trusted publisher in AgentRig for the plugin artifact.
 - Bind the exact GitHub repository, repository id, owner, owner id, workflow file, and environment if used.
+- Use `workflow_dispatch` only for trusted publishing. Keep PR and push CI separate and read-only.
+- Use GitHub-hosted runners. Self-hosted runners cannot mint AgentRig publish tokens.
+- Do not publish through arbitrary reusable workflows.
+- Do not restore or save dependency caches in jobs with `id-token: write`.
+- Pin actions to full commit SHA.
 - Keep `.plugin/plugin.json` in the submitted plugin path, or pass `--artifactId`.
 - Do not store an AgentRig access token in CI.
 

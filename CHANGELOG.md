@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.2] - 2026-05-12
+
+### Fixed
+- GitHub Actions trusted publishing now prefers the OIDC publish-token path in CI even when a local AgentRig login session exists, avoiding accidental user-session fallback during release jobs.
+
+### Changed
+- Documented hardened trusted-publish workflow requirements: manual `workflow_dispatch`, GitHub-hosted runners, job-scoped `id-token: write`, pinned actions, and no dependency caches in OIDC publish jobs.
+
 ## [0.8.1] - 2026-05-11
 
 ### Fixed

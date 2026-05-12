@@ -113,7 +113,7 @@ const command = defineCommand({
     if (args.help) return showUsage(command)
 
     const session = await loadAuthSession()
-    const trustedPublish = Boolean(args.trustedPublish) || (!session && hasGitHubActionsOidcEnv())
+    const trustedPublish = Boolean(args.trustedPublish) || hasGitHubActionsOidcEnv()
     if (!session && !trustedPublish) {
       throw new Error('Not logged in. Run `agentrig login` first or run from GitHub Actions with id-token: write.')
     }

@@ -174,6 +174,44 @@ describe('command:plugin submit', () => {
     expect(mocks.getPluginSubmissionStatus).not.toHaveBeenCalled()
   })
 
+  it('uses GitHub Actions OIDC instead of a stored login session when OIDC env is present', async () => {
+    mocks.hasGitHubActionsOidcEnv.mockReturnValue(true)
+    process.env.GITHUB_REPOSITORY = 'acme/demo-plugin'
+    process.env.GITHUB_REF_NAME = 'v1.2.3'
+    process.env.GITHUB_SHA = '1234567890abcdef1234567890abcdef12345678'
+    mocks.resolveSubmitSource.mockResolvedValue({
+      upstream_repo: 'https://github.com/acme/demo-plugin',
+      upstream_tag: 'v1.2.3',
+      upstream_commit_sha: '1234567890abcdef1234567890abcdef12345678',
+      plugin_path: '.',
+    })
+
+    await run({
+      args: {
+        baseUrl: undefined,
+        source: undefined,
+        version: undefined,
+        path: undefined,
+        artifactId: 'acme.demo-plugin',
+        trustedPublish: false,
+        dryRun: false,
+        help: false,
+      },
+    })
+
+    expect(mocks.resolveAuthenticatedCommunityBaseUrl).not.toHaveBeenCalled()
+    expect(mocks.resolveCommunityBaseUrl).toHaveBeenCalledWith(undefined, 'https://agentrig.ai')
+    expect(mocks.mintPublishToken).toHaveBeenCalledWith('https://agentrig.ai', expect.objectContaining({
+      artifactId: 'acme.demo-plugin',
+      githubOidcToken: 'github-oidc-token',
+    }))
+    expect(mocks.createPluginSubmission).toHaveBeenCalledWith(
+      'https://agentrig.ai',
+      'publish-token',
+      expect.objectContaining({ plugin_path: '.' }),
+    )
+  })
+
   it('fails trusted publishing before minting when the source does not match GITHUB_SHA', async () => {
     mocks.loadAuthSession.mockResolvedValue(null)
     mocks.hasGitHubActionsOidcEnv.mockReturnValue(true)
