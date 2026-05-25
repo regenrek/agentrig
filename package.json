@@ -37,11 +37,11 @@
     }
   },
   "devDependencies": {
-    "lefthook": "^2.1.4",
-    "tsx": "^4.7.0",
+    "lefthook": "^2.1.8",
+    "tsx": "^4.22.3",
     "typescript": "^5.9.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-    "vite-plus": "^0.1.14",
-    "vitest": "4.1.1"
+    "vite-plus": "^0.1.22",
+    "vitest": "4.1.7"
   }
 }
