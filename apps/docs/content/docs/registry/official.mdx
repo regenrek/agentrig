@@ -6,8 +6,8 @@ icon: BadgeCheck
 
 # Official registry
 
-AgentRig installs marketplace artifacts from `agentrig.ai`. The canonical
-marketplace state is the Convex `artifact_listings` row, and the SDK
+AgentRig installs official and reviewed registry artifacts from `agentrig.ai`.
+The canonical catalog state is the Convex `artifact_listings` row, and the SDK
 `InstallBundle` is the install contract consumed by the CLI.
 
 The [`agentrig-registry`](https://github.com/agentrig/agentrig-registry)
@@ -66,7 +66,7 @@ Mirrored plugin ids use:
 namespace.plugin
 ```
 
-Marketplace install refs use:
+Registry install refs use:
 
 ```text
 <registryAlias>/<namespace.plugin>
@@ -86,7 +86,7 @@ and scan digest in its install ledger after resolving the `InstallBundle` from
 
 ## CLI behavior
 
-The CLI resolves AgentRig marketplace refs through the `agentrig.ai`
+The CLI resolves AgentRig registry refs through the `agentrig.ai`
 install-bundle endpoint. It verifies the fetched files against the bundle's
 content-addressed lock and rejects mismatches before writing the install ledger.
 

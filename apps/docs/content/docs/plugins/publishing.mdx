@@ -1,6 +1,6 @@
 ---
 title: Publishing plugins
-description: Add plugins to registries and publish them.
+description: How official and reviewed plugins enter the AgentRig registry.
 icon: Upload
 ---
 
@@ -12,30 +12,31 @@ AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plug
 
 ## Installable publishing paths
 
-Installable publication happens through the AgentRig marketplace. Approval
-creates a marketplace listing and the CLI resolves installs by fetching an
-`InstallBundle` from `agentrig.ai`.
+Installable publication happens through official and reviewed registry/catalog
+artifacts. Maintainers approve a catalog listing and the CLI resolves installs
+by fetching an `InstallBundle` from `agentrig.ai`.
 
 The verified registry mirror is a separate audit and verification lane. It is
-not required for marketplace approval or normal public installs.
+not required for catalog approval or normal public installs.
 
 ## Submission and review
 
-Submit pinned upstream snapshots to AgentRig via the CLI or the web UI at
-`/submit` when you want review and discovery.
+Public upload and the hosted `/submit` flow are disabled for AgentRig 1.0.
+Plugin proposals should go through a maintainer-reviewed GitHub issue or PR.
 
-Submission is not itself an install source.
+Maintainer-configured trusted publishing may still submit canonical snapshots
+for review. Submission is not itself an install source.
 
 See: [Submission contract](/plugins/uploads)
 
 There are two independent lifecycles:
 
 1. Submission lifecycle: submit, validate, review, then approve or reject. An
-   approval materializes the marketplace listing.
+   approval materializes the catalog listing.
 2. Verified-mirror lifecycle: an optional admin **Start verified mirror** action
    creates a reviewable PR into `agentrig-registry` for approved listings.
 
-Being approved into the marketplace does **not** require a GitHub PR. The only
+Being approved into the catalog does **not** require a GitHub PR. The only
 repository app used for source fetches is the read-only user-repo-sync app.
 
 ## Trusted publishing from GitHub Actions
@@ -47,8 +48,8 @@ Flow:
 - GitHub Actions requests an OIDC token with audience `agentrig` from a manually dispatched workflow.
 - AgentRig verifies issuer, audience, `event_name=workflow_dispatch`, `runner_environment=github-hosted`, repository, repository id, owner, owner id, workflow, optional environment, SHA, ref, run id, and run attempt.
 - AgentRig mints a short-lived scoped publish token.
-- The CLI submits the canonical plugin snapshot through the normal submission endpoint.
-- Marketplace approval still requires review. Verified mirroring, when used, is
+- The CLI submits the canonical plugin snapshot through the maintainer submission endpoint.
+- Catalog approval still requires review. Verified mirroring, when used, is
   an explicit admin action after approval.
 
 Required workflow permissions:

@@ -1,41 +1,37 @@
 ---
-title: Submission contract
-description: Submit canonical upstream snapshots for marketplace review.
+title: Maintainer submission contract
+description: Canonical upstream snapshots for maintainer registry review.
 icon: Upload
 ---
 
 # Submission contract
 
-Use AgentRig to submit one pinned upstream snapshot for review:
+Public uploads are disabled for AgentRig 1.0. Maintainers can submit one pinned
+upstream snapshot for registry/catalog review through trusted publishing:
 
 ```bash
-agentrig login
-agentrig plugin submit owner/repo@v1.2.3
+agentrig plugin submit owner/repo@v1.2.3 --trustedPublish
 ```
 
-`agentrig plugin submit` creates a review submission from one resolved source.
+`agentrig plugin submit --trustedPublish` creates a review submission from one resolved source.
 The source can be a tagged local checkout, a GitHub shorthand, or a GitHub repo
 URL plus a version tag:
 
 ```bash
-agentrig plugin submit . --version v1.2.3
-agentrig plugin submit owner/repo@v1.2.3
-agentrig plugin submit https://github.com/owner/repo --version v1.2.3
+agentrig plugin submit . --version v1.2.3 --trustedPublish
+agentrig plugin submit owner/repo@v1.2.3 --trustedPublish
+agentrig plugin submit https://github.com/owner/repo --version v1.2.3 --trustedPublish
 ```
 
 If the plugin lives below the repo root, pass its repo-relative path:
 
 ```bash
-agentrig plugin submit owner/repo@v1.2.3 --path plugin
+agentrig plugin submit owner/repo@v1.2.3 --path plugin --trustedPublish
 ```
 
-Skill, MCP, and hook submissions use the same source shape:
-
-```bash
-agentrig skill submit owner/repo@v1.2.3 --path skills/review
-agentrig mcp submit owner/repo@v1.2.3 --path mcps/github
-agentrig hook submit owner/repo@v1.2.3 --path hooks/pre-submit
-```
+Standalone public Skill, MCP, and Hook upload flows are not part of AgentRig 1.0.
+MCPs and hooks should ship through plugin artifacts; selection bundles from
+trusted plugin artifacts remain allowed.
 
 To check review progress later:
 
@@ -49,7 +45,7 @@ You can also pass a submission id directly:
 agentrig plugin status <submission-id>
 ```
 
-The web submission UI at `/submit` uses the same resolved provenance model.
+The hosted web submission UI at `/submit` is disabled for 1.0.
 
 AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
 
@@ -60,7 +56,7 @@ The normal path looks like this:
 1. submit one exact upstream snapshot
 2. AgentRig validates and scans it
 3. an admin reviews it in the web app
-4. approval materializes a marketplace listing in AgentRig
+4. approval materializes a catalog listing in AgentRig
 5. the approved listing becomes installable through an AgentRig `InstallBundle`
 
 A verified mirror is separate. An admin may choose **Start verified mirror** for
@@ -75,7 +71,7 @@ A submission can support:
 
 - review
 - validation
-- marketplace listing review
+- catalog listing review
 - optional verified mirroring after approval
 
 It does **not** make author repos, ZIPs, arbitrary URLs, or Convex-hosted payloads installable.
@@ -127,4 +123,4 @@ Approved listings also carry installability:
 
 - Never submit sources that contain secrets.
 - Review and validation reduce risk, but install trust belongs to the approved
-  marketplace listing and its AgentRig `InstallBundle`, not to submission itself.
+  catalog listing and its AgentRig `InstallBundle`, not to submission itself.

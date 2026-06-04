@@ -1,18 +1,17 @@
 ---
 title: Official registry workflow
-description: Submit marketplace listings and optionally mirror verified entries.
+description: Review catalog listings and optionally mirror verified entries.
 icon: PackagePlus
 ---
 
 # Official registry workflow
 
-AgentRig marketplace submissions and the verified registry mirror are separate
-workflows.
+AgentRig catalog review and the verified registry mirror are separate workflows.
 
-## Marketplace listing lifecycle
+## Catalog listing lifecycle
 
-Users submit plugins, skills, MCPs, and hooks through AgentRig. Submissions move
-through one review lifecycle:
+Public upload is disabled for AgentRig 1.0. Maintainer submissions move through
+one review lifecycle:
 
 ```text
 pending_review -> approved | rejected | blocked
@@ -22,7 +21,7 @@ When a submission is approved, AgentRig materializes a Convex
 `artifact_listings` row with an SDK `InstallBundle`. That listing is immediately
 available to the CLI through the `agentrig.ai` install-bundle endpoint. No
 repository pull request or merge is required before users can install the
-approved marketplace listing.
+approved catalog listing.
 
 Rejected submissions do not create listings. Blocked submissions are retained for
 moderation and policy history, but they do not resolve to install bundles.
@@ -31,7 +30,7 @@ moderation and policy history, but they do not resolve to install bundles.
 
 The [`agentrig-registry`](https://github.com/agentrig/agentrig-registry)
 repository is an opt-in verified mirror for transparency and audit. It is not
-part of the approve path, and marketplace listings work without a mirrored
+part of the approve path, and catalog listings work without a mirrored
 registry entry.
 
 An AgentRig admin can explicitly choose **Start verified mirror** on a listing.
@@ -46,9 +45,9 @@ history, and independent inspection. CLI installs still resolve through
 
 ## Who triggers what
 
-- **User submit:** the user submits an artifact for review. Automated checks and
-  admin review decide whether the submission becomes `approved`, `rejected`, or
-  `blocked`.
+- **Maintainer submit:** a maintainer or trusted publisher submits an artifact for
+  review. Automated checks and admin review decide whether the submission becomes
+  `approved`, `rejected`, or `blocked`.
 - **Approve flow:** approval writes the Convex `artifact_listings` row and SDK
   `InstallBundle`. The listing is then available from the AgentRig install-bundle
   endpoint.
@@ -64,18 +63,16 @@ history, and independent inspection. CLI installs still resolve through
 
 Discovery submissions created from pasted repo URLs or `agentrig inspect` output
 help reviewers find candidate files and metadata. They become installable only
-when the review flow approves a marketplace listing and stores an
+when the review flow approves a catalog listing and stores an
 `InstallBundle`.
 
-AI-enriched text is draft metadata until accepted by an admin. Hosted AI
-enrichment exists only in the web submit flow and is gated by login, Turnstile,
-quotas, and review. The CLI supports only local BYOK enrichment, where the
-user's provider key is sent directly to their configured provider and never to
-AgentRig.
+Hosted AI enrichment is disabled for AgentRig 1.0. The CLI supports only local
+BYOK enrichment, where the user's provider key is sent directly to their
+configured provider and never to AgentRig.
 
 ## Mirror safety rules
 
-- Keep marketplace approval separate from verified mirroring.
+- Keep catalog approval separate from verified mirroring.
 - Keep the SDK `InstallBundle` as the source of mirrored install metadata.
 - Keep user repository access on the read-only `agentrig-repository-sync` app.
 - Use the write-capable `agentrig-repository-mirror` app only for AgentRig-owned

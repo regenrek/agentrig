@@ -24,7 +24,7 @@ Run `agentrig --help` for global help.
 - `agentrig registry add` - add a registry.
 - `agentrig plugin init` - scaffold a new plugin.
 
-Public installs use latest-first marketplace refs:
+Public installs use latest-first registry refs:
 `<registryAlias>/<namespace.plugin>` for plugins and
 `<registryAlias>/<namespace.skill>` for standalone skills. Add `@<version>` only
 when you need an explicit reproducibility or rollback pin. Install ledgers still
@@ -33,7 +33,7 @@ uses the unversioned latest ref. Install commands resolve refs by fetching an
 AgentRig `InstallBundle` from `agentrig.ai`.
 
 Plugin install remains the primary full-bundle path. Selection install is the
-selective path for choosing specific artifacts from an installable marketplace
+selective path for choosing specific artifacts from an installable registry
 plugin. In V1, standalone MCP and hook installs without `--pick` are not a
 public flow; install MCPs and hooks as plugin contents with `--pick`.
 

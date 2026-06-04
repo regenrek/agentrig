@@ -1,12 +1,12 @@
 ---
 title: list
-description: List installed plugins or available marketplace plugins.
+description: List installed plugins or available registry plugins.
 icon: List
 ---
 
 # `agentrig list`
 
-List installed plugins (default) or available plugins in the marketplace.
+List installed plugins (default) or available plugins in the registry catalog.
 
 ```bash
 agentrig list
@@ -16,11 +16,11 @@ agentrig list --available
 ## Options
 
 - `--installed` - list installed plugins (default: true).
-- `--available` - list plugins available in the AgentRig marketplace.
+- `--available` - list plugins available in the AgentRig registry catalog.
 - `--registry <name|url>` - registry override.
 - `--cwd <path>` - working directory.
 
 ## Output
 
 Installed plugins are read from `.agentrig/manifest.json`.
-Available plugins are fetched from `agentrig.ai` as marketplace listing data.
+Available plugins are fetched from `agentrig.ai` as catalog listing data.

@@ -20,7 +20,7 @@ agentrig view <plugin-spec>
 agentrig plugin install <provider> <plugin-spec>
 ```
 
-For public installs, `<plugin-spec>` must be the canonical marketplace ref
+For public installs, `<plugin-spec>` must be the canonical registry ref
 `<registryAlias>/<namespace.plugin>`. Add `@<version>` only when you need to pin
 an exact version for reproducibility or rollback.
 
@@ -34,7 +34,7 @@ agentrig plugin uninstall codex agentrig/agentrig.core-committer
 ```
 
 This is the main path for installing an entire published plugin. The install
-ledger records the resolved concrete version, marketplace identity, and
+ledger records the resolved concrete version, registry identity, and
 snapshot digest even when you use the unversioned latest ref. The CLI resolves
 the ref by fetching an AgentRig `InstallBundle` from `agentrig.ai`.
 
@@ -86,7 +86,7 @@ materialize a local plugin first.
 
 For third-party repos that are not in a signed registry, use the top-level
 `inspect` and `use` commands. Those commands create external-repo provenance,
-not marketplace identity.
+not registry trust.
 
 ## inspect and use
 
@@ -103,7 +103,7 @@ computed from detector output only; AI output never changes it.
 `use --as-plugin <name>` writes a local plugin directory with `x-agentrig.source`
 provenance. `use --install` stages the same external-repo plugin shape and installs
 it through the provider installer. Both paths record external-repo provenance, not
-marketplace trust.
+registry trust.
 
 ## Local BYOK enrichment
 
@@ -136,9 +136,8 @@ raise `AGENTRIG_AI_MAX_TOKENS` if the provider reports a token-limit truncation.
 The response must pass the shared `AiEnrichmentDraft` schema. Suggested description,
 keywords, and manifest `name` fields are draft metadata only.
 
-Hosted AI enrichment is web-only in v1. The `/submit` flow requires login,
-Turnstile, product quotas, and admin review before any AI-suggested field can be
-accepted.
+Hosted AI enrichment is disabled for AgentRig 1.0. AI-assisted CLI metadata is
+local BYOK only.
 
 ## init
 
