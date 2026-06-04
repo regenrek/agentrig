@@ -27,6 +27,7 @@ const main = defineCommand({
     list: () => import('./commands/list').then((m) => m.default),
     inspect: () => import('./commands/inspect').then((m) => m.default),
     use: () => import('./commands/use').then((m) => m.default),
+    doctor: () => import('./commands/doctor').then((m) => m.default),
     skill: () => import('./commands/skill').then((m) => m.default),
     mcp: () => import('./commands/mcp').then((m) => m.default),
     hook: () => import('./commands/hook').then((m) => m.default),

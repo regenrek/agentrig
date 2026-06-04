@@ -23,6 +23,7 @@ AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plug
   "x-agentrig": {
     "displayName": "Committer Skill",
     "kind": "plugin",
+    "profile": "other",
     "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
     "pluginDependencies": []
   }
@@ -43,8 +44,110 @@ AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plug
 | `commands`, `agents`, `skills`, `rules`, `hooks`, `mcpServers`, `lspServers`, `outputStyles` | No | Standard Open Plugins metadata-only fields in this release. |
 | `x-agentrig.displayName` | No | AgentRig display label. |
 | `x-agentrig.kind` | No | AgentRig artifact kind, usually `plugin`. |
+| `x-agentrig.profile` | No | AgentRig plugin profile: `base`, `core`, `project`, `third-party`, or `other`. Omit it when no profile applies. |
+| `x-agentrig.owner` | No | AgentRig ownership classification, for example `external` for curated third-party providers. |
+| `x-agentrig.supportLevel` | No | AgentRig support classification, for example `curated`. |
 | `x-agentrig.configSchema` | No | AgentRig-specific plugin configuration schema. |
 | `x-agentrig.pluginDependencies` | No | AgentRig plugin dependencies installed before this plugin. |
+| `x-agentrig.providesCapabilities` | No | Map of canonical capability id to provider metadata. Used by third-party provider plugins. |
+| `x-agentrig.requiresCapabilities` | No | Map of canonical capability id to requirement metadata. Used by project plugins. |
+| `x-agentrig.verification` | No | Provider verification metadata: `lastVerified`, `cadence`, and `smokeTest`. |
+| `x-agentrig.replacementPolicy` | No | Replacement metadata for course-stable provider swaps. |
+
+## Capability metadata
+
+Capabilities are metadata, not installable artifacts. They stay under
+`x-agentrig` so the manifest remains Open Plugins 1.0.0 compatible.
+
+Project plugins declare what they need:
+
+```json
+{
+  "x-agentrig": {
+    "kind": "plugin",
+    "profile": "project",
+    "pluginDependencies": [
+      "agentrig/instructa.base@^1.0.0",
+      "agentrig/instructa.core@^1.0.0",
+      "agentrig/third-party.context7@^1.0.0"
+    ],
+    "requiresCapabilities": {
+      "docs.latest": {
+        "required": true,
+        "provider": "third-party.context7"
+      },
+      "browser.cloud": {
+        "required": false,
+        "provider": "third-party.browser-cloud"
+      }
+    }
+  }
+}
+```
+
+Third-party provider plugins declare what they provide:
+
+```json
+{
+  "x-agentrig": {
+    "kind": "plugin",
+    "profile": "third-party",
+    "owner": "external",
+    "supportLevel": "curated",
+    "providesCapabilities": {
+      "docs.latest": {
+        "stability": "required-provider",
+        "permissionLevel": "read-context",
+        "useWhen": [
+          "checking current framework APIs",
+          "validating SDK examples",
+          "resolving deprecated syntax"
+        ],
+        "doNotUseWhen": [
+          "local architecture is the source of truth",
+          "business rules are project-specific"
+        ]
+      }
+    },
+    "verification": {
+      "lastVerified": "2026-06-04",
+      "cadence": "30d",
+      "smokeTest": "verify/context7-smoke.md"
+    },
+    "replacementPolicy": {
+      "capabilityAlias": "docs.latest",
+      "replaceWithoutCourseChange": true
+    }
+  }
+}
+```
+
+The canonical capability ids for AgentRig 1.0 are:
+
+```txt
+workflow.project
+workflow.core
+docs.latest
+plan.graph
+browser.verify
+browser.cloud
+repo.hosting
+db.schema
+auth.docs
+payments.docs
+security.secrets
+deploy.preview
+observability.logs
+desktop.runtime
+desktop.signing
+mcp.verify
+mcp.tools
+mcp.resources
+mcp.prompts
+test.e2e
+test.api
+test.unit
+```
 
 <Callout title="Schemas">
 The CLI generates `$schema` using `https://agentrig.ai/schema/plugin.v1.json`.

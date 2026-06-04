@@ -167,9 +167,187 @@ describe('marketplace listing contracts', () => {
     expect((manifest as Record<string, unknown>).commands).toEqual({ review: './commands/review.md' })
   })
 
+  it('accepts a project plugin with capability requirements', () => {
+    const manifest = PluginManifestSchema.parse({
+      $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+      name: 'instructa.saas',
+      version: '1.0.0',
+      description: 'Agentic engineering workflow plugin for SaaS products.',
+      author: { name: 'Instructa', url: 'https://instructa.ai' },
+      license: 'MIT',
+      keywords: ['instructa', 'saas', 'agentic-engineering'],
+      'x-agentrig': {
+        kind: 'plugin',
+        profile: 'project',
+        pluginDependencies: [
+          'agentrig/instructa.base@^1.0.0',
+          'agentrig/instructa.core@^1.0.0',
+          'agentrig/third-party.context7@^1.0.0',
+        ],
+        requiresCapabilities: {
+          'docs.latest': {
+            required: true,
+            provider: 'third-party.context7',
+          },
+          'browser.cloud': {
+            required: false,
+            provider: 'third-party.browser-cloud',
+          },
+        },
+      },
+    })
+
+    expect(manifest['x-agentrig']).toMatchObject({
+      kind: 'plugin',
+      profile: 'project',
+      pluginDependencies: [
+        'agentrig/instructa.base@^1.0.0',
+        'agentrig/instructa.core@^1.0.0',
+        'agentrig/third-party.context7@^1.0.0',
+      ],
+      requiresCapabilities: {
+        'docs.latest': {
+          required: true,
+          provider: 'third-party.context7',
+        },
+        'browser.cloud': {
+          required: false,
+          provider: 'third-party.browser-cloud',
+        },
+      },
+    })
+  })
+
+  it('accepts a third-party provider with capability metadata', () => {
+    const manifest = PluginManifestSchema.parse({
+      $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+      name: 'third-party.context7',
+      version: '1.0.0',
+      description: 'Curated provider for docs.latest using Context7.',
+      author: { name: 'Instructa', url: 'https://instructa.ai' },
+      license: 'MIT',
+      keywords: ['third-party', 'mcp', 'docs', 'context'],
+      'x-agentrig': {
+        kind: 'plugin',
+        profile: 'third-party',
+        owner: 'external',
+        supportLevel: 'curated',
+        providesCapabilities: {
+          'docs.latest': {
+            stability: 'required-provider',
+            permissionLevel: 'read-context',
+            useWhen: [
+              'checking current framework APIs',
+              'validating SDK examples',
+            ],
+            doNotUseWhen: [
+              'local architecture is the source of truth',
+              'business rules are project-specific',
+            ],
+          },
+        },
+        verification: {
+          lastVerified: '2026-06-04',
+          cadence: '30d',
+          smokeTest: 'verify/context7-smoke.md',
+        },
+        replacementPolicy: {
+          capabilityAlias: 'docs.latest',
+          replaceWithoutCourseChange: true,
+        },
+      },
+    })
+
+    expect(manifest['x-agentrig']).toMatchObject({
+      profile: 'third-party',
+      owner: 'external',
+      supportLevel: 'curated',
+      providesCapabilities: {
+        'docs.latest': {
+          stability: 'required-provider',
+          permissionLevel: 'read-context',
+        },
+      },
+      verification: {
+        lastVerified: '2026-06-04',
+      },
+      replacementPolicy: {
+        capabilityAlias: 'docs.latest',
+        replaceWithoutCourseChange: true,
+      },
+    })
+  })
+
+  it('keeps Phase 2 x-agentrig metadata optional', () => {
+    expect(PluginManifestSchema.parse({ name: 'agentrig.minimal' })).toEqual({ name: 'agentrig.minimal' })
+    expect(
+      PluginManifestSchema.parse({
+        name: 'agentrig.legacy',
+        'x-agentrig': {
+          displayName: 'Legacy',
+          kind: 'plugin',
+          pluginDependencies: [],
+        },
+      })['x-agentrig']
+    ).toMatchObject({
+      displayName: 'Legacy',
+      kind: 'plugin',
+      pluginDependencies: [],
+    })
+  })
+
   it('validates Open Plugins name and version syntax', () => {
     expect(() => PluginManifestSchema.parse({ name: 'agentrig--core' })).toThrow()
     expect(() => PluginManifestSchema.parse({ name: 'agentrig.core', version: 'latest' })).toThrow()
+  })
+
+  it('rejects invalid AgentRig manifest metadata values', () => {
+    expect(() =>
+      PluginManifestSchema.parse({
+        name: 'instructa.saas',
+        'x-agentrig': { kind: 'plugin', profile: 'stack' },
+      })
+    ).toThrow()
+    expect(() =>
+      PluginManifestSchema.parse({
+        name: 'instructa.saas',
+        'x-agentrig': {
+          kind: 'plugin',
+          requiresCapabilities: {
+            'not.canonical': { required: true },
+          },
+        },
+      })
+    ).toThrow()
+    expect(() =>
+      PluginManifestSchema.parse({
+        name: 'third-party.context7',
+        'x-agentrig': {
+          kind: 'plugin',
+          providesCapabilities: {
+            'docs.latest': {
+              stability: 'required-provider',
+              permissionLevel: 'read-context',
+              useWhen: 'checking docs',
+              doNotUseWhen: [],
+            },
+          },
+        },
+      })
+    ).toThrow()
+    expect(() =>
+      PluginManifestSchema.parse({
+        name: 'third-party.context7',
+        'x-agentrig': {
+          kind: 'plugin',
+          verification: {
+            lastVerified: 'June 4, 2026',
+            cadence: '30d',
+            smokeTest: 'verify/context7-smoke.md',
+          },
+        },
+      })
+    ).toThrow()
   })
 
   it('emits the required registry LICENSE file from listing license metadata', async () => {

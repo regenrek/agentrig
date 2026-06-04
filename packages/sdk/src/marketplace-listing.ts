@@ -14,12 +14,39 @@ export const REGISTRY_MIRROR_STATUSES = ['queued', 'opened', 'merged', 'failed']
 export const MARKETPLACE_INSTALLABILITIES = ['available', 'yanked', 'taken_down'] as const
 export const REGISTRY_TRUST_TIERS = ['official', 'reviewed', 'listed', 'blocked', 'yanked'] as const
 export const INSTALLABILITY_STATES = ['installable', 'discovery_only', 'blocked', 'yanked'] as const
+export const PLUGIN_PROFILES = ['base', 'core', 'project', 'third-party', 'other'] as const
+export const CAPABILITY_IDS = [
+  'workflow.project',
+  'workflow.core',
+  'docs.latest',
+  'plan.graph',
+  'browser.verify',
+  'browser.cloud',
+  'repo.hosting',
+  'db.schema',
+  'auth.docs',
+  'payments.docs',
+  'security.secrets',
+  'deploy.preview',
+  'observability.logs',
+  'desktop.runtime',
+  'desktop.signing',
+  'mcp.verify',
+  'mcp.tools',
+  'mcp.resources',
+  'mcp.prompts',
+  'test.e2e',
+  'test.api',
+  'test.unit',
+] as const
 
 export const SubmissionStatusSchema = z.enum(SUBMISSION_STATUSES)
 export const RegistryMirrorStatusSchema = z.enum(REGISTRY_MIRROR_STATUSES)
 export const MarketplaceInstallabilitySchema = z.enum(MARKETPLACE_INSTALLABILITIES)
 export const RegistryTrustTierSchema = z.enum(REGISTRY_TRUST_TIERS)
 export const InstallabilityStateSchema = z.enum(INSTALLABILITY_STATES)
+export const PluginProfileSchema = z.enum(PLUGIN_PROFILES)
+export const CapabilityIdSchema = z.enum(CAPABILITY_IDS)
 export const ArtifactKindSchema = z.enum(ARTIFACT_KINDS)
 export const CliSupportedKindSchema = z.enum(CLI_SUPPORTED_ARTIFACT_KINDS)
 
@@ -31,6 +58,11 @@ export type CanonicalTrustTier = RegistryTrustTier
 export type TrustTier = RegistryTrustTier
 export type InstallabilityState = z.infer<typeof InstallabilityStateSchema>
 export type RegistryInstallability = InstallabilityState
+export type PluginProfile = z.infer<typeof PluginProfileSchema>
+export type CapabilityId = z.infer<typeof CapabilityIdSchema>
+
+const CAPABILITY_ID_SET = new Set<string>(CAPABILITY_IDS)
+const YYYY_MM_DD_RE = /^\d{4}-\d{2}-\d{2}$/
 
 const MarketplaceListingPublicBaseSchema = z.object({
   kind: CliSupportedKindSchema,
@@ -338,14 +370,59 @@ const AgentRigPluginListingSchema = z.object({
   category: z.string().trim().min(1),
 })
 
-const AgentRigPluginExtensionSchema = z.object({
-  displayName: z.string().optional(),
-  kind: z.string().optional(),
-  listing: AgentRigPluginListingSchema.optional(),
-  configSchema: z.record(z.string(), z.any()).optional(),
-  pluginDependencies: z.array(z.string()).optional(),
-  source: z.any().optional(),
-})
+const CapabilityIdKeySchema = z.string().refine(
+  (value) => CAPABILITY_ID_SET.has(value),
+  'Capability id must be one of the AgentRig 1.0 canonical capability ids',
+)
+
+const AgentRigProvidedCapabilitySchema = z
+  .object({
+    stability: z.string().trim().min(1),
+    permissionLevel: z.string().trim().min(1),
+    useWhen: z.array(z.string().trim().min(1)),
+    doNotUseWhen: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+
+const AgentRigRequiredCapabilitySchema = z
+  .object({
+    required: z.boolean(),
+    provider: z.string().trim().min(1).optional(),
+  })
+  .strict()
+
+const AgentRigVerificationSchema = z
+  .object({
+    lastVerified: z.string().regex(YYYY_MM_DD_RE, 'lastVerified must use YYYY-MM-DD format'),
+    cadence: z.string().trim().min(1),
+    smokeTest: z.string().trim().min(1),
+  })
+  .strict()
+
+const AgentRigReplacementPolicySchema = z
+  .object({
+    capabilityAlias: CapabilityIdKeySchema,
+    replaceWithoutCourseChange: z.boolean(),
+  })
+  .strict()
+
+const AgentRigPluginExtensionSchema = z
+  .object({
+    displayName: z.string().optional(),
+    kind: z.string().trim().min(1).optional(),
+    profile: PluginProfileSchema.optional(),
+    owner: z.string().trim().min(1).optional(),
+    supportLevel: z.string().trim().min(1).optional(),
+    listing: AgentRigPluginListingSchema.optional(),
+    configSchema: z.record(z.string(), z.any()).optional(),
+    pluginDependencies: z.array(z.string().trim().min(1)).optional(),
+    providesCapabilities: z.record(CapabilityIdKeySchema, AgentRigProvidedCapabilitySchema).optional(),
+    requiresCapabilities: z.record(CapabilityIdKeySchema, AgentRigRequiredCapabilitySchema).optional(),
+    verification: AgentRigVerificationSchema.optional(),
+    replacementPolicy: AgentRigReplacementPolicySchema.optional(),
+    source: z.any().optional(),
+  })
+  .catchall(z.any())
 
 export const PluginManifestSchema = z.object({
   $schema: z.string().trim().min(1).optional(),
