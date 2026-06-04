@@ -254,7 +254,7 @@ describe('command:plugin install', () => {
           name: 'demo-plugin',
           source: { source: 'local', path: './plugins/demo-plugin' },
           policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
-          category: 'productivity',
+          category: 'Development',
         },
       },
     }

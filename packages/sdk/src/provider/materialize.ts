@@ -13,6 +13,7 @@ const manifestInputSchema = z
     displayName: z.string().trim().min(1).optional(),
     description: z.string().trim().min(1),
     version: z.string().trim().max(64).regex(PLUGIN_VERSION_RE),
+    category: z.string().trim().min(1),
     author: z
       .object({
         name: z.string().trim().min(1),
@@ -67,6 +68,9 @@ export function buildPluginManifest(input: MaterializedPluginManifestInput, pick
     'x-agentrig': {
       displayName: parsed.displayName ?? parsed.name,
       kind: 'plugin',
+      listing: {
+        category: parsed.category,
+      },
       configSchema: {},
       pluginDependencies: [],
       source: {

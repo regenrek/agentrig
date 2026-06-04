@@ -9,6 +9,7 @@
   "x-agentrig": {
     "displayName": "__PLUGIN_NAME__",
     "kind": "plugin",
+    "listing": { "category": "__PLUGIN_CATEGORY__" },
     "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
     "pluginDependencies": []
   }

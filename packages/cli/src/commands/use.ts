@@ -46,6 +46,10 @@ const command = defineCommand({
       type: 'string',
       description: 'Materialize picked signals as this plugin id',
     },
+    category: {
+      type: 'string',
+      description: 'Marketplace category for a materialized plugin (required with --as-plugin)',
+    },
     provider: {
       type: 'string',
       description: 'Provider to install for: claude, codex, cursor, or all',
@@ -184,6 +188,10 @@ const command = defineCommand({
         }
         return
       }
+      const category = String(args.category ?? '').trim()
+      if (!category) {
+        throw new Error('Missing required --category <category> for materialized plugins.')
+      }
       const files = await materializePlugin({
         tree: resolved.tree,
         pickedSignals,
@@ -192,6 +200,7 @@ const command = defineCommand({
           displayName: titleFromPluginId(pluginId),
           description: enrichment?.description ?? `AgentRig plugin generated from ${report.source.label}.`,
           version: '0.1.0',
+          category,
           keywords: enrichment?.keywords,
           source: {
             ...sourceReferenceForManifest(report.source),

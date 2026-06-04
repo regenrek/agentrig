@@ -25,6 +25,7 @@ describe('materializePlugin', () => {
         displayName: 'Review',
         description: 'Review workflow.',
         version: '1.0.0',
+        category: 'Development',
         keywords: ['review'],
         source: {
           owner: 'owner',
@@ -50,6 +51,9 @@ describe('materializePlugin', () => {
       'x-agentrig': {
         displayName: 'Review',
         kind: 'plugin',
+        listing: {
+          category: 'Development',
+        },
         configSchema: {},
         pluginDependencies: [],
         source: {
@@ -80,6 +84,7 @@ describe('materializePlugin', () => {
           displayName: 'Review',
           description: 'Review workflow.',
           version: '1.0.0',
+          category: 'Development',
           source: { scanDigest: scan.digest },
         },
       })
@@ -104,6 +109,7 @@ describe('materializePlugin', () => {
           displayName: 'Review',
           description: 'Review workflow.',
           version: '1.0.0',
+          category: 'Development',
           source: { scanDigest: scan.digest },
         },
       })

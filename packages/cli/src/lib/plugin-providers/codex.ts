@@ -27,6 +27,7 @@ import {
   normalizeManifestDescription,
   normalizeManifestVersion,
   pluginAuthor,
+  pluginCategory,
   pluginDisplayName,
   providerPluginName,
 } from './shared'
@@ -60,7 +61,7 @@ function buildCodexPluginManifest(
       displayName: pluginDisplayName(plugin.manifest),
       shortDescription: normalizeManifestDescription(plugin.manifest),
       developerName: plugin.manifest.author?.name ?? owner.name,
-      category: 'Productivity',
+      category: pluginCategory(plugin.manifest),
     },
   })
 }
@@ -87,7 +88,7 @@ function buildCodexMarketplaceManifest(
           installation: cfg.providers.codex.installationPolicy,
           authentication: cfg.providers.codex.authenticationPolicy,
         },
-        category: cfg.providers.codex.category,
+        category: pluginCategory(plugin.manifest),
       }
     }),
   })
@@ -252,7 +253,7 @@ export const codexProvider: PluginProviderAdapter = {
           installation: cfg.providers.codex.installationPolicy,
           authentication: cfg.providers.codex.authenticationPolicy,
         },
-        category: cfg.providers.codex.category,
+        category: pluginCategory(plugin.manifest),
       })
       const installResult = await codexInstallPlugin({
         marketplaceName: result.marketplaceName,

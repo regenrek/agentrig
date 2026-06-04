@@ -44,16 +44,16 @@ importers:
         specifier: latest
         version: 6.0.2(react@19.2.5)
       '@tanstack/react-query':
-        specifier: latest
+        specifier: 5.100.9
         version: 5.100.9(react@19.2.5)
       '@tanstack/react-router':
-        specifier: latest
+        specifier: 1.169.2
         version: 1.169.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-router-ssr-query':
-        specifier: latest
+        specifier: 1.166.12
         version: 1.166.12(@tanstack/query-core@5.100.9)(@tanstack/react-query@5.100.9(react@19.2.5))(@tanstack/react-router@1.169.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.169.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-start':
-        specifier: latest
+        specifier: 1.167.65
         version: 1.167.65(@rsbuild/core@2.0.1)(@rspack/core@2.0.0(@swc/helpers@0.5.21))(@voidzero-dev/vite-plus-core@0.1.14(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.4))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite-plugin-solid@2.11.10(@voidzero-dev/vite-plus-core@0.1.14(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.4))(solid-js@1.9.11))
       alchemy:
         specifier: ^0.93.7
@@ -123,7 +123,7 @@ importers:
         specifier: latest
         version: 4.3.0(@voidzero-dev/vite-plus-core@0.1.14(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.4))
       '@tanstack/react-router-devtools':
-        specifier: latest
+        specifier: 1.166.13
         version: 1.166.13(@tanstack/react-router@1.169.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.169.2)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@types/mdx':
         specifier: latest

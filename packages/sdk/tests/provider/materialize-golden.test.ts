@@ -19,6 +19,7 @@ describe('materializePlugin golden fixture', () => {
         displayName: 'Dots Like',
         description: 'Selected workflows from dots-like.',
         version: '1.0.0',
+        category: 'Development',
         keywords: ['review', 'debug'],
         source: {
           repoUrl: 'https://github.com/jxnl/dots',

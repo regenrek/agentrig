@@ -189,7 +189,18 @@ describe('plugin provider command runner', () => {
       name: providerName,
       interface: {
         displayName: 'Agent Skills',
+        category: 'Development',
       },
+    })
+    await expect(
+      readJson(path.join(persistentRoot, '.agents', 'plugins', 'marketplace.json'))
+    ).resolves.toMatchObject({
+      plugins: [
+        {
+          name: providerName,
+          category: 'Development',
+        },
+      ],
     })
     expect(result[0]?.installed).toEqual([providerName])
     expect(result[0]?.locations[0]).toBe(persistentRoot)
@@ -205,6 +216,27 @@ describe('plugin provider command runner', () => {
         appServerInstalled: true,
       },
     })
+  })
+
+  it('rejects Codex installs when plugin manifests omit the canonical category', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const home = path.join(root, 'home')
+    const pluginsRoot = path.join(root, 'plugins')
+    await fs.mkdir(home, { recursive: true })
+    vi.stubEnv('AGENTRIG_HOME', home)
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills', { category: false })
+
+    await expect(installPluginProviders({
+      cwd,
+      agent: 'codex',
+      pluginsDir: pluginsRoot,
+      scope: 'personal',
+      installMetadataByPluginId: {
+        'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
+      },
+    })).rejects.toThrow(/x-agentrig\.listing\.category/)
+    expect(codexAppServerMocks.codexInstallPlugin).not.toHaveBeenCalled()
   })
 
   it('passes Codex no-enable through to app-server installs', async () => {
@@ -334,7 +366,7 @@ describe('plugin provider command runner', () => {
           name: 'agentrig-regenrek-agent-skills',
           source: { source: 'local', path: './plugins/agentrig-regenrek-agent-skills' },
           policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
-          category: 'productivity',
+          category: 'Development',
         },
       },
     }
@@ -506,15 +538,21 @@ async function tempRoot() {
   return dir
 }
 
-async function writePluginSource(pluginsRoot: string, pluginId: string) {
+async function writePluginSource(
+  pluginsRoot: string,
+  pluginId: string,
+  options: { category?: boolean } = {}
+) {
   const pluginDir = path.join(pluginsRoot, pluginId)
   await fs.mkdir(path.join(pluginDir, '.plugin'), { recursive: true })
+  const includeCategory = options.category !== false
   await fs.writeFile(path.join(pluginDir, '.plugin', 'plugin.json'), `${JSON.stringify({
     name: pluginId,
     description: 'Dotted artifact plugin for provider install tests.',
     version: '1.0.0',
     'x-agentrig': {
       displayName: 'Agent Skills',
+      ...(includeCategory ? { listing: { category: 'Development' } } : {}),
     },
   }, null, 2)}\n`)
 }

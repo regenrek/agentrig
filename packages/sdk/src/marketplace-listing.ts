@@ -44,6 +44,7 @@ const MarketplaceListingPublicBaseSchema = z.object({
   license: z.string().trim().min(1).optional(),
   keywords: z.array(z.string()).optional(),
   capabilityTags: z.array(z.string()).optional(),
+  category: z.string().trim().min(1).optional(),
   source: z.string().trim().min(1),
   sourceType: z
     .enum(['submission', 'registry', 'github_repo', 'claimed_project', 'mcp', 'manual_curation'])
@@ -64,7 +65,17 @@ const MarketplaceListingPublicBaseSchema = z.object({
   updatedAt: z.number().int().nonnegative(),
 })
 
-export const MarketplaceListingPublicSchema = MarketplaceListingPublicBaseSchema
+function enforcePluginCategory(listing: { kind?: unknown; category?: unknown }, ctx: z.RefinementCtx) {
+  if (listing.kind === 'plugin' && (typeof listing.category !== 'string' || !listing.category.trim())) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['category'],
+      message: 'Plugin listings require category',
+    })
+  }
+}
+
+export const MarketplaceListingPublicSchema = MarketplaceListingPublicBaseSchema.superRefine(enforcePluginCategory)
 export type MarketplaceListingPublic = z.infer<typeof MarketplaceListingPublicSchema>
 
 export const MarketplaceListingInternalSchema = MarketplaceListingPublicBaseSchema.extend({
@@ -89,7 +100,7 @@ export const MarketplaceListingInternalSchema = MarketplaceListingPublicBaseSche
   likeCountAllTime: z.number().int().nonnegative().optional(),
   yankReason: z.string().trim().min(1).optional(),
   yankedAt: z.number().int().nonnegative().optional(),
-})
+}).superRefine(enforcePluginCategory)
 
 export type MarketplaceListingInternal = z.infer<typeof MarketplaceListingInternalSchema>
 
@@ -292,6 +303,14 @@ export function isResolvable(listing: Pick<MarketplaceListingPublic, 'installabi
   return listing.installability === 'available'
 }
 
+function requiredPluginListingCategory(listing: Pick<MarketplaceListingPublic, 'artifactId' | 'category'>) {
+  const category = listing.category?.trim()
+  if (!category) {
+    throw new Error(`Plugin listing ${listing.artifactId} is missing category`)
+  }
+  return category
+}
+
 export type RegistryRef = {
   name: string
   url: string
@@ -315,9 +334,14 @@ const OpenPluginAuthorSchema = z.object({
   url: z.string().trim().min(1).optional(),
 })
 
+const AgentRigPluginListingSchema = z.object({
+  category: z.string().trim().min(1),
+})
+
 const AgentRigPluginExtensionSchema = z.object({
   displayName: z.string().optional(),
   kind: z.string().optional(),
+  listing: AgentRigPluginListingSchema.optional(),
   configSchema: z.record(z.string(), z.any()).optional(),
   pluginDependencies: z.array(z.string()).optional(),
   source: z.any().optional(),
@@ -349,6 +373,14 @@ export const PluginManifestSchema = z.object({
 })
 
 export type PluginManifest = z.infer<typeof PluginManifestSchema>
+
+export function pluginManifestListingCategory(manifest: Pick<PluginManifest, 'name' | 'x-agentrig'>) {
+  const category = manifest['x-agentrig']?.listing?.category?.trim()
+  if (!category) {
+    throw new Error(`Plugin ${manifest.name} is missing x-agentrig.listing.category.`)
+  }
+  return category
+}
 
 export type RegistryFileDigest = {
   path: string
@@ -393,6 +425,7 @@ export type RegistryHistory = {
   trust_tier: TrustTier
   installability: RegistryInstallability
   active_version: RegistryVersionRecord
+  category?: string
   keywords?: string[]
   advisories?: string[]
   versions: RegistryVersionRecord[]
@@ -409,6 +442,7 @@ export type RegistryIndexItem = {
   active_version: RegistryVersionRecord
   trust_tier: TrustTier
   installability: RegistryInstallability
+  category?: string
   keywords?: string[]
   advisories?: string[]
   summary?: string
@@ -527,10 +561,11 @@ export const RegistryHistorySchema = z.object({
   trust_tier: RegistryTrustTierSchema,
   installability: InstallabilityStateSchema,
   active_version: RegistryVersionRecordSchema,
+  category: z.string().trim().min(1).optional(),
   keywords: z.array(z.string()).optional(),
   advisories: z.array(z.string()).optional(),
   versions: z.array(RegistryVersionRecordSchema).min(1),
-})
+}).superRefine(enforcePluginCategory)
 
 export const RegistryIndexItemSchema = z.object({
   kind: ArtifactKindSchema,
@@ -543,10 +578,11 @@ export const RegistryIndexItemSchema = z.object({
   active_version: RegistryVersionRecordSchema,
   trust_tier: RegistryTrustTierSchema,
   installability: InstallabilityStateSchema,
+  category: z.string().trim().min(1).optional(),
   keywords: z.array(z.string()).optional(),
   advisories: z.array(z.string()).optional(),
   summary: z.string().optional(),
-})
+}).superRefine(enforcePluginCategory)
 
 export const RegistryIndexSchema = z.object({
   $schema: z.string().trim().min(1).optional(),
@@ -617,6 +653,7 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
   const artifactId = listing.registryArtifactId ?? listing.artifactId
   const [namespace, artifactName] = splitArtifactId(artifactId)
   const kind = listing.kind
+  const category = kind === 'plugin' ? requiredPluginListingCategory(listing) : undefined
   const layout = registryLayoutForKind(kind)
   const version = listing.registryVersion ?? listing.version
   const versionRoot = `${layout.root}/${namespace}/${artifactName}/versions/${version}`
@@ -748,6 +785,7 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
     trust_tier: versions[0]!.trust_tier,
     installability: versions[0]!.installability,
     active_version: versions[0],
+    category,
     keywords: listing.keywords?.length ? listing.keywords : undefined,
     advisories: advisoryIds.length ? advisoryIds : undefined,
     versions,
@@ -766,6 +804,7 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
       active_version: historyDocument.active_version,
       trust_tier: historyDocument.trust_tier,
       installability: historyDocument.installability,
+      category: historyDocument.category,
       keywords: historyDocument.keywords,
       advisories: historyDocument.advisories,
     }))

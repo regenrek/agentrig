@@ -137,7 +137,7 @@ export type SubmitEnrichmentDraft = {
   description?: string
   keywords?: string[]
   summary?: string
-  categories?: string[]
+  category?: string
 }
 
 export type SubmitReviewMetadata = {
@@ -521,6 +521,6 @@ function normalizeEnrichment(enrichment: SubmitEnrichmentDraft): SubmitEnrichmen
     ...(enrichment.description?.trim() ? { description: enrichment.description.trim() } : {}),
     ...(enrichment.keywords?.length ? { keywords: [...new Set(enrichment.keywords.map((keyword) => keyword.trim()).filter(Boolean))].sort() } : {}),
     ...(enrichment.summary?.trim() ? { summary: enrichment.summary.trim() } : {}),
-    ...(enrichment.categories?.length ? { categories: [...new Set(enrichment.categories.map((category) => category.trim()).filter(Boolean))].sort() } : {}),
+    ...(enrichment.category?.trim() ? { category: enrichment.category.trim() } : {}),
   }
 }

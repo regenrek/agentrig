@@ -25,6 +25,7 @@ export type MaterializedPluginManifestInput = {
   displayName?: string
   description: string
   version: string
+  category: string
   author?: {
     name: string
     email?: string

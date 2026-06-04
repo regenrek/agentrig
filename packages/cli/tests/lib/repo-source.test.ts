@@ -38,7 +38,7 @@ describe('repo source resolver', () => {
     })
     expect(resolved.root).toBe(path.join(repoRoot, 'plugins', 'cursor'))
     expect(downloadTemplateMock).toHaveBeenCalledWith(
-      'https://github.com/acme/demo#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'github:acme/demo#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       expect.objectContaining({ dir: expect.any(String), force: true })
     )
     expect(fetchMock).toHaveBeenCalledWith(
@@ -108,7 +108,7 @@ describe('repo source resolver', () => {
     })
     expect(resolved.root).toBe(path.join(repoRoot, 'plugins', 'cursor'))
     expect(downloadTemplateMock).toHaveBeenCalledWith(
-      'https://github.com/acme/demo#dddddddddddddddddddddddddddddddddddddddd',
+      'github:acme/demo#dddddddddddddddddddddddddddddddddddddddd',
       expect.any(Object)
     )
 
@@ -168,8 +168,35 @@ describe('repo source resolver', () => {
       commitSha: 'cccccccccccccccccccccccccccccccccccccccc',
     })
     expect(downloadTemplateMock).toHaveBeenCalledWith(
-      'https://github.com/acme/demo#cccccccccccccccccccccccccccccccccccccccc',
+      'github:acme/demo#cccccccccccccccccccccccccccccccccccccccc',
       expect.any(Object)
+    )
+
+    await resolved.cleanup()
+  })
+
+  it('uses the github giget provider for owner/repo shorthand sources', async () => {
+    const repoRoot = await createRepoRoot()
+    const downloadTemplateMock = vi.fn(async () => ({ dir: repoRoot }))
+    const fetchMock = mockGitHubFetch({
+      defaultBranch: 'main',
+      commits: {
+        '0a7a0d984033fa6d6ff4ef2b50bdd9eb06a3a6c5': '0a7a0d984033fa6d6ff4ef2b50bdd9eb06a3a6c5',
+      },
+      owner: 'joelhooks',
+      repo: 'effectts-skills',
+    })
+
+    const resolved = await resolveRepoSource({
+      source: 'joelhooks/effectts-skills',
+      ref: '0a7a0d984033fa6d6ff4ef2b50bdd9eb06a3a6c5',
+      fetchImpl: fetchMock,
+      downloadTemplateImpl: downloadTemplateMock,
+    })
+
+    expect(downloadTemplateMock).toHaveBeenCalledWith(
+      'github:joelhooks/effectts-skills#0a7a0d984033fa6d6ff4ef2b50bdd9eb06a3a6c5',
+      expect.objectContaining({ dir: expect.any(String), force: true })
     )
 
     await resolved.cleanup()
@@ -212,15 +239,23 @@ async function createRepoRoot() {
   return root
 }
 
-function mockGitHubFetch(input: { defaultBranch: string; commits: Record<string, string>; apiBaseUrl?: string }) {
+function mockGitHubFetch(input: {
+  defaultBranch: string
+  commits: Record<string, string>
+  apiBaseUrl?: string
+  owner?: string
+  repo?: string
+}) {
+  const owner = input.owner ?? 'acme'
+  const repo = input.repo ?? 'demo'
   const fetchMock = vi.fn(async (url: string | URL | Request, _init?: RequestInit) => {
     const href = String(url)
     const apiBaseUrl = input.apiBaseUrl ?? 'https://api.github.com'
-    if (href === `${apiBaseUrl}/repos/acme/demo`) {
+    if (href === `${apiBaseUrl}/repos/${owner}/${repo}`) {
       return jsonResponse({ default_branch: input.defaultBranch })
     }
 
-    const commitPrefix = `${apiBaseUrl}/repos/acme/demo/commits/`
+    const commitPrefix = `${apiBaseUrl}/repos/${owner}/${repo}/commits/`
     if (href.startsWith(commitPrefix)) {
       const ref = decodeURIComponent(href.slice(commitPrefix.length))
       const sha = input.commits[ref]

@@ -33,6 +33,9 @@ const pluginCandidate: PublishPluginCandidate = {
     'x-agentrig': {
       displayName: 'Acme Tools',
       kind: 'plugin',
+      listing: {
+        category: 'Development',
+      },
       configSchema: {},
       pluginDependencies: [],
     },
@@ -112,6 +115,9 @@ describe('publish shape primitives', () => {
           'x-agentrig': {
             displayName: 'Agentic Engineer Core',
             kind: 'plugin',
+            listing: {
+              category: 'Development',
+            },
             configSchema: {},
             pluginDependencies: [],
           },
@@ -153,6 +159,9 @@ describe('publish shape primitives', () => {
           'x-agentrig': {
             displayName: 'Test Submission',
             kind: 'plugin',
+            listing: {
+              category: 'Development',
+            },
             configSchema: {},
             pluginDependencies: [],
           },

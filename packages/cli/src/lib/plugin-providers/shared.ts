@@ -5,6 +5,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import {
   PluginManifestSchema as pluginManifestSchema,
+  pluginManifestListingCategory,
   sanitizeProviderPluginName,
   type PluginManifest,
   type PluginFeatures,
@@ -50,7 +51,6 @@ export type ClaudeMarketplaceConfig = {
 export type CodexMarketplaceConfig = {
   marketplaceName?: string
   displayName?: string
-  category?: string
   installationPolicy?: 'AVAILABLE' | 'INSTALLED_BY_DEFAULT' | 'NOT_AVAILABLE'
   authenticationPolicy?: 'ON_INSTALL' | 'ON_USE'
   pluginRoot?: string
@@ -266,7 +266,6 @@ const claudeMarketplaceConfigSchema = z.object({
 const codexMarketplaceConfigSchema = z.object({
   marketplaceName: optionalStringSchema,
   displayName: optionalStringSchema,
-  category: optionalStringSchema,
   installationPolicy: z.enum(['AVAILABLE', 'INSTALLED_BY_DEFAULT', 'NOT_AVAILABLE']).optional(),
   authenticationPolicy: z.enum(['ON_INSTALL', 'ON_USE']).optional(),
   pluginRoot: optionalStringSchema,
@@ -304,7 +303,6 @@ const DEFAULT_CONFIG: ResolvedPluginConfig = {
     codex: {
       marketplaceName: 'agentrig-local',
       displayName: 'Agentrig Local',
-      category: 'Productivity',
       installationPolicy: 'AVAILABLE',
       authenticationPolicy: 'ON_INSTALL',
       pluginRoot: './plugins',
@@ -374,6 +372,10 @@ export function pluginAuthor(meta: PluginSourceManifest, owner: PluginOwner) {
 
 export function pluginDisplayName(meta: PluginSourceManifest) {
   return meta['x-agentrig']?.displayName ?? meta.name
+}
+
+export function pluginCategory(meta: PluginSourceManifest) {
+  return pluginManifestListingCategory(meta)
 }
 
 export function providerPluginName(
@@ -530,9 +532,6 @@ export async function loadPluginConfig(
         displayName:
           parsed.providers?.codex?.displayName?.trim() ||
           DEFAULT_CONFIG.providers.codex.displayName,
-        category:
-          parsed.providers?.codex?.category?.trim() ||
-          DEFAULT_CONFIG.providers.codex.category,
         installationPolicy:
           parsed.providers?.codex?.installationPolicy ||
           DEFAULT_CONFIG.providers.codex.installationPolicy,

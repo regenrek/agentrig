@@ -74,6 +74,7 @@ describe('commands: inspect/use', () => {
       args: {
         source: fixture,
         'as-plugin': 'community.review',
+        category: 'Development',
         out: outDir,
         pick: 'skills/review,.mcp.json',
         yes: false,
@@ -113,6 +114,7 @@ describe('commands: inspect/use', () => {
       args: {
         source: dotsLikeFixture,
         'as-plugin': 'community.dots-like',
+        category: 'Development',
         out: outDir,
         pick: 'skills/review,.claude/commands/review.md,prompts/debug.md,.mcp.json',
         yes: false,
@@ -257,6 +259,7 @@ describe('commands: inspect/use', () => {
       args: {
         source: fixture,
         'as-plugin': 'community.review',
+        category: 'Development',
         out: outDir,
         pick: 'skills/review',
         'enrich-ai': 'local',
@@ -289,6 +292,7 @@ describe('commands: inspect/use', () => {
       args: {
         source: fixture,
         'as-plugin': 'community.review',
+        category: 'Development',
         out: outDir,
         pick: 'skills/review',
         yes: false,

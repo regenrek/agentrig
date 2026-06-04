@@ -1,3 +1,20 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@latest
+  kysely: 0.28.14
+  postcss: 8.5.10
+
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+blockExoticSubdeps: true
+dangerouslyAllowAllBuilds: false
+savePrefix: ""
+allowBuilds:
+  esbuild: true
+  lefthook: true
+  sharp: true
+  workerd: true

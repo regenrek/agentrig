@@ -20,6 +20,7 @@ const listing: MarketplaceListing = MarketplaceListingSchema.parse({
   description: 'A demo plugin.',
   version: '1.0.0',
   license: 'MIT',
+  category: 'Development',
   source: 'registry',
   installability: 'available',
   publishedAt: 1,
@@ -73,6 +74,18 @@ describe('marketplace listing contracts', () => {
         installability: undefined,
       })
     ).toThrow()
+  })
+
+  it('requires categories on plugin listings', () => {
+    const { category: _category, ...uncategorizedListing } = listing
+
+    expect(() => MarketplaceListingSchema.parse(uncategorizedListing)).toThrow(/category/i)
+    expect(() =>
+      InstallBundleSchema.parse({
+        ...bundle,
+        listing: uncategorizedListing,
+      })
+    ).toThrow(/category/i)
   })
 
   it('requires sha256 and size on install bundle files', () => {
@@ -132,6 +145,9 @@ describe('marketplace listing contracts', () => {
       commands: { review: './commands/review.md' },
       'x-agentrig': {
         displayName: 'Core',
+        listing: {
+          category: 'Development',
+        },
       },
     })
 
@@ -139,7 +155,12 @@ describe('marketplace listing contracts', () => {
       name: 'agentrig.core',
       author: { email: 'plugins@example.com' },
       homepage: 'https://example.com/agentrig.core',
-      'x-agentrig': { displayName: 'Core' },
+      'x-agentrig': {
+        displayName: 'Core',
+        listing: {
+          category: 'Development',
+        },
+      },
     })
     expect(manifest.version).toBeUndefined()
     expect(manifest.description).toBeUndefined()

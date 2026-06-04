@@ -1,7 +1,7 @@
 {
   "name": "agentrig-workspace",
   "private": true,
-  "packageManager": "pnpm@9.15.4",
+  "packageManager": "pnpm@11.1.1",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -28,13 +28,6 @@
     "prepare": "lefthook install",
     "security:check": "./scripts/secleak-check.sh",
     "security:hooks": "node scripts/hooks/block-forbidden-staged-files.mjs"
-  },
-  "pnpm": {
-    "overrides": {
-      "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-      "kysely": "0.28.14",
-      "postcss": "8.5.10"
-    }
   },
   "devDependencies": {
     "lefthook": "^2.1.4",

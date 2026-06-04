@@ -92,8 +92,18 @@ function fromFileUrl(source: string) {
 }
 
 function toGigetSource(source: string, ref?: string) {
-  const withPrefix = GITHUB_SHORTHAND_RE.test(source) ? `github:${source}` : source
+  const githubShorthand = toGitHubGigetShorthand(source)
+  const withPrefix = githubShorthand ?? (GITHUB_SHORTHAND_RE.test(source) ? `github:${source}` : source)
   return ref ? `${withPrefix}#${ref}` : withPrefix
+}
+
+function toGitHubGigetShorthand(source: string) {
+  if (source.startsWith('github:') || source.startsWith('gh:')) {
+    return source.startsWith('gh:') ? `github:${source.slice(3)}` : source
+  }
+  const url = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:\/.*)?$/.exec(source)
+  if (!url) return undefined
+  return `github:${url[1]}/${stripGitSuffix(url[2])}`
 }
 
 type GitHubSource = {

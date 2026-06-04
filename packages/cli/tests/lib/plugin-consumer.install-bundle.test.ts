@@ -380,6 +380,7 @@ function bundle(
       name: 'TypeScript skill',
       description: 'TypeScript patterns.',
       version: '0.1.0',
+      category: 'Development',
       source: 'registry',
       slug: options.slug ?? 'community-typescript',
       registryAlias: 'agentrig',

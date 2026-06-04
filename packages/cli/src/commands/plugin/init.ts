@@ -50,6 +50,10 @@ const args = {
     type: 'string',
     description: 'Plugin description',
   },
+  category: {
+    type: 'string',
+    description: 'Marketplace category (default: Development)',
+  },
   author: {
     type: 'string',
     description: 'Plugin author',
@@ -246,6 +250,11 @@ const command = defineCommand({
     const pluginSlug = pluginName.split('.').at(-1) ?? pluginName
     const displayName = args.title || deriveDisplayName(pluginName)
     const description = args.description || `${displayName} plugin for AgentRig`
+    const category = String(args.category ?? 'Development').trim()
+    if (!category) {
+      console.error('Plugin category is required.')
+      process.exit(1)
+    }
     const author = args.author || ''
 
     // Substitution map
@@ -254,6 +263,7 @@ const command = defineCommand({
       '__PLUGIN_SLUG__': pluginSlug,
       '__PLUGIN_NAME__': displayName,
       '__PLUGIN_DESCRIPTION__': description,
+      '__PLUGIN_CATEGORY__': category,
       '__PLUGIN_AUTHOR__': author,
       '__YEAR__': new Date().getFullYear().toString(),
     }
