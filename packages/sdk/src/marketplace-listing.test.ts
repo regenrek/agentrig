@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   buildRegistryMirrorArtifactsFromInstallBundle,
+  CAPABILITY_IDS,
   InstallBundleSchema,
   MarketplaceListingPublicSchema,
   MarketplaceListingSchema,
@@ -167,7 +168,7 @@ describe('marketplace listing contracts', () => {
     expect((manifest as Record<string, unknown>).commands).toEqual({ review: './commands/review.md' })
   })
 
-  it('accepts a project plugin with capability requirements', () => {
+  it('accepts a project plugin with final capability requirements', () => {
     const manifest = PluginManifestSchema.parse({
       $schema: 'https://agentrig.ai/schema/plugin.v1.json',
       name: 'instructa.saas',
@@ -184,16 +185,23 @@ describe('marketplace listing contracts', () => {
           'agentrig/instructa.core@^1.0.0',
           'agentrig/third-party.context7@^1.0.0',
         ],
-        requiresCapabilities: {
+        requiredCapabilities: {
+          'plan.ledger': {
+            required: true,
+            provider: 'third-party.plandb',
+            fallback: 'docs/plan-ledger/events.jsonl',
+          },
           'docs.latest': {
             required: true,
             provider: 'third-party.context7',
           },
-          'browser.cloud': {
-            required: false,
-            provider: 'third-party.browser-cloud',
+          'browser.verify': {
+            required: true,
+            provider: 'third-party.playwright-mcp',
           },
         },
+        optionalCapabilities: ['repo.remote', 'deploy.preview', 'observability.logs'],
+        providerTargets: ['codex', 'claude-code', 'cursor'],
       },
     })
 
@@ -205,55 +213,71 @@ describe('marketplace listing contracts', () => {
         'agentrig/instructa.core@^1.0.0',
         'agentrig/third-party.context7@^1.0.0',
       ],
-      requiresCapabilities: {
+      requiredCapabilities: {
+        'plan.ledger': {
+          required: true,
+          provider: 'third-party.plandb',
+          fallback: 'docs/plan-ledger/events.jsonl',
+        },
         'docs.latest': {
           required: true,
           provider: 'third-party.context7',
         },
-        'browser.cloud': {
-          required: false,
-          provider: 'third-party.browser-cloud',
+        'browser.verify': {
+          required: true,
+          provider: 'third-party.playwright-mcp',
         },
       },
+      optionalCapabilities: ['repo.remote', 'deploy.preview', 'observability.logs'],
+      providerTargets: ['codex', 'claude-code', 'cursor'],
     })
   })
 
-  it('accepts a third-party provider with capability metadata', () => {
+  it('accepts a third-party provider with final capability metadata', () => {
     const manifest = PluginManifestSchema.parse({
       $schema: 'https://agentrig.ai/schema/plugin.v1.json',
-      name: 'third-party.context7',
+      name: 'third-party.plandb',
       version: '1.0.0',
-      description: 'Curated provider for docs.latest using Context7.',
+      description: 'Curated provider manifest for the plan.ledger capability.',
       author: { name: 'Instructa', url: 'https://instructa.ai' },
       license: 'MIT',
-      keywords: ['third-party', 'mcp', 'docs', 'context'],
+      keywords: ['third-party', 'ledger', 'plandb'],
       'x-agentrig': {
         kind: 'plugin',
         profile: 'third-party',
         owner: 'external',
         supportLevel: 'curated',
         providesCapabilities: {
-          'docs.latest': {
-            stability: 'required-provider',
-            permissionLevel: 'read-context',
-            useWhen: [
-              'checking current framework APIs',
-              'validating SDK examples',
-            ],
-            doNotUseWhen: [
-              'local architecture is the source of truth',
-              'business rules are project-specific',
-            ],
+          'plan.ledger': {
+            type: 'ledger',
+            requiredByCore: false,
+            riskLevel: 'medium',
+            fallback: 'docs/plan-ledger/events.jsonl',
+          },
+          'ci.status': {
+            type: 'tool',
+            requiredByCore: false,
+            riskLevel: 'medium',
           },
         },
+        providerTargets: ['codex', 'claude-code', 'cursor'],
         verification: {
           lastVerified: '2026-06-04',
           cadence: '30d',
-          smokeTest: 'verify/context7-smoke.md',
+          smokeTest: 'verify/plandb-smoke.md',
+        },
+        security: {
+          requiresConsent: true,
+          showsExactCommands: true,
+          requiresEnvVars: [],
+          notes: 'Provider manifest only. Does not own PlanDB upstream code.',
         },
         replacementPolicy: {
-          capabilityAlias: 'docs.latest',
+          capabilities: ['plan.ledger', 'ci.status'],
           replaceWithoutCourseChange: true,
+        },
+        risk: {
+          level: 'medium',
         },
       },
     })
@@ -263,37 +287,85 @@ describe('marketplace listing contracts', () => {
       owner: 'external',
       supportLevel: 'curated',
       providesCapabilities: {
-        'docs.latest': {
-          stability: 'required-provider',
-          permissionLevel: 'read-context',
+        'plan.ledger': {
+          type: 'ledger',
+          requiredByCore: false,
+          riskLevel: 'medium',
         },
       },
+      providerTargets: ['codex', 'claude-code', 'cursor'],
       verification: {
         lastVerified: '2026-06-04',
       },
+      security: {
+        requiresConsent: true,
+        showsExactCommands: true,
+        requiresEnvVars: [],
+      },
       replacementPolicy: {
-        capabilityAlias: 'docs.latest',
+        capabilities: ['plan.ledger', 'ci.status'],
         replaceWithoutCourseChange: true,
+      },
+      risk: {
+        level: 'medium',
       },
     })
   })
 
-  it('keeps Phase 2 x-agentrig metadata optional', () => {
+  it('keeps final x-agentrig metadata optional', () => {
     expect(PluginManifestSchema.parse({ name: 'agentrig.minimal' })).toEqual({ name: 'agentrig.minimal' })
     expect(
       PluginManifestSchema.parse({
-        name: 'agentrig.legacy',
+        name: 'agentrig.minimal-metadata',
         'x-agentrig': {
-          displayName: 'Legacy',
+          displayName: 'Minimal metadata',
           kind: 'plugin',
           pluginDependencies: [],
         },
       })['x-agentrig']
     ).toMatchObject({
-      displayName: 'Legacy',
+      displayName: 'Minimal metadata',
       kind: 'plugin',
       pluginDependencies: [],
     })
+  })
+
+  it('documents known AgentRig 1.0 capability id examples without closing validation', () => {
+    expect(CAPABILITY_IDS).toEqual([
+      'plan.ledger',
+      'docs.latest',
+      'browser.verify',
+      'repo.remote',
+      'ci.status',
+      'repo.security',
+      'deploy.preview',
+      'observability.logs',
+      'mcp.verify',
+      'secrets.scan',
+      'supplychain.scan',
+      'shell.lint',
+      'desktop.runtime',
+      'native.debug',
+    ])
+
+    expect(
+      PluginManifestSchema.parse({
+        name: 'third-party.custom-provider',
+        'x-agentrig': {
+          kind: 'plugin',
+          providesCapabilities: {
+            'custom.tool-chain': {
+              type: 'tool',
+              requiredByCore: false,
+            },
+          },
+          replacementPolicy: {
+            capabilities: ['custom.tool-chain'],
+            replaceWithoutCourseChange: true,
+          },
+        },
+      })['x-agentrig']?.providesCapabilities
+    ).toHaveProperty('custom.tool-chain')
   })
 
   it('validates Open Plugins name and version syntax', () => {
@@ -313,8 +385,8 @@ describe('marketplace listing contracts', () => {
         name: 'instructa.saas',
         'x-agentrig': {
           kind: 'plugin',
-          requiresCapabilities: {
-            'not.canonical': { required: true },
+          requiredCapabilities: {
+            'Not.canonical': { required: true },
           },
         },
       })
@@ -326,10 +398,8 @@ describe('marketplace listing contracts', () => {
           kind: 'plugin',
           providesCapabilities: {
             'docs.latest': {
-              stability: 'required-provider',
-              permissionLevel: 'read-context',
-              useWhen: 'checking docs',
-              doNotUseWhen: [],
+              type: 'documentation',
+              requiredByCore: false,
             },
           },
         },

@@ -20,13 +20,13 @@ describe('capability resolver', () => {
             'agentrig/instructa.base@^1.0.0',
             'agentrig/third-party.context7@^1.0.0',
           ],
-          requiresCapabilities: {
+          requiredCapabilities: {
             'docs.latest': { required: true, provider: 'third-party.context7' },
           },
         }),
         basePlugin('instructa.base'),
         providerPlugin('third-party.context7', 'docs.latest', {
-          providerCompatibility: { codex: 'native', claude: 'port', cursor: 'native' },
+          providerTargets: ['codex', 'claude-code', 'cursor'],
           installConstraints: {
             common: ['network access to package docs'],
             codex: ['CONTEXT7_API_KEY is optional for higher rate limits'],
@@ -57,7 +57,7 @@ describe('capability resolver', () => {
         plugin: 'third-party.context7',
         required: true,
         stale: false,
-        compatibility: { codex: 'native', claude: 'port', cursor: 'native' },
+        compatibility: { codex: 'native', 'claude-code': 'native', cursor: 'native' },
         installConstraints: {
           common: ['network access to package docs'],
           codex: ['CONTEXT7_API_KEY is optional for higher rate limits'],
@@ -71,14 +71,50 @@ describe('capability resolver', () => {
     })
   })
 
+  it('resolves capabilities that follow the package open id pattern', async () => {
+    const result = await resolveCapabilityGraph({
+      pluginRef: 'instructa.github-workflow',
+      now: NOW,
+      loader: memoryLoader([
+        projectPlugin('instructa.github-workflow', {
+          pluginDependencies: ['third-party.github-mcp'],
+          requiredCapabilities: {
+            'ci.status': { required: true, provider: 'third-party.github-mcp' },
+          },
+          optionalCapabilities: ['deploy.preview'],
+        }),
+        providerPlugin('third-party.github-mcp', 'ci.status'),
+      ]),
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.requiredCapabilities).toEqual([
+      expect.objectContaining({
+        capability: 'ci.status',
+        requestedProvider: 'third-party.github-mcp',
+      }),
+    ])
+    expect(result.optionalCapabilities).toEqual([
+      expect.objectContaining({
+        capability: 'deploy.preview',
+      }),
+    ])
+    expect(result.chosenProviders).toEqual([
+      expect.objectContaining({
+        capability: 'ci.status',
+        plugin: 'third-party.github-mcp',
+      }),
+    ])
+  })
+
   it('hard-fails when a required capability has no installable provider', async () => {
     const result = await resolveCapabilityGraph({
       pluginRef: 'instructa.saas',
       now: NOW,
       loader: memoryLoader([
         projectPlugin('instructa.saas', {
-          requiresCapabilities: {
-            'plan.graph': { required: true },
+          requiredCapabilities: {
+            'plan.ledger': { required: true },
           },
         }),
       ]),
@@ -88,7 +124,7 @@ describe('capability resolver', () => {
     expect(result.errors).toEqual([
       expect.objectContaining({
         code: 'required_provider_missing',
-        capability: 'plan.graph',
+        capability: 'plan.ledger',
       }),
     ])
   })
@@ -99,9 +135,7 @@ describe('capability resolver', () => {
       now: NOW,
       loader: memoryLoader([
         projectPlugin('instructa.webapp', {
-          requiresCapabilities: {
-            'browser.cloud': { required: false },
-          },
+          optionalCapabilities: ['browser.verify'],
         }),
       ]),
     })
@@ -110,7 +144,41 @@ describe('capability resolver', () => {
     expect(result.warnings).toEqual([
       expect.objectContaining({
         code: 'optional_provider_missing',
-        capability: 'browser.cloud',
+        capability: 'browser.verify',
+      }),
+    ])
+  })
+
+  it('uses the plan ledger fallback when PlanDB is unavailable', async () => {
+    const result = await resolveCapabilityGraph({
+      pluginRef: 'instructa.base',
+      now: NOW,
+      loader: memoryLoader([
+        basePlugin('instructa.base', {
+          requiredCapabilities: {
+            'plan.ledger': {
+              required: true,
+              provider: 'third-party.plandb',
+              fallback: 'docs/plan-ledger/events.jsonl',
+            },
+          },
+        }),
+      ]),
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.requiredCapabilities).toEqual([
+      expect.objectContaining({
+        capability: 'plan.ledger',
+        requestedProvider: 'third-party.plandb',
+        fallback: 'docs/plan-ledger/events.jsonl',
+      }),
+    ])
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        code: 'capability_fallback_used',
+        capability: 'plan.ledger',
+        provider: 'third-party.plandb',
       }),
     ])
   })
@@ -122,7 +190,7 @@ describe('capability resolver', () => {
       loader: memoryLoader([
         projectPlugin('instructa.saas', {
           pluginDependencies: ['third-party.context7'],
-          requiresCapabilities: {
+          requiredCapabilities: {
             'docs.latest': { required: true, provider: 'third-party.context7' },
           },
         }),
@@ -145,7 +213,7 @@ describe('capability resolver', () => {
       loader: memoryLoader([
         projectPlugin('instructa.saas', {
           pluginDependencies: ['third-party.context7'],
-          requiresCapabilities: {
+          requiredCapabilities: {
             'docs.latest': { required: true, provider: 'third-party.context7' },
           },
         }),
@@ -171,14 +239,14 @@ describe('capability resolver', () => {
     }))
   })
 
-  it('hard-fails stale required providers outside their verification cadence', async () => {
+  it('warns about stale providers outside their verification cadence', async () => {
     const result = await resolveCapabilityGraph({
       pluginRef: 'instructa.saas',
       now: NOW,
       loader: memoryLoader([
         projectPlugin('instructa.saas', {
           pluginDependencies: ['third-party.context7'],
-          requiresCapabilities: {
+          requiredCapabilities: {
             'docs.latest': { required: true, provider: 'third-party.context7' },
           },
         }),
@@ -189,7 +257,7 @@ describe('capability resolver', () => {
       ]),
     })
 
-    expect(result.ok).toBe(false)
+    expect(result.ok).toBe(true)
     expect(result.staleProviders).toEqual([
       expect.objectContaining({
         capability: 'docs.latest',
@@ -198,7 +266,7 @@ describe('capability resolver', () => {
         cadence: '30d',
       }),
     ])
-    expect(result.errors).toContainEqual(expect.objectContaining({
+    expect(result.warnings).toContainEqual(expect.objectContaining({
       code: 'stale_provider',
       capability: 'docs.latest',
       provider: 'third-party.context7',
@@ -214,12 +282,12 @@ describe('capability resolver', () => {
           pluginDependencies: ['instructa.website', 'instructa.webapp'],
         }),
         projectPlugin('instructa.website', {
-          requiresCapabilities: {
+          requiredCapabilities: {
             'docs.latest': { required: true, provider: 'third-party.context7' },
           },
         }),
         projectPlugin('instructa.webapp', {
-          requiresCapabilities: {
+          requiredCapabilities: {
             'docs.latest': { required: true, provider: 'third-party.docs-alt' },
           },
         }),
@@ -254,10 +322,14 @@ function memoryLoader(records: readonly CapabilityPluginRecord[]): CapabilityPlu
   }
 }
 
-function basePlugin(name: string): CapabilityPluginRecord {
+function basePlugin(
+  name: string,
+  extension: Partial<NonNullable<CapabilityPluginRecord['manifest']['x-agentrig']>> = {}
+): CapabilityPluginRecord {
   return pluginRecord(name, {
     profile: 'base',
     pluginDependencies: [],
+    ...extension,
   })
 }
 
@@ -274,13 +346,13 @@ function projectPlugin(
 
 function providerPlugin(
   name: string,
-  capability: 'docs.latest' | 'plan.graph',
+  capability: string,
   options: {
     trustTier?: CapabilityPluginRecord['trustTier']
     installability?: CapabilityPluginRecord['installability']
     lastVerified?: string
     cadence?: string
-    providerCompatibility?: CapabilityPluginRecord['providerCompatibility']
+    providerTargets?: NonNullable<CapabilityPluginRecord['manifest']['x-agentrig']>['providerTargets']
     installConstraints?: CapabilityPluginRecord['installConstraints']
   } = {}
 ): CapabilityPluginRecord {
@@ -290,12 +362,11 @@ function providerPlugin(
       profile: 'third-party',
       providesCapabilities: {
         [capability]: {
-          stability: 'required-provider',
-          permissionLevel: 'read-context',
-          useWhen: ['checking current framework APIs'],
-          doNotUseWhen: ['local architecture is the source of truth'],
+          type: capability === 'plan.ledger' ? 'ledger' : 'tool',
+          requiredByCore: false,
         },
       },
+      providerTargets: options.providerTargets ?? ['codex', 'claude-code', 'cursor'],
       verification: {
         lastVerified: options.lastVerified ?? '2026-06-01',
         cadence: options.cadence ?? '30d',
@@ -312,7 +383,6 @@ function pluginRecord(
   options: {
     trustTier?: CapabilityPluginRecord['trustTier']
     installability?: CapabilityPluginRecord['installability']
-    providerCompatibility?: CapabilityPluginRecord['providerCompatibility']
     installConstraints?: CapabilityPluginRecord['installConstraints']
   } = {}
 ): CapabilityPluginRecord {
@@ -329,7 +399,6 @@ function pluginRecord(
     },
     trustTier: options.trustTier ?? 'reviewed',
     installability: options.installability ?? 'installable',
-    providerCompatibility: options.providerCompatibility,
     installConstraints: options.installConstraints,
   }
 }

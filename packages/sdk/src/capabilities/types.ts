@@ -5,9 +5,10 @@ import type {
   RegistryInstallability,
   TrustTier,
 } from '../marketplace-listing'
-import type { ProviderCompatState, ProviderId } from '../repo-scan/types'
+import { PROVIDER_TARGETS } from '../marketplace-listing'
+import type { ProviderCompatState } from '../repo-scan/types'
 
-export const CAPABILITY_RESOLUTION_TARGETS = ['codex', 'claude', 'cursor'] as const satisfies readonly ProviderId[]
+export const CAPABILITY_RESOLUTION_TARGETS = PROVIDER_TARGETS
 
 export type CapabilityTarget = (typeof CAPABILITY_RESOLUTION_TARGETS)[number]
 export type CapabilityProviderCompatibilityState = ProviderCompatState | 'unknown'
@@ -15,7 +16,7 @@ export type CapabilityProviderCompatibility = Record<CapabilityTarget, Capabilit
 
 export type AgentRigPluginExtension = NonNullable<PluginManifest['x-agentrig']>
 export type AgentRigProvidedCapability = NonNullable<AgentRigPluginExtension['providesCapabilities']>[string]
-export type AgentRigRequiredCapability = NonNullable<AgentRigPluginExtension['requiresCapabilities']>[string]
+export type AgentRigRequiredCapability = NonNullable<AgentRigPluginExtension['requiredCapabilities']>[string]
 export type AgentRigVerification = NonNullable<AgentRigPluginExtension['verification']>
 
 export type CapabilityProviderInstallConstraints = Partial<Record<CapabilityTarget, string[]>> & {
@@ -31,7 +32,6 @@ export type CapabilityPluginRecord = {
   registryAlias?: string
   registryRef?: string
   snapshotDigest?: string
-  providerCompatibility?: Partial<Record<CapabilityTarget, CapabilityProviderCompatibilityState>>
   installConstraints?: CapabilityProviderInstallConstraints
 }
 
@@ -75,6 +75,7 @@ export type CapabilityRequirement = {
   capability: CapabilityId
   required: boolean
   requestedProvider?: string
+  fallback?: string
   requiringPlugin: string
   requiringPluginProfile?: PluginProfile
 }
@@ -130,6 +131,7 @@ export type CapabilityResolutionIssueCode =
   | 'dependency_not_found'
   | 'required_provider_missing'
   | 'optional_provider_missing'
+  | 'capability_fallback_used'
   | 'provider_missing_capability'
   | 'provider_not_installable'
   | 'listed_required_provider'

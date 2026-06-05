@@ -100,7 +100,7 @@ describe('command:doctor', () => {
     ]))
   })
 
-  it('warns when required provider env vars are missing', async () => {
+  it('hard-fails when required provider env vars are missing', async () => {
     const fixture = await createDoctorFixture({
       context7: {
         requiredEnvVars: ['CONTEXT7_API_KEY'],
@@ -114,11 +114,11 @@ describe('command:doctor', () => {
       cwd: fixture.cwd,
     })
 
-    expect(result.exitCode).toBe(0)
+    expect(result.exitCode).toBe(1)
     expect(result.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: 'required-env-vars',
-        status: 'warn',
+        status: 'fail',
         message: 'CONTEXT7_API_KEY',
       }),
     ]))
@@ -218,7 +218,7 @@ async function createDoctorFixture(options: {
       'agentrig/instructa.base@^1.0.0',
       'agentrig/third-party.context7@^1.0.0',
     ],
-    requiresCapabilities: {
+    requiredCapabilities: {
       'docs.latest': {
         required: true,
         provider: 'third-party.context7',
@@ -234,14 +234,12 @@ async function createDoctorFixture(options: {
   })
   const context7 = pluginManifest('third-party.context7', {
     profile: 'third-party',
-    targetProviders: ['codex', 'claude', 'cursor'],
-    ...(options.context7?.requiredEnvVars ? { requiredEnvVars: options.context7.requiredEnvVars } : {}),
+    providerTargets: ['codex', 'claude-code', 'cursor'],
     providesCapabilities: {
       'docs.latest': {
-        stability: 'required-provider',
-        permissionLevel: 'read-context',
-        useWhen: ['checking current framework APIs'],
-        doNotUseWhen: ['local architecture is the source of truth'],
+        type: 'tool',
+        requiredByCore: false,
+        riskLevel: 'medium',
       },
     },
     verification: {
@@ -249,8 +247,14 @@ async function createDoctorFixture(options: {
       cadence: '30d',
       smokeTest: 'verify/context7-smoke.md',
     },
+    security: {
+      requiresConsent: true,
+      showsExactCommands: true,
+      requiresEnvVars: options.context7?.requiredEnvVars ?? [],
+      notes: 'Provider manifest fixture for doctor tests.',
+    },
     replacementPolicy: {
-      capabilityAlias: 'docs.latest',
+      capabilities: ['docs.latest'],
       replaceWithoutCourseChange: true,
     },
   })

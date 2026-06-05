@@ -11,6 +11,7 @@ import {
   type CapabilityPluginRecord,
   type CapabilityResolutionIssue,
   type CapabilityResolutionResult,
+  type CapabilityTarget,
   type InstallBundle,
   type PluginManifest,
   type RegistryInstallability,
@@ -34,7 +35,6 @@ import { resolvePluginSpec } from '../lib/plugin-resolver'
 import { parseRegistryPluginSpec } from '../lib/registry-spec'
 import { pathExists, readJsonFile } from '../lib/fs'
 import {
-  parsePluginProviderSelector,
   preparePluginInstall,
   resolveInstallScope,
   type PluginProviderId,
@@ -61,7 +61,7 @@ type DoctorCheck = {
 
 type DoctorInput = {
   spec?: string
-  provider?: PluginProviderId
+  provider?: CapabilityTarget
   cwd: string
 }
 
@@ -77,7 +77,7 @@ type DoctorJson = {
   checks: DoctorCheck[]
   capabilityResolution?: ReturnType<typeof capabilityResolutionToJson>
   provider?: {
-    selected: PluginProviderId
+    selected: CapabilityTarget
     scope: PluginInstallScopeName
     previewLocations: string[]
   }
@@ -103,7 +103,7 @@ const command = defineCommand({
     },
     provider: {
       type: 'string',
-      description: 'Provider to check: codex, claude, or cursor',
+      description: 'Provider target to check: codex, claude-code, or cursor',
     },
     cwd: {
       type: 'string',
@@ -151,6 +151,7 @@ export async function runDoctor(args: {
   const checks: DoctorCheck[] = []
   const addCheck = (check: DoctorCheck) => checks.push(check)
   const provider = args.provider ? parseSingleProvider(args.provider) : undefined
+  const installProvider = provider ? providerTargetToPluginProvider(provider) : undefined
   const input: DoctorInput = { cwd, ...(args.spec ? { spec: args.spec } : {}), ...(provider ? { provider } : {}) }
   let capabilityResolution: CapabilityResolutionResult | undefined
   let providerPreview: DoctorJson['provider']
@@ -281,10 +282,11 @@ export async function runDoctor(args: {
         await addSmokeTestChecks(materialized.pluginsRoot, capabilityResolution.chosenProviders, addCheck)
         await addMcpAndEnvChecks(materialized.pluginsRoot, capabilityResolution.chosenProviders, addCheck)
 
-        if (provider) {
+        if (provider && installProvider) {
           providerPreview = await addProviderPreviewChecks({
             cwd,
             provider,
+            installProvider,
             pluginsRoot: materialized.pluginsRoot,
             bundles: resolvedBundles,
             addCheck,
@@ -340,7 +342,7 @@ export async function runDoctor(args: {
 
   await addLedgerChecks({
     cwd,
-    provider,
+    provider: installProvider,
     resolvedBundles,
     addCheck,
   })
@@ -554,12 +556,14 @@ async function readPluginManifestFromBundle(bundle: InstallBundle): Promise<Plug
   return parsed.data
 }
 
-function parseSingleProvider(value: string): PluginProviderId {
-  const provider = parsePluginProviderSelector(value)
-  if (provider === 'all') {
-    throw new Error('`agentrig doctor --provider` requires a single provider: codex, claude, or cursor.')
-  }
-  return provider
+function parseSingleProvider(value: string): CapabilityTarget {
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'codex' || normalized === 'claude-code' || normalized === 'cursor') return normalized
+  throw new Error('`agentrig doctor --provider` requires a single provider target: codex, claude-code, or cursor.')
+}
+
+function providerTargetToPluginProvider(provider: CapabilityTarget): PluginProviderId {
+  return provider === 'claude-code' ? 'claude' : provider
 }
 
 function addResolvedPluginChecks(
@@ -603,7 +607,7 @@ function addResolvedPluginChecks(
 
 function addCapabilityProviderChecks(
   result: CapabilityResolutionResult,
-  provider: PluginProviderId | undefined,
+  provider: CapabilityTarget | undefined,
   addCheck: (check: DoctorCheck) => void
 ) {
   if (result.requiredCapabilities.length === 0 && result.optionalCapabilities.length === 0) {
@@ -652,7 +656,7 @@ function addCapabilityProviderChecks(
     status: unsupported.some((chosen) => chosen.required) ? 'fail' : unknown.length ? 'unknown' : 'pass',
     label: providerCompatibilityLabel(provider, supported, unknown, unsupported),
     message: unknown.length
-      ? 'Provider compatibility is not canonical in the schema yet; Doctor reads permissive x-agentrig.targetProviders/providerCompatibility when present.'
+      ? 'Provider compatibility is unknown because x-agentrig.providerTargets did not declare this target.'
       : unsupported.length
         ? `Unsupported provider(s): ${unsupported.map((chosen) => chosen.plugin).join(', ')}`
         : undefined,
@@ -673,22 +677,23 @@ function addCapabilityProviderChecks(
 
 async function addProviderPreviewChecks(args: {
   cwd: string
-  provider: PluginProviderId
+  provider: CapabilityTarget
+  installProvider: PluginProviderId
   pluginsRoot: string
   bundles: InstallBundle[]
   addCheck: (check: DoctorCheck) => void
 }) {
-  const scope = resolveInstallScope(args.provider, 'auto')
+  const scope = resolveInstallScope(args.installProvider, 'auto')
   const plan = await preparePluginInstall({
     cwd: args.cwd,
-    agent: args.provider,
+    agent: args.installProvider,
     pluginsDir: args.pluginsRoot,
     installMetadataByPluginId: buildResolvedPluginInstallMetadataMap(args.bundles),
     scope: 'auto',
     force: false,
     dryRun: true,
   })
-  const providerPlan = plan.providers.find((item) => item.provider === args.provider)
+  const providerPlan = plan.providers.find((item) => item.provider === args.installProvider)
   const previewLocations = providerPlan?.preview.locations ?? []
   args.addCheck({
     id: 'provider-installation-path',
@@ -699,6 +704,21 @@ async function addProviderPreviewChecks(args: {
       : `${titleProvider(args.provider)} plugin path`,
     message: previewLocations.length ? previewLocations.join(', ') : 'Provider adapter did not expose install preview locations.',
     details: providerPlan?.preview,
+  })
+  args.addCheck({
+    id: 'provider-exact-install-commands',
+    section: 'Provider',
+    status: providerPlan?.preview.actions.length ? 'pass' : 'unknown',
+    label: providerPlan?.preview.actions.length ? 'exact install commands available' : 'exact install commands',
+    message: providerPlan?.preview.actions.join('; ') || 'Provider adapter did not expose exact install actions.',
+    details: providerPlan?.preview.actions,
+  })
+  args.addCheck({
+    id: 'provider-export-surface',
+    section: 'Provider',
+    status: previewLocations.length ? 'pass' : 'unknown',
+    label: `${titleProvider(args.provider)} export surface`,
+    message: providerExportSurfaceMessage(args.provider),
   })
   return {
     selected: args.provider,
@@ -762,8 +782,9 @@ async function addMcpAndEnvChecks(
   })
 
   const declaredEnv = collectDeclaredEnv(chosenProviders, mcpConfigs, extensions)
-  addEnvCheck('required-env-vars', 'required env vars', declaredEnv.required, addCheck)
-  addEnvCheck('optional-env-vars', 'optional env vars', declaredEnv.optional, addCheck)
+  addEnvCheck('required-env-vars', 'required env vars', declaredEnv.required, true, addCheck)
+  addEnvCheck('optional-env-vars', 'optional env vars', declaredEnv.optional, false, addCheck)
+  addProviderSecurityChecks(chosenProviders, mcpConfigs, extensions, addCheck)
 
   for (const provider of chosenProviders) {
     if (provider.required) continue
@@ -787,7 +808,7 @@ async function addMcpAndEnvChecks(
         message: 'Provider metadata indicates a paid/cloud account requirement.',
       })
     }
-    if (writesToRepoOrExternal(provider, extension)) {
+    if (writesToRepoOrExternal(extension)) {
       addCheck({
         id: `security-write-provider:${provider.plugin}`,
         section: 'Provider',
@@ -872,12 +893,18 @@ function collectEnvFromExtension(extension: Record<string, unknown>, required: S
     for (const value of stringArray(env.required)) required.add(value)
     for (const value of stringArray(env.optional)) optional.add(value)
   }
+
+  const security = toRecord(extension.security)
+  if (security) {
+    for (const value of stringArray(security.requiresEnvVars)) required.add(value)
+  }
 }
 
 function addEnvCheck(
   id: string,
   label: string,
   vars: string[],
+  required: boolean,
   addCheck: (check: DoctorCheck) => void
 ) {
   if (!vars.length) {
@@ -894,10 +921,108 @@ function addEnvCheck(
   addCheck({
     id,
     section: 'Provider',
-    status: missing.length ? 'warn' : 'pass',
+    status: missing.length ? required ? 'fail' : 'warn' : 'pass',
     label: missing.length ? `missing ${label}` : `${label} present`,
     message: missing.length ? missing.join(', ') : vars.join(', '),
   })
+}
+
+function addProviderSecurityChecks(
+  chosenProviders: CapabilityChosenProvider[],
+  mcpConfigs: Awaited<ReturnType<typeof collectMcpConfigs>>,
+  extensions: Awaited<ReturnType<typeof collectPluginExtensions>>,
+  addCheck: (check: DoctorCheck) => void
+) {
+  const requiredProviders = chosenProviders.filter((provider) => provider.required)
+  for (const provider of requiredProviders) {
+    const extension = extensions.get(provider.plugin) ?? {}
+    const security = toRecord(extension.security)
+    addCheck({
+      id: `provider-security:${provider.plugin}`,
+      section: 'Provider',
+      status: security?.requiresConsent === true && security.showsExactCommands === true ? 'pass' : 'fail',
+      label: `${provider.plugin} security metadata`,
+      message: security
+        ? 'Required providers must set security.requiresConsent=true and security.showsExactCommands=true.'
+        : 'Required provider is missing x-agentrig.security metadata.',
+      details: security,
+    })
+  }
+
+  const unverifiedLocalCommands = mcpConfigs.flatMap((config) => localMcpCommandNames(config.json)
+    .filter(() => {
+      const security = toRecord(extensions.get(config.plugin)?.security)
+      return security?.showsExactCommands !== true
+    })
+    .map((name) => `${config.plugin}:${name}`))
+  addCheck({
+    id: 'mcp-local-command-verification',
+    section: 'Provider',
+    status: unverifiedLocalCommands.length ? 'fail' : 'pass',
+    label: unverifiedLocalCommands.length ? 'unverified local MCP commands' : 'local MCP commands verified',
+    message: unverifiedLocalCommands.join(', ') || undefined,
+  })
+
+  const broadGithubAll = requiredProviders
+    .filter((provider) => provider.plugin === 'third-party.github-mcp')
+    .filter((provider) => providerUsesGithubAll(extensions.get(provider.plugin), mcpConfigs))
+    .map((provider) => provider.plugin)
+  addCheck({
+    id: 'mcp-github-toolsets',
+    section: 'Provider',
+    status: broadGithubAll.length ? 'fail' : 'pass',
+    label: broadGithubAll.length ? 'broad GitHub all toolset requested' : 'no broad GitHub all toolset',
+    message: broadGithubAll.join(', ') || undefined,
+  })
+
+  const broadScopes = requiredProviders
+    .filter((provider) => hasBroadScopes(extensions.get(provider.plugin)))
+    .map((provider) => provider.plugin)
+  addCheck({
+    id: 'approval-sandbox-warnings',
+    section: 'Provider',
+    status: broadScopes.length ? 'warn' : 'pass',
+    label: broadScopes.length ? 'approval/sandbox review needed' : 'approval/sandbox metadata acceptable',
+    message: broadScopes.join(', ') || undefined,
+  })
+}
+
+function localMcpCommandNames(config: Record<string, unknown>) {
+  const servers = toRecord(config.mcpServers) ?? toRecord(config.servers) ?? {}
+  return Object.entries(servers)
+    .filter(([, server]) => {
+      const command = toRecord(server)?.command
+      return typeof command === 'string' && command.trim().length > 0
+    })
+    .map(([name]) => name)
+    .sort()
+}
+
+function providerUsesGithubAll(
+  extension: Record<string, unknown> | undefined,
+  mcpConfigs: Awaited<ReturnType<typeof collectMcpConfigs>>
+) {
+  const values = [
+    ...stringArray(extension?.toolsets),
+    ...stringArray(extension?.defaultToolsets),
+    ...stringArray(toRecord(extension?.github)?.toolsets),
+    ...mcpConfigs.flatMap((config) => stringArray(config.json.toolsets)),
+  ]
+  return values.some((value) => value.trim().toLowerCase() === 'all')
+}
+
+function hasBroadScopes(extension: Record<string, unknown> | undefined) {
+  if (!extension) return false
+  const security = toRecord(extension.security)
+  const haystack = [
+    ...stringArray(extension.permissions),
+    ...stringArray(extension.scopes),
+    ...stringArray(extension.fileScopes),
+    ...stringArray(extension.networkScopes),
+    ...stringArray(toRecord(security?.permissions)?.scopes),
+    ...stringArray(security?.notes),
+  ].join(' ').toLowerCase()
+  return /\ball\b|\bhome\b|~\/|\bssh\b|\bsudo\b|rm -rf|curl\s*\|/.test(haystack)
 }
 
 async function addLedgerChecks(args: {
@@ -1155,7 +1280,7 @@ function capabilityIssueLabel(issue: CapabilityResolutionIssue) {
 }
 
 function providerCompatibilityLabel(
-  provider: PluginProviderId,
+  provider: CapabilityTarget,
   supported: CapabilityChosenProvider[],
   unknown: CapabilityChosenProvider[],
   unsupported: CapabilityChosenProvider[]
@@ -1166,9 +1291,15 @@ function providerCompatibilityLabel(
   return `${titleProvider(provider)} provider compatibility`
 }
 
-function titleProvider(provider: PluginProviderId) {
+function providerExportSurfaceMessage(provider: CapabilityTarget) {
+  if (provider === 'codex') return 'Codex plugin export preview includes marketplace locations and install actions; AGENTS.md pointer presence is tracked by provider adapter output.'
+  if (provider === 'claude-code') return 'Claude Code plugin export preview includes marketplace locations and install actions; CLAUDE.md pointer and reload visibility remain host-state checks.'
+  return 'Cursor plugin export preview includes plugin/rules locations and copy actions.'
+}
+
+function titleProvider(provider: CapabilityTarget | PluginProviderId) {
   if (provider === 'codex') return 'Codex'
-  if (provider === 'claude') return 'Claude Code'
+  if (provider === 'claude' || provider === 'claude-code') return 'Claude Code'
   return 'Cursor'
 }
 
@@ -1180,14 +1311,13 @@ function requiresPaidAccount(extension: Record<string, unknown>) {
     || extension.pricing === 'paid'
 }
 
-function writesToRepoOrExternal(provider: CapabilityChosenProvider, extension: Record<string, unknown>) {
+function writesToRepoOrExternal(extension: Record<string, unknown>) {
   if (extension.writesToRepo === true || extension.writesToExternalSystem === true) return true
-  const permissionLevel = String(provider.providedCapability.permissionLevel ?? '').toLowerCase()
-  if (permissionLevel.includes('write')) return true
   const permissions = [
     ...stringArray(extension.permissions),
     ...stringArray(extension.permissionLevel),
     ...stringArray(extension.dataAccessScope),
+    ...stringArray(toRecord(extension.security)?.notes),
   ].join(' ').toLowerCase()
   return /\bwrite\b|\bmutate\b|\bdelete\b|\bdeploy\b/.test(permissions)
 }

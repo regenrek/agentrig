@@ -8,36 +8,33 @@ import { isValidPluginName } from './provider/plugin-names'
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
+const CAPABILITY_ID_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)*$/
 
 export const SUBMISSION_STATUSES = ['pending_review', 'approved', 'rejected', 'blocked'] as const
 export const REGISTRY_MIRROR_STATUSES = ['queued', 'opened', 'merged', 'failed'] as const
 export const MARKETPLACE_INSTALLABILITIES = ['available', 'yanked', 'taken_down'] as const
 export const REGISTRY_TRUST_TIERS = ['official', 'reviewed', 'listed', 'blocked', 'yanked'] as const
 export const INSTALLABILITY_STATES = ['installable', 'discovery_only', 'blocked', 'yanked'] as const
-export const PLUGIN_PROFILES = ['base', 'core', 'project', 'third-party', 'other'] as const
+export const PLUGIN_PROFILES = ['kit-entry', 'base', 'core', 'project', 'third-party', 'other'] as const
+export const PROVIDER_TARGETS = ['codex', 'claude-code', 'cursor'] as const
+export const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const
+// Known AgentRig 1.0 capability IDs from the Instructa ADR package. Validation
+// intentionally stays open and follows agentrig-capability.schema.json.
 export const CAPABILITY_IDS = [
-  'workflow.project',
-  'workflow.core',
+  'plan.ledger',
   'docs.latest',
-  'plan.graph',
   'browser.verify',
-  'browser.cloud',
-  'repo.hosting',
-  'db.schema',
-  'auth.docs',
-  'payments.docs',
-  'security.secrets',
+  'repo.remote',
+  'ci.status',
+  'repo.security',
   'deploy.preview',
   'observability.logs',
-  'desktop.runtime',
-  'desktop.signing',
   'mcp.verify',
-  'mcp.tools',
-  'mcp.resources',
-  'mcp.prompts',
-  'test.e2e',
-  'test.api',
-  'test.unit',
+  'secrets.scan',
+  'supplychain.scan',
+  'shell.lint',
+  'desktop.runtime',
+  'native.debug',
 ] as const
 
 export const SubmissionStatusSchema = z.enum(SUBMISSION_STATUSES)
@@ -46,7 +43,12 @@ export const MarketplaceInstallabilitySchema = z.enum(MARKETPLACE_INSTALLABILITI
 export const RegistryTrustTierSchema = z.enum(REGISTRY_TRUST_TIERS)
 export const InstallabilityStateSchema = z.enum(INSTALLABILITY_STATES)
 export const PluginProfileSchema = z.enum(PLUGIN_PROFILES)
-export const CapabilityIdSchema = z.enum(CAPABILITY_IDS)
+export const ProviderTargetSchema = z.enum(PROVIDER_TARGETS)
+export const RiskLevelSchema = z.enum(RISK_LEVELS)
+export const CapabilityIdSchema = z.string().regex(
+  CAPABILITY_ID_RE,
+  'Capability id must match the AgentRig capability id pattern',
+)
 export const ArtifactKindSchema = z.enum(ARTIFACT_KINDS)
 export const CliSupportedKindSchema = z.enum(CLI_SUPPORTED_ARTIFACT_KINDS)
 
@@ -59,9 +61,10 @@ export type TrustTier = RegistryTrustTier
 export type InstallabilityState = z.infer<typeof InstallabilityStateSchema>
 export type RegistryInstallability = InstallabilityState
 export type PluginProfile = z.infer<typeof PluginProfileSchema>
+export type ProviderTarget = z.infer<typeof ProviderTargetSchema>
+export type RiskLevel = z.infer<typeof RiskLevelSchema>
 export type CapabilityId = z.infer<typeof CapabilityIdSchema>
 
-const CAPABILITY_ID_SET = new Set<string>(CAPABILITY_IDS)
 const YYYY_MM_DD_RE = /^\d{4}-\d{2}-\d{2}$/
 
 const MarketplaceListingPublicBaseSchema = z.object({
@@ -370,17 +373,14 @@ const AgentRigPluginListingSchema = z.object({
   category: z.string().trim().min(1),
 })
 
-const CapabilityIdKeySchema = z.string().refine(
-  (value) => CAPABILITY_ID_SET.has(value),
-  'Capability id must be one of the AgentRig 1.0 canonical capability ids',
-)
+const CapabilityIdKeySchema = CapabilityIdSchema
 
 const AgentRigProvidedCapabilitySchema = z
   .object({
-    stability: z.string().trim().min(1),
-    permissionLevel: z.string().trim().min(1),
-    useWhen: z.array(z.string().trim().min(1)),
-    doNotUseWhen: z.array(z.string().trim().min(1)),
+    type: z.enum(['tool', 'workflow', 'ledger', 'scanner', 'runtime']),
+    requiredByCore: z.boolean(),
+    riskLevel: RiskLevelSchema.optional(),
+    fallback: z.string().trim().min(1).optional(),
   })
   .strict()
 
@@ -388,6 +388,7 @@ const AgentRigRequiredCapabilitySchema = z
   .object({
     required: z.boolean(),
     provider: z.string().trim().min(1).optional(),
+    fallback: z.string().trim().min(1).optional(),
   })
   .strict()
 
@@ -401,8 +402,24 @@ const AgentRigVerificationSchema = z
 
 const AgentRigReplacementPolicySchema = z
   .object({
-    capabilityAlias: CapabilityIdKeySchema,
+    capabilities: z.array(CapabilityIdKeySchema).min(1),
     replaceWithoutCourseChange: z.boolean(),
+  })
+  .strict()
+
+const AgentRigSecuritySchema = z
+  .object({
+    requiresConsent: z.boolean(),
+    showsExactCommands: z.boolean(),
+    requiresEnvVars: z.array(z.string().trim()),
+    notes: z.string().trim().min(1).optional(),
+  })
+  .strict()
+
+const AgentRigRiskSchema = z
+  .object({
+    level: RiskLevelSchema,
+    notes: z.string().trim().min(1).optional(),
   })
   .strict()
 
@@ -416,10 +433,17 @@ const AgentRigPluginExtensionSchema = z
     listing: AgentRigPluginListingSchema.optional(),
     configSchema: z.record(z.string(), z.any()).optional(),
     pluginDependencies: z.array(z.string().trim().min(1)).optional(),
+    publicSkills: z.array(z.string().trim().min(1)).optional(),
+    supportSkills: z.array(z.string().trim().min(1)).optional(),
+    optionalCapabilities: z.array(CapabilityIdKeySchema).optional(),
+    requiredCapabilities: z.record(CapabilityIdKeySchema, AgentRigRequiredCapabilitySchema).optional(),
+    aliases: z.record(z.string().trim().min(1), z.string().trim().min(1)).optional(),
+    providerTargets: z.array(ProviderTargetSchema).optional(),
     providesCapabilities: z.record(CapabilityIdKeySchema, AgentRigProvidedCapabilitySchema).optional(),
-    requiresCapabilities: z.record(CapabilityIdKeySchema, AgentRigRequiredCapabilitySchema).optional(),
     verification: AgentRigVerificationSchema.optional(),
+    security: AgentRigSecuritySchema.optional(),
     replacementPolicy: AgentRigReplacementPolicySchema.optional(),
+    risk: AgentRigRiskSchema.optional(),
     source: z.any().optional(),
   })
   .catchall(z.any())

@@ -49,13 +49,6 @@ const INSTALLABILITY_RANK: Record<RegistryInstallability, number> = {
   yanked: 3,
 }
 
-const COMPATIBILITY_STATES = new Set<CapabilityProviderCompatibilityState>([
-  'native',
-  'port',
-  'unsupported',
-  'unknown',
-])
-
 export async function resolveCapabilityGraph(input: CapabilityResolveInput): Promise<CapabilityResolutionResult> {
   const resolvedAt = normalizeNow(input.now)
   const errors: CapabilityResolutionIssue[] = []
@@ -180,9 +173,17 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
 
     if (requestedProviders.length > 1) continue
 
-    const provider = await resolveProviderForCapability(group.capability, requestedProviders[0], group.required)
+    const fallback = fallbackForGroup(group)
+    const provider = await resolveProviderForCapability(group.capability, requestedProviders[0], group.required, fallback)
     if (!provider) {
-      if (!requestedProviders[0]) {
+      if (fallbackSatisfiesRequirement(group.capability, fallback) && !requestedProviders[0]) {
+        addIssue({
+          severity: 'warning',
+          code: 'capability_fallback_used',
+          capability: group.capability,
+          message: `Capability "${group.capability}" will use fallback "${fallback}".`,
+        })
+      } else if (!requestedProviders[0]) {
         addIssue({
           severity: group.required ? 'error' : 'warning',
           code: group.required ? 'required_provider_missing' : 'optional_provider_missing',
@@ -232,7 +233,7 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
       }
       staleProviders.push(staleProvider)
       addIssue({
-        severity: group.required ? 'error' : 'warning',
+        severity: 'warning',
         code: 'stale_provider',
         capability: group.capability,
         provider: provider.manifest.name,
@@ -293,7 +294,8 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
   async function resolveProviderForCapability(
     capability: CapabilityId,
     requestedProvider: string | undefined,
-    required: boolean
+    required: boolean,
+    fallback: string | undefined
   ): Promise<CapabilityPluginRecord | undefined> {
     if (requestedProvider) {
       const existing = findRecord(requestedProvider)
@@ -302,13 +304,17 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
       const node = await loadDependencyNode(
         requestedProvider,
         {
-          severity: required ? 'error' : 'warning',
-          code: required ? 'required_provider_missing' : 'optional_provider_missing',
+          severity: fallbackSatisfiesRequirement(capability, fallback) ? 'warning' : required ? 'error' : 'warning',
+          code: fallbackSatisfiesRequirement(capability, fallback)
+            ? 'capability_fallback_used'
+            : required ? 'required_provider_missing' : 'optional_provider_missing',
           capability,
           provider: parseCapabilityPluginRef(requestedProvider).name,
-          message: required
-            ? `Required provider "${requestedProvider}" for capability "${capability}" could not be loaded.`
-            : `Optional provider "${requestedProvider}" for capability "${capability}" could not be loaded.`,
+          message: fallbackSatisfiesRequirement(capability, fallback)
+            ? `Provider "${requestedProvider}" for capability "${capability}" could not be loaded; fallback "${fallback}" will be used.`
+            : required
+              ? `Required provider "${requestedProvider}" for capability "${capability}" could not be loaded.`
+              : `Optional provider "${requestedProvider}" for capability "${capability}" could not be loaded.`,
         }
       )
       if (!node) return undefined
@@ -324,11 +330,15 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
     for (const provider of discovered) {
       registerRecord(provider)
       await loadDependencyNode(provider.ref, {
-        severity: required ? 'error' : 'warning',
-        code: required ? 'required_provider_missing' : 'optional_provider_missing',
+        severity: fallbackSatisfiesRequirement(capability, fallback) ? 'warning' : required ? 'error' : 'warning',
+        code: fallbackSatisfiesRequirement(capability, fallback)
+          ? 'capability_fallback_used'
+          : required ? 'required_provider_missing' : 'optional_provider_missing',
         capability,
         provider: provider.manifest.name,
-        message: `Discovered provider "${provider.manifest.name}" for capability "${capability}" could not be loaded.`,
+        message: fallbackSatisfiesRequirement(capability, fallback)
+          ? `Discovered provider "${provider.manifest.name}" for capability "${capability}" could not be loaded; fallback "${fallback}" will be used.`
+          : `Discovered provider "${provider.manifest.name}" for capability "${capability}" could not be loaded.`,
       })
     }
 
@@ -411,12 +421,21 @@ function collectRequirements(records: readonly CapabilityPluginRecord[]): Capabi
   const requirements: CapabilityRequirement[] = []
   for (const record of [...records].sort((left, right) => left.manifest.name.localeCompare(right.manifest.name))) {
     const extension = record.manifest['x-agentrig']
-    const requiredCapabilities = extension?.requiresCapabilities ?? {}
+    const requiredCapabilities = extension?.requiredCapabilities ?? {}
     for (const [capability, requirement] of Object.entries(requiredCapabilities) as Array<[CapabilityId, AgentRigRequiredCapability]>) {
       requirements.push({
         capability,
         required: requirement.required,
         requestedProvider: requirement.provider,
+        fallback: requirement.fallback,
+        requiringPlugin: record.manifest.name,
+        requiringPluginProfile: extension?.profile,
+      })
+    }
+    for (const capability of (extension?.optionalCapabilities ?? []) as CapabilityId[]) {
+      requirements.push({
+        capability,
+        required: false,
         requiringPlugin: record.manifest.name,
         requiringPluginProfile: extension?.profile,
       })
@@ -439,6 +458,14 @@ function groupRequirements(requirements: readonly CapabilityRequirement[]): Requ
       required: capabilityRequirements.some((requirement) => requirement.required),
     }))
     .sort((left, right) => left.capability.localeCompare(right.capability))
+}
+
+function fallbackForGroup(group: RequirementGroup) {
+  return group.requirements.find((requirement) => requirement.fallback)?.fallback
+}
+
+function fallbackSatisfiesRequirement(capability: CapabilityId, fallback: string | undefined) {
+  return capability === 'plan.ledger' && Boolean(fallback?.trim())
 }
 
 function collectProjectProviderConflicts(requirements: readonly CapabilityRequirement[]): CapabilityConflict[] {
@@ -502,16 +529,11 @@ function resolvedPluginSummary(record: CapabilityPluginRecord): CapabilityResolv
 }
 
 function compatibilityForProvider(record: CapabilityPluginRecord): CapabilityProviderCompatibility {
-  const extensionCompatibility = compatibilityFromExtension(record.manifest)
-  const raw = {
-    ...extensionCompatibility,
-    ...record.providerCompatibility,
-  }
+  const compatibility = compatibilityFromExtension(record.manifest)
 
   return Object.fromEntries(
     CAPABILITY_RESOLUTION_TARGETS.map((target) => {
-      const state = raw[target]
-      return [target, state && COMPATIBILITY_STATES.has(state) ? state : 'unknown']
+      return [target, compatibility[target] ?? 'unknown']
     })
   ) as CapabilityProviderCompatibility
 }
@@ -519,21 +541,11 @@ function compatibilityForProvider(record: CapabilityPluginRecord): CapabilityPro
 function compatibilityFromExtension(manifest: Pick<PluginManifest, 'x-agentrig'>) {
   const extension = manifest['x-agentrig'] as Record<string, unknown> | undefined
   const compatibility: Partial<Record<CapabilityTarget, CapabilityProviderCompatibilityState>> = {}
-  const targetProviders = extension?.targetProviders
+  const providerTargets = extension?.providerTargets
 
-  if (Array.isArray(targetProviders)) {
+  if (Array.isArray(providerTargets)) {
     for (const target of CAPABILITY_RESOLUTION_TARGETS) {
-      compatibility[target] = targetProviders.includes(target) ? 'native' : 'unsupported'
-    }
-  }
-
-  const rawCompatibility = extension?.providerCompatibility
-  if (isRecord(rawCompatibility)) {
-    for (const target of CAPABILITY_RESOLUTION_TARGETS) {
-      const value = rawCompatibility[target]
-      if (typeof value === 'string' && COMPATIBILITY_STATES.has(value as CapabilityProviderCompatibilityState)) {
-        compatibility[target] = value as CapabilityProviderCompatibilityState
-      }
+      compatibility[target] = providerTargets.includes(target) ? 'native' : 'unsupported'
     }
   }
 
