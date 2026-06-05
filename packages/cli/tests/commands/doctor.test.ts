@@ -7,7 +7,7 @@ import command, { __doctorGeneratedFileChecksForTests, runDoctor, type DoctorChe
 import { exportPluginProviders, type ProviderExportResult } from '../../src/lib/plugin-providers'
 import { savePluginInstallLedger } from '../../src/lib/plugin-install-ledger'
 import { startFixtureServer, type FixtureServer } from '../helpers/harness'
-import type { InstallBundle, PluginManifest } from '@agentrig/sdk'
+import { agentRigInstallCommandFingerprint, type InstallBundle, type PluginManifest } from '@agentrig/sdk'
 import type { PluginInstallRecord } from '../../src/lib/types'
 
 const tempDirs: string[] = []
@@ -98,6 +98,60 @@ describe('command:doctor', () => {
       expect.objectContaining({
         id: 'stale-verification-date',
         status: 'warn',
+      }),
+    ]))
+  })
+
+  it('hard-fails when a required provider install command changed since verification', async () => {
+    const fixture = await createDoctorFixture({
+      context7: {
+        declareMcp: true,
+        commandFingerprint: `sha256:${'0'.repeat(64)}`,
+      },
+    })
+    await installLedgerRecords(fixture.cwd, ['instructa.saas', 'instructa.base', 'third-party.context7'])
+
+    const result = await runDoctor({
+      spec: 'agentrig/instructa.saas',
+      provider: 'codex',
+      cwd: fixture.cwd,
+    })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'provider-install-command-fingerprint',
+        status: 'fail',
+        message: 'third-party.context7: install command changed since last verification',
+      }),
+    ]))
+  })
+
+  it('hard-fails when GitHub permissions default toolsets request all', async () => {
+    const fixture = await createDoctorFixture({
+      github: {
+        permissionsDefaultToolsets: ['context', 'all'],
+      },
+    })
+    await installLedgerRecords(fixture.cwd, [
+      'instructa.saas',
+      'instructa.base',
+      'third-party.context7',
+      'third-party.github-mcp',
+    ])
+
+    const result = await runDoctor({
+      spec: 'agentrig/instructa.saas',
+      provider: 'codex',
+      cwd: fixture.cwd,
+    })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'mcp-github-toolsets',
+        status: 'fail',
+        message: 'third-party.github-mcp',
       }),
     ]))
   })
@@ -267,6 +321,10 @@ async function createDoctorFixture(options: {
     includeSkillFile?: boolean
     declareMcp?: boolean
     includeMcpFile?: boolean
+    commandFingerprint?: string
+  }
+  github?: {
+    permissionsDefaultToolsets?: string[]
   }
 } = {}) {
   const root = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-doctor-test-'))
@@ -317,12 +375,21 @@ async function createDoctorFixture(options: {
     pluginDependencies: [
       'agentrig/instructa.base@^1.0.0',
       'agentrig/third-party.context7@^1.0.0',
+      ...(options.github ? ['agentrig/third-party.github-mcp@^1.0.0'] : []),
     ],
     requiredCapabilities: {
       'docs.latest': {
         required: true,
         provider: 'third-party.context7',
       },
+      ...(options.github
+        ? {
+            'repo.remote': {
+              required: true,
+              provider: 'third-party.github-mcp',
+            },
+          }
+        : {}),
     },
     courseCompatibility: {
       kit: 'instructa-agentic-engineer-kit',
@@ -334,6 +401,12 @@ async function createDoctorFixture(options: {
   })
   const includeContext7Skill = options.context7?.includeSkillFile ?? true
   const includeContext7Mcp = options.context7?.includeMcpFile ?? true
+  const context7McpConfig = { mcpServers: { context7: { command: 'node', args: ['server.js'] } } }
+  const context7CommandFingerprint = options.context7?.commandFingerprint
+    ?? await agentRigInstallCommandFingerprint([
+      ...(options.context7?.declareMcp ? [context7McpConfig] : []),
+      ...(includeContext7Mcp ? [context7McpConfig] : []),
+    ])
   const context7 = {
     ...pluginManifest('third-party.context7', {
       profile: 'third-party',
@@ -349,6 +422,9 @@ async function createDoctorFixture(options: {
         lastVerified: options.context7?.lastVerified ?? '2026-06-01',
         cadence: '30d',
         smokeTest: 'verify/context7-smoke.md',
+        ...(context7CommandFingerprint
+          ? { commandFingerprint: context7CommandFingerprint }
+          : {}),
       },
       security: {
         requiresConsent: true,
@@ -362,12 +438,43 @@ async function createDoctorFixture(options: {
       },
     }),
     ...(options.context7?.declareSkills ? { skills: ['context7-docs'] } : {}),
-    ...(options.context7?.declareMcp ? { mcpServers: { context7: { command: 'node', args: ['server.js'] } } } : {}),
+    ...(options.context7?.declareMcp ? context7McpConfig : {}),
   } satisfies PluginManifest
-  const context7Files = {
+  const github = options.github
+    ? pluginManifest('third-party.github-mcp', {
+        profile: 'third-party',
+        providerTargets: ['codex', 'claude-code', 'cursor'],
+        providesCapabilities: {
+          'repo.remote': {
+            type: 'tool',
+            requiredByCore: false,
+            riskLevel: 'high',
+          },
+        },
+        verification: {
+          lastVerified: '2026-06-01',
+          cadence: '30d',
+          smokeTest: 'verify/github-smoke.md',
+        },
+        security: {
+          requiresConsent: true,
+          showsExactCommands: true,
+          requiresEnvVars: [],
+          notes: 'Provider manifest fixture for doctor tests.',
+        },
+        permissions: {
+          defaultToolsets: options.github.permissionsDefaultToolsets ?? [],
+        },
+        replacementPolicy: {
+          capabilities: ['repo.remote'],
+          replaceWithoutCourseChange: true,
+        },
+      })
+    : undefined
+  const context7Files: Record<string, string> = {
     'verify/context7-smoke.md': '# Context7 smoke\n',
     ...(includeContext7Mcp
-      ? { '.mcp.json': JSON.stringify({ mcpServers: { context7: { command: 'node', args: ['server.js'] } } }, null, 2) }
+      ? { '.mcp.json': JSON.stringify(context7McpConfig, null, 2) }
       : {}),
     ...(includeContext7Skill
       ? { 'skills/context7-docs/SKILL.md': [
@@ -381,17 +488,46 @@ async function createDoctorFixture(options: {
       : {}),
   }
 
-  for (const [artifactId, manifest, files, trustTier, installability] of [
-    ['instructa.saas', project, {}, 'official', 'installable'],
-    ['instructa.base', base, {}, 'official', 'installable'],
-    [
-      'third-party.context7',
-      context7,
-      context7Files,
-      options.context7?.trustTier ?? 'reviewed',
-      options.context7?.installability ?? 'installable',
-    ],
-  ] as const) {
+  const bundleInputs: Array<{
+    artifactId: string
+    manifest: PluginManifest
+    files: Record<string, string>
+    trustTier: 'official' | 'reviewed' | 'listed' | 'blocked' | 'yanked'
+    installability: 'installable' | 'discovery_only' | 'blocked' | 'yanked'
+  }> = [
+    {
+      artifactId: 'instructa.saas',
+      manifest: project,
+      files: {},
+      trustTier: 'official',
+      installability: 'installable',
+    },
+    {
+      artifactId: 'instructa.base',
+      manifest: base,
+      files: {},
+      trustTier: 'official',
+      installability: 'installable',
+    },
+    {
+      artifactId: 'third-party.context7',
+      manifest: context7,
+      files: context7Files,
+      trustTier: options.context7?.trustTier ?? 'reviewed',
+      installability: options.context7?.installability ?? 'installable',
+    },
+  ]
+  if (github) {
+    bundleInputs.push({
+      artifactId: 'third-party.github-mcp',
+      manifest: github,
+      files: { 'verify/github-smoke.md': '# GitHub smoke\n' },
+      trustTier: 'reviewed',
+      installability: 'installable',
+    })
+  }
+
+  for (const { artifactId, manifest, files, trustTier, installability } of bundleInputs) {
     bundles.set(
       artifactId,
       installBundle(server.baseUrl, manifest, files, trustTier, installability)

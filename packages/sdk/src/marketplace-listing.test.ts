@@ -6,7 +6,9 @@ import {
   MarketplaceListingPublicSchema,
   MarketplaceListingSchema,
   PluginManifestSchema,
+  agentRigInstallCommandFingerprint,
   isResolvable,
+  resolvePluginSkillName,
   verifyInstallBundleHashes,
   type InstallBundle,
   type MarketplaceListing,
@@ -310,6 +312,78 @@ describe('marketplace listing contracts', () => {
         level: 'medium',
       },
     })
+  })
+
+  it('resolves existing skill aliases to canonical manifest skill names', () => {
+    const manifest = PluginManifestSchema.parse({
+      name: 'instructa.core',
+      version: '1.0.0',
+      description: 'Lean reusable anti-drift engineering skills for agentic coding.',
+      'x-agentrig': {
+        kind: 'plugin',
+        profile: 'core',
+        publicSkills: [
+          'project-spec-packager',
+          'duplicate-ownership-audit',
+          'test-ownership',
+        ],
+        supportSkills: ['ship-gate'],
+        aliases: {
+          'app-spec-packager': 'project-spec-packager',
+          'find-duplicate-ownership': 'duplicate-ownership-audit',
+          'consolidate-test-suites': 'test-ownership',
+        },
+      },
+    })
+
+    expect(resolvePluginSkillName(manifest, 'find-duplicate-ownership')).toEqual({
+      plugin: 'instructa.core',
+      requestedName: 'find-duplicate-ownership',
+      canonicalName: 'duplicate-ownership-audit',
+      matched: 'alias',
+    })
+    expect(resolvePluginSkillName(manifest, 'duplicate-ownership-audit')).toEqual({
+      plugin: 'instructa.core',
+      requestedName: 'duplicate-ownership-audit',
+      canonicalName: 'duplicate-ownership-audit',
+      matched: 'canonical',
+    })
+  })
+
+  it('accepts the verified install command fingerprint field', async () => {
+    const commandFingerprint = await agentRigInstallCommandFingerprint([{
+      mcpServers: {
+        context7: {
+          command: 'node',
+          args: ['server.js'],
+          env: { CONTEXT7_API_KEY: '${CONTEXT7_API_KEY}' },
+        },
+      },
+    }])
+
+    const manifest = PluginManifestSchema.parse({
+      name: 'third-party.context7',
+      version: '1.0.0',
+      description: 'Context7 provider fixture.',
+      mcpServers: {
+        context7: {
+          command: 'node',
+          args: ['server.js'],
+        },
+      },
+      'x-agentrig': {
+        kind: 'plugin',
+        profile: 'third-party',
+        verification: {
+          lastVerified: '2026-06-04',
+          cadence: '30d',
+          smokeTest: 'verify/context7-smoke.md',
+          commandFingerprint,
+        },
+      },
+    })
+
+    expect(manifest['x-agentrig']?.verification?.commandFingerprint).toBe(commandFingerprint)
   })
 
   it('keeps final x-agentrig metadata optional', () => {

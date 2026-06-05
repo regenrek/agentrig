@@ -7,6 +7,7 @@ import {
 import { isValidPluginName } from './provider/plugin-names'
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/
+const SHA256_DIGEST_RE = /^sha256:[a-f0-9]{64}$/
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 const CAPABILITY_ID_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)*$/
 
@@ -397,6 +398,7 @@ const AgentRigVerificationSchema = z
     lastVerified: z.string().regex(YYYY_MM_DD_RE, 'lastVerified must use YYYY-MM-DD format'),
     cadence: z.string().trim().min(1),
     smokeTest: z.string().trim().min(1),
+    commandFingerprint: z.string().regex(SHA256_DIGEST_RE, 'commandFingerprint must be a sha256:<hex> digest').optional(),
   })
   .strict()
 
@@ -475,12 +477,127 @@ export const PluginManifestSchema = z.object({
 
 export type PluginManifest = z.infer<typeof PluginManifestSchema>
 
+export type PluginSkillResolution = {
+  plugin: string
+  requestedName: string
+  canonicalName: string
+  matched: 'canonical' | 'alias'
+}
+
+export function resolvePluginSkillName(
+  manifest: Pick<PluginManifest, 'name' | 'skills' | 'x-agentrig'>,
+  requestedName: string
+): PluginSkillResolution | null {
+  const requested = requestedName.trim()
+  if (!requested) return null
+
+  const declaredNames = declaredPluginSkillNames(manifest)
+  if (declaredNames.has(requested)) {
+    return {
+      plugin: manifest.name,
+      requestedName: requested,
+      canonicalName: requested,
+      matched: 'canonical',
+    }
+  }
+
+  const aliasTarget = manifest['x-agentrig']?.aliases?.[requested]?.trim()
+  if (!aliasTarget) return null
+  if (declaredNames.size > 0 && !declaredNames.has(aliasTarget)) return null
+
+  return {
+    plugin: manifest.name,
+    requestedName: requested,
+    canonicalName: aliasTarget,
+    matched: 'alias',
+  }
+}
+
+export type AgentRigInstallCommandEntry = {
+  server: string
+  command: string
+  args: string[]
+  envKeys: string[]
+}
+
+export function collectAgentRigInstallCommandEntries(sources: readonly unknown[]): AgentRigInstallCommandEntry[] {
+  const byIdentity = new Map<string, AgentRigInstallCommandEntry>()
+  for (const source of sources) {
+    const sourceRecord = isRecord(source) ? source : undefined
+    if (!sourceRecord) continue
+    for (const servers of [sourceRecord.mcpServers, sourceRecord.servers]) {
+      const serverRecord = isRecord(servers) ? servers : undefined
+      if (!serverRecord) continue
+      for (const [serverName, value] of Object.entries(serverRecord)) {
+        const server = isRecord(value) ? value : undefined
+        if (!server) continue
+        const command = typeof server?.command === 'string' ? server.command.trim() : ''
+        if (!command) continue
+        const entry: AgentRigInstallCommandEntry = {
+          server: serverName,
+          command,
+          args: stringValues(server.args),
+          envKeys: Object.keys(isRecord(server.env) ? server.env : {}).sort(),
+        }
+        byIdentity.set(stableJson(entry), entry)
+      }
+    }
+  }
+
+  return [...byIdentity.values()].sort((left, right) =>
+    left.server.localeCompare(right.server)
+      || left.command.localeCompare(right.command)
+      || left.args.join('\0').localeCompare(right.args.join('\0'))
+      || left.envKeys.join('\0').localeCompare(right.envKeys.join('\0'))
+  )
+}
+
+export async function agentRigInstallCommandFingerprint(sources: readonly unknown[]): Promise<string | undefined> {
+  const commands = collectAgentRigInstallCommandEntries(sources)
+  if (!commands.length) return undefined
+  return digestJson({
+    kind: 'agentrig.provider-install-commands.v1',
+    commands,
+  })
+}
+
 export function pluginManifestListingCategory(manifest: Pick<PluginManifest, 'name' | 'x-agentrig'>) {
   const category = manifest['x-agentrig']?.listing?.category?.trim()
   if (!category) {
     throw new Error(`Plugin ${manifest.name} is missing x-agentrig.listing.category.`)
   }
   return category
+}
+
+function declaredPluginSkillNames(manifest: Pick<PluginManifest, 'skills' | 'x-agentrig'>) {
+  const names = new Set<string>()
+  for (const name of [
+    ...(manifest['x-agentrig']?.publicSkills ?? []),
+    ...(manifest['x-agentrig']?.supportSkills ?? []),
+    ...skillNamesFromManifestField(manifest.skills),
+  ]) {
+    const trimmed = name.trim()
+    if (trimmed) names.add(trimmed)
+  }
+  return names
+}
+
+function skillNamesFromManifestField(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => {
+      if (typeof entry === 'string') return [entry]
+      if (isRecord(entry) && typeof entry.name === 'string') return [entry.name]
+      return []
+    })
+  }
+  if (isRecord(value)) return Object.keys(value)
+  return []
+}
+
+function stringValues(value: unknown) {
+  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+  if (typeof value === 'string' && value.trim()) return [value.trim()]
+  return []
 }
 
 export type RegistryFileDigest = {

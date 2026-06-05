@@ -5,6 +5,7 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import {
   PluginManifestSchema,
+  agentRigInstallCommandFingerprint,
   capabilityResolutionToJson,
   parseCapabilityPluginRef,
   resolveCapabilityGraph,
@@ -1102,7 +1103,7 @@ async function addMcpAndEnvChecks(
   const declaredEnv = collectDeclaredEnv(chosenProviders, mcpConfigs, extensions)
   addEnvCheck('required-env-vars', 'required env vars', declaredEnv.required, true, addCheck)
   addEnvCheck('optional-env-vars', 'optional env vars', declaredEnv.optional, false, addCheck)
-  addProviderSecurityChecks(chosenProviders, mcpConfigs, extensions, addCheck)
+  await addProviderSecurityChecks(chosenProviders, mcpConfigs, extensions, addCheck)
 
   for (const provider of chosenProviders) {
     if (provider.required) continue
@@ -1245,7 +1246,7 @@ function addEnvCheck(
   })
 }
 
-function addProviderSecurityChecks(
+async function addProviderSecurityChecks(
   chosenProviders: CapabilityChosenProvider[],
   mcpConfigs: Awaited<ReturnType<typeof collectMcpConfigs>>,
   extensions: Awaited<ReturnType<typeof collectPluginExtensions>>,
@@ -1266,6 +1267,8 @@ function addProviderSecurityChecks(
       details: security,
     })
   }
+
+  await addInstallCommandFingerprintChecks(requiredProviders, mcpConfigs, extensions, addCheck)
 
   const unverifiedLocalCommands = mcpConfigs.flatMap((config) => localMcpCommandNames(config.json)
     .filter(() => {
@@ -1305,6 +1308,61 @@ function addProviderSecurityChecks(
   })
 }
 
+async function addInstallCommandFingerprintChecks(
+  requiredProviders: CapabilityChosenProvider[],
+  mcpConfigs: Awaited<ReturnType<typeof collectMcpConfigs>>,
+  extensions: Awaited<ReturnType<typeof collectPluginExtensions>>,
+  addCheck: (check: DoctorCheck) => void
+) {
+  const failures: Array<{
+    plugin: string
+    expected?: string
+    actual?: string
+    reason: string
+  }> = []
+
+  for (const provider of requiredProviders) {
+    const extension = extensions.get(provider.plugin) ?? {}
+    const verification = toRecord(extension.verification)
+    const expected = typeof verification?.commandFingerprint === 'string'
+      ? verification.commandFingerprint.trim()
+      : undefined
+    const sources = [
+      extension,
+      ...mcpConfigs
+        .filter((config) => config.plugin === provider.plugin)
+        .map((config) => config.json),
+    ]
+    const actual = await agentRigInstallCommandFingerprint(sources)
+    if (!actual && !expected) continue
+    if (!expected) {
+      failures.push({
+        plugin: provider.plugin,
+        actual,
+        reason: 'missing x-agentrig.verification.commandFingerprint',
+      })
+      continue
+    }
+    if (actual !== expected) {
+      failures.push({
+        plugin: provider.plugin,
+        expected,
+        actual,
+        reason: 'install command changed since last verification',
+      })
+    }
+  }
+
+  addCheck({
+    id: 'provider-install-command-fingerprint',
+    section: 'Provider',
+    status: failures.length ? 'fail' : 'pass',
+    label: failures.length ? 'provider install command fingerprint changed' : 'provider install command fingerprints verified',
+    message: failures.map((failure) => `${failure.plugin}: ${failure.reason}`).join('; ') || undefined,
+    details: failures.length ? failures : undefined,
+  })
+}
+
 function localMcpCommandNames(config: Record<string, unknown>) {
   const servers = toRecord(config.mcpServers) ?? toRecord(config.servers) ?? {}
   return Object.entries(servers)
@@ -1324,6 +1382,7 @@ function providerUsesGithubAll(
     ...stringArray(extension?.toolsets),
     ...stringArray(extension?.defaultToolsets),
     ...stringArray(toRecord(extension?.github)?.toolsets),
+    ...stringArray(toRecord(extension?.permissions)?.defaultToolsets),
     ...mcpConfigs.flatMap((config) => stringArray(config.json.toolsets)),
   ]
   return values.some((value) => value.trim().toLowerCase() === 'all')
