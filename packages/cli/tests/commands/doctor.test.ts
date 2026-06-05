@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import command, { runDoctor } from '../../src/commands/doctor'
+import command, { __doctorGeneratedFileChecksForTests, runDoctor, type DoctorCheck } from '../../src/commands/doctor'
+import { exportPluginProviders, type ProviderExportResult } from '../../src/lib/plugin-providers'
 import { savePluginInstallLedger } from '../../src/lib/plugin-install-ledger'
 import { startFixtureServer, type FixtureServer } from '../helpers/harness'
 import type { InstallBundle, PluginManifest } from '@agentrig/sdk'
@@ -48,6 +49,7 @@ describe('command:doctor', () => {
     expect(process.exitCode).toBe(0)
     expect(output).toContain('AgentRig Doctor - instructa.saas / codex')
     expect(output).toContain('✓ docs.latest -> third-party.context7@1.0.0')
+    expect(output).toContain('✓ Codex generated files verified')
     expect(output).toContain('✓ Ready for Instructa Saas workflow.')
   })
 
@@ -124,6 +126,100 @@ describe('command:doctor', () => {
     ]))
   })
 
+  it('verifies Claude Code and Cursor generated files', async () => {
+    const fixture = await createDoctorFixture()
+
+    const claude = await runDoctor({
+      spec: 'agentrig/instructa.saas',
+      provider: 'claude-code',
+      cwd: fixture.cwd,
+    })
+    const cursor = await runDoctor({
+      spec: 'agentrig/instructa.saas',
+      provider: 'cursor',
+      cwd: fixture.cwd,
+    })
+
+    expect(checkById(claude.checks, 'claude-generated-files')).toEqual(expect.objectContaining({
+      status: 'pass',
+      label: 'Claude Code generated files verified',
+    }))
+    expect(checkById(cursor.checks, 'cursor-generated-files')).toEqual(expect.objectContaining({
+      status: 'pass',
+      label: 'Cursor generated files verified',
+    }))
+  })
+
+  it('fails provider generated-file checks when canonical skills are dropped', async () => {
+    const fixture = await createDoctorFixture({
+      context7: {
+        declareSkills: true,
+        includeSkillFile: false,
+      },
+    })
+
+    const result = await runDoctor({
+      spec: 'agentrig/instructa.saas',
+      provider: 'cursor',
+      cwd: fixture.cwd,
+    })
+
+    expect(checkById(result.checks, 'cursor-generated-files')).toEqual(expect.objectContaining({
+      status: 'fail',
+      message: expect.stringContaining('agentrig-third-party-context7:skills/'),
+    }))
+  })
+
+  it('fails provider generated-file checks when canonical MCP is dropped', async () => {
+    const fixture = await createDoctorFixture({
+      context7: {
+        declareMcp: true,
+        includeMcpFile: false,
+      },
+    })
+
+    const result = await runDoctor({
+      spec: 'agentrig/instructa.saas',
+      provider: 'claude-code',
+      cwd: fixture.cwd,
+    })
+
+    expect(checkById(result.checks, 'claude-generated-files')).toEqual(expect.objectContaining({
+      status: 'fail',
+      message: expect.stringContaining('agentrig-third-party-context7:.mcp.json'),
+    }))
+  })
+
+  it('fails Claude generated-file checks when .mcp.json omits Claude variables', async () => {
+    const root = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-doctor-generated-test-'))
+    tempDirs.push(root)
+    const cwd = path.join(root, 'workspace')
+    const pluginsRoot = path.join(root, 'plugins')
+    const out = path.join(root, 'out')
+    await fs.mkdir(cwd, { recursive: true })
+    await writeProviderPluginSource(pluginsRoot)
+
+    const [result] = await exportPluginProviders({
+      cwd,
+      agent: 'claude',
+      pluginsDir: pluginsRoot,
+      out,
+    })
+    const providerName = 'agentrig-third-party-context7'
+    await fs.writeFile(
+      path.join(out, 'plugins', providerName, '.mcp.json'),
+      JSON.stringify({ mcpServers: { context7: { command: 'node', args: ['server.js'] } } }, null, 2),
+      'utf-8'
+    )
+
+    const checks = await collectGeneratedChecks('claude-code', 'claude', result)
+
+    expect(checkById(checks, 'claude-generated-files')).toEqual(expect.objectContaining({
+      status: 'fail',
+      message: expect.stringContaining(`${providerName}:.mcp.json Claude path variables`),
+    }))
+  })
+
   it('prints machine-readable JSON output', async () => {
     const fixture = await createDoctorFixture()
     await installLedgerRecords(fixture.cwd, ['instructa.saas', 'instructa.base', 'third-party.context7'])
@@ -167,6 +263,10 @@ async function createDoctorFixture(options: {
     installability?: 'installable' | 'discovery_only' | 'blocked' | 'yanked'
     lastVerified?: string
     requiredEnvVars?: string[]
+    declareSkills?: boolean
+    includeSkillFile?: boolean
+    declareMcp?: boolean
+    includeMcpFile?: boolean
   }
 } = {}) {
   const root = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-doctor-test-'))
@@ -232,32 +332,54 @@ async function createDoctorFixture(options: {
   const base = pluginManifest('instructa.base', {
     profile: 'base',
   })
-  const context7 = pluginManifest('third-party.context7', {
-    profile: 'third-party',
-    providerTargets: ['codex', 'claude-code', 'cursor'],
-    providesCapabilities: {
-      'docs.latest': {
-        type: 'tool',
-        requiredByCore: false,
-        riskLevel: 'medium',
+  const includeContext7Skill = options.context7?.includeSkillFile ?? true
+  const includeContext7Mcp = options.context7?.includeMcpFile ?? true
+  const context7 = {
+    ...pluginManifest('third-party.context7', {
+      profile: 'third-party',
+      providerTargets: ['codex', 'claude-code', 'cursor'],
+      providesCapabilities: {
+        'docs.latest': {
+          type: 'tool',
+          requiredByCore: false,
+          riskLevel: 'medium',
+        },
       },
-    },
-    verification: {
-      lastVerified: options.context7?.lastVerified ?? '2026-06-01',
-      cadence: '30d',
-      smokeTest: 'verify/context7-smoke.md',
-    },
-    security: {
-      requiresConsent: true,
-      showsExactCommands: true,
-      requiresEnvVars: options.context7?.requiredEnvVars ?? [],
-      notes: 'Provider manifest fixture for doctor tests.',
-    },
-    replacementPolicy: {
-      capabilities: ['docs.latest'],
-      replaceWithoutCourseChange: true,
-    },
-  })
+      verification: {
+        lastVerified: options.context7?.lastVerified ?? '2026-06-01',
+        cadence: '30d',
+        smokeTest: 'verify/context7-smoke.md',
+      },
+      security: {
+        requiresConsent: true,
+        showsExactCommands: true,
+        requiresEnvVars: options.context7?.requiredEnvVars ?? [],
+        notes: 'Provider manifest fixture for doctor tests.',
+      },
+      replacementPolicy: {
+        capabilities: ['docs.latest'],
+        replaceWithoutCourseChange: true,
+      },
+    }),
+    ...(options.context7?.declareSkills ? { skills: ['context7-docs'] } : {}),
+    ...(options.context7?.declareMcp ? { mcpServers: { context7: { command: 'node', args: ['server.js'] } } } : {}),
+  } satisfies PluginManifest
+  const context7Files = {
+    'verify/context7-smoke.md': '# Context7 smoke\n',
+    ...(includeContext7Mcp
+      ? { '.mcp.json': JSON.stringify({ mcpServers: { context7: { command: 'node', args: ['server.js'] } } }, null, 2) }
+      : {}),
+    ...(includeContext7Skill
+      ? { 'skills/context7-docs/SKILL.md': [
+          '---',
+          'name: context7-docs',
+          'description: Fetch current library documentation through Context7 MCP.',
+          '---',
+          '',
+          '# Context7 Docs',
+        ].join('\n') }
+      : {}),
+  }
 
   for (const [artifactId, manifest, files, trustTier, installability] of [
     ['instructa.saas', project, {}, 'official', 'installable'],
@@ -265,7 +387,7 @@ async function createDoctorFixture(options: {
     [
       'third-party.context7',
       context7,
-      { 'verify/context7-smoke.md': '# Context7 smoke\n' },
+      context7Files,
       options.context7?.trustTier ?? 'reviewed',
       options.context7?.installability ?? 'installable',
     ],
@@ -404,6 +526,69 @@ async function installLedgerRecords(cwd: string, pluginIds: string[]) {
     installs,
     selections: {},
   })
+}
+
+async function writeProviderPluginSource(pluginsRoot: string) {
+  const pluginDir = path.join(pluginsRoot, 'third-party.context7')
+  await fs.mkdir(path.join(pluginDir, '.plugin'), { recursive: true })
+  await fs.mkdir(path.join(pluginDir, 'skills', 'context7-docs'), { recursive: true })
+  await fs.writeFile(
+    path.join(pluginDir, '.plugin', 'plugin.json'),
+    JSON.stringify({
+      name: 'third-party.context7',
+      version: '1.0.0',
+      description: 'Context7 provider fixture.',
+      skills: ['context7-docs'],
+      'x-agentrig': {
+        kind: 'plugin',
+        displayName: 'Context7',
+        listing: { category: 'Development' },
+      },
+    }, null, 2),
+    'utf-8'
+  )
+  await fs.writeFile(
+    path.join(pluginDir, 'skills', 'context7-docs', 'SKILL.md'),
+    [
+      '---',
+      'name: context7-docs',
+      'description: Fetch current library documentation through Context7 MCP.',
+      '---',
+      '',
+      '# Context7 Docs',
+    ].join('\n'),
+    'utf-8'
+  )
+  await fs.writeFile(
+    path.join(pluginDir, '.mcp.json'),
+    JSON.stringify({ mcpServers: { context7: { command: 'node', args: ['server.js'] } } }, null, 2),
+    'utf-8'
+  )
+}
+
+async function collectGeneratedChecks(
+  provider: 'codex' | 'claude-code' | 'cursor',
+  installProvider: 'codex' | 'claude' | 'cursor',
+  result: ProviderExportResult | undefined
+) {
+  if (!result) throw new Error('Missing provider export result.')
+  const checks: DoctorCheck[] = []
+  await __doctorGeneratedFileChecksForTests.addGeneratedFileChecksForProvider(
+    provider,
+    installProvider,
+    result,
+    (check) => checks.push(check)
+  )
+  return checks
+}
+
+function checkById(checks: DoctorCheck[], id: string) {
+  const check = checks.find((item) => item.id === id)
+  if (!check) {
+    const generated = checks.find((item) => item.id === 'provider-generated-files')
+    throw new Error(`Missing doctor check: ${id}; provider-generated-files: ${JSON.stringify(generated)}; available checks: ${checks.map((item) => item.id).join(', ')}`)
+  }
+  return check
 }
 
 function sha256Hex(input: string) {

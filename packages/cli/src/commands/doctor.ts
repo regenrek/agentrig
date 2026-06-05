@@ -1,3 +1,5 @@
+import { promises as fs } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
@@ -35,10 +37,13 @@ import { resolvePluginSpec } from '../lib/plugin-resolver'
 import { parseRegistryPluginSpec } from '../lib/registry-spec'
 import { pathExists, readJsonFile } from '../lib/fs'
 import {
+  exportPluginProviders,
   preparePluginInstall,
   resolveInstallScope,
   type PluginProviderId,
+  type ProviderExportResult,
 } from '../lib/plugin-providers'
+import { providerPluginName } from '../lib/plugin-providers/shared'
 import { sha256Hex } from '../lib/hash'
 import type {
   PluginInstallRecord,
@@ -50,7 +55,7 @@ import type {
 type DoctorStatus = 'pass' | 'warn' | 'fail' | 'unknown'
 type DoctorSection = 'Core' | 'Capabilities' | 'Provider' | 'Status'
 
-type DoctorCheck = {
+export type DoctorCheck = {
   id: string
   section: DoctorSection
   label: string
@@ -720,11 +725,324 @@ async function addProviderPreviewChecks(args: {
     label: `${titleProvider(args.provider)} export surface`,
     message: providerExportSurfaceMessage(args.provider),
   })
+  await addProviderGeneratedExportChecks({
+    cwd: args.cwd,
+    provider: args.provider,
+    installProvider: args.installProvider,
+    pluginsRoot: args.pluginsRoot,
+    addCheck: args.addCheck,
+  })
   return {
     selected: args.provider,
     scope,
     previewLocations,
   } satisfies NonNullable<DoctorJson['provider']>
+}
+
+async function addProviderGeneratedExportChecks(args: {
+  cwd: string
+  provider: CapabilityTarget
+  installProvider: PluginProviderId
+  pluginsRoot: string
+  addCheck: (check: DoctorCheck) => void
+}) {
+  const exportRoot = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-doctor-provider-export-'))
+  try {
+    const results = await exportPluginProviders({
+      cwd: args.cwd,
+      agent: args.installProvider,
+      pluginsDir: args.pluginsRoot,
+      out: exportRoot,
+      clean: true,
+    })
+    const result = results.find((entry) => entry.provider === args.installProvider)
+    if (!result) {
+      args.addCheck({
+        id: 'provider-generated-files',
+        section: 'Provider',
+        status: 'fail',
+        label: `${titleProvider(args.provider)} generated files missing`,
+        message: 'Provider export did not return a result.',
+      })
+      return
+    }
+    await addGeneratedFileChecksForProvider(args.provider, args.installProvider, result, args.addCheck)
+  } catch (error) {
+    args.addCheck({
+      id: 'provider-generated-files',
+      section: 'Provider',
+      status: 'fail',
+      label: `${titleProvider(args.provider)} generated files failed`,
+      message: errorMessage(error),
+    })
+  } finally {
+    await fs.rm(exportRoot, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+async function addGeneratedFileChecksForProvider(
+  provider: CapabilityTarget,
+  installProvider: PluginProviderId,
+  result: ProviderExportResult,
+  addCheck: (check: DoctorCheck) => void
+) {
+  if (provider === 'codex') {
+    await addCodexGeneratedFileChecks(result, installProvider, addCheck)
+    return
+  }
+  if (provider === 'claude-code') {
+    await addClaudeGeneratedFileChecks(result, installProvider, addCheck)
+    return
+  }
+  await addCursorGeneratedFileChecks(result, installProvider, addCheck)
+}
+
+export const __doctorGeneratedFileChecksForTests = {
+  addGeneratedFileChecksForProvider,
+}
+
+async function addCodexGeneratedFileChecks(
+  result: ProviderExportResult,
+  installProvider: PluginProviderId,
+  addCheck: (check: DoctorCheck) => void
+) {
+  const summaries = await collectGeneratedPluginSummaries(result.outRoot)
+  const expectations = await collectCanonicalProviderExpectations(result, installProvider)
+  const missing = expectations.flatMap((plugin) => {
+    const summary = summaries.get(plugin.name)
+    return [
+      ...missingWhen(!summary?.files.has('.codex-plugin/plugin.json'), `${plugin.name}:.codex-plugin/plugin.json`),
+      ...missingWhen(!summary?.files.has('AGENTS.md'), `${plugin.name}:AGENTS.md`),
+      ...missingWhen(plugin.expectsSkills && !hasGeneratedSkills(summary), `${plugin.name}:skills/`),
+      ...missingWhen(plugin.expectsSkills && !summary?.manifest?.skills, `${plugin.name}:skills manifest pointer`),
+      ...missingWhen(plugin.expectsMcp && !summary?.manifest?.mcpServers, `${plugin.name}:MCP manifest pointer`),
+      ...missingWhen(plugin.expectsMcp && !summary?.files.has('.mcp.json'), `${plugin.name}:.mcp.json`),
+      ...missingWhen(plugin.expectsMcp && !mcpConfigHasServers(summary?.mcpJson.get('.mcp.json')), `${plugin.name}:.mcp.json valid MCP config`),
+    ]
+  })
+  const badPointers = expectations
+    .filter((plugin) => {
+      const pointer = summaries.get(plugin.name)?.text.get('AGENTS.md') ?? ''
+      return !/agentrig doctor --provider codex/.test(pointer)
+        || !/project-spec-packager/.test(pointer)
+        || !/ship-gate/.test(pointer)
+        || !/approval|sandbox/i.test(pointer)
+        || pointer.split(/\r?\n/).length > 100
+    })
+    .map((plugin) => `${plugin.name}:AGENTS.md`)
+  addCheck({
+    id: 'codex-generated-files',
+    section: 'Provider',
+    status: missing.length || badPointers.length ? 'fail' : 'pass',
+    label: missing.length || badPointers.length ? 'Codex generated files incomplete' : 'Codex generated files verified',
+    message: [...missing, ...badPointers].join('; ') || undefined,
+  })
+}
+
+async function addClaudeGeneratedFileChecks(
+  result: ProviderExportResult,
+  installProvider: PluginProviderId,
+  addCheck: (check: DoctorCheck) => void
+) {
+  const summaries = await collectGeneratedPluginSummaries(result.outRoot)
+  const expectations = await collectCanonicalProviderExpectations(result, installProvider)
+  const missing = expectations.flatMap((plugin) => {
+    const summary = summaries.get(plugin.name)
+    return [
+      ...missingWhen(!summary?.files.has('.claude-plugin/plugin.json'), `${plugin.name}:.claude-plugin/plugin.json`),
+      ...missingWhen(!summary?.files.has('CLAUDE.md'), `${plugin.name}:CLAUDE.md`),
+      ...missingWhen(plugin.expectsSkills && !hasGeneratedSkills(summary), `${plugin.name}:skills/`),
+      ...missingWhen(plugin.expectsMcp && !summary?.files.has('.mcp.json'), `${plugin.name}:.mcp.json`),
+      ...missingWhen(plugin.expectsMcp && !mcpConfigHasServers(summary?.mcpJson.get('.mcp.json')), `${plugin.name}:.mcp.json valid MCP config`),
+      ...missingWhen(plugin.expectsMcp && !claudeMcpUsesRequiredVariables(summary?.text.get('.mcp.json')), `${plugin.name}:.mcp.json Claude path variables`),
+    ]
+  })
+  const badPointers = expectations
+    .filter((plugin) => {
+      const pointer = summaries.get(plugin.name)?.text.get('CLAUDE.md') ?? ''
+      return !/agentrig doctor --provider claude-code/.test(pointer)
+        || (plugin.expectsMcp && !/\/mcp/.test(pointer))
+        || !/reload/i.test(pointer)
+        || !/settings/i.test(pointer)
+    })
+    .map((plugin) => `${plugin.name}:CLAUDE.md`)
+  addCheck({
+    id: 'claude-generated-files',
+    section: 'Provider',
+    status: missing.length || badPointers.length ? 'fail' : 'pass',
+    label: missing.length || badPointers.length
+      ? 'Claude Code generated files incomplete'
+      : 'Claude Code generated files verified',
+    message: [...missing, ...badPointers].join('; ') || undefined,
+  })
+}
+
+async function addCursorGeneratedFileChecks(
+  result: ProviderExportResult,
+  installProvider: PluginProviderId,
+  addCheck: (check: DoctorCheck) => void
+) {
+  const summaries = await collectGeneratedPluginSummaries(result.outRoot)
+  const expectations = await collectCanonicalProviderExpectations(result, installProvider)
+  const missing = expectations.flatMap((plugin) => {
+    const summary = summaries.get(plugin.name)
+    return [
+      ...missingWhen(!summary?.files.has('.cursor-plugin/plugin.json'), `${plugin.name}:.cursor-plugin/plugin.json`),
+      ...missingWhen(!summary?.files.has('CURSOR.md'), `${plugin.name}:CURSOR.md`),
+      ...missingWhen(!summary?.files.has('rules/agentrig-provider.mdc'), `${plugin.name}:rules/agentrig-provider.mdc`),
+      ...missingWhen(plugin.expectsSkills && !hasGeneratedSkills(summary), `${plugin.name}:skills/`),
+      ...missingWhen(plugin.expectsSkills && !summary?.manifest?.skills, `${plugin.name}:skills manifest pointer`),
+      ...missingWhen(plugin.expectsMcp && !summary?.manifest?.mcpServers, `${plugin.name}:MCP manifest pointer`),
+      ...missingWhen(plugin.expectsMcp && !summary?.files.has('mcp.json'), `${plugin.name}:mcp.json`),
+      ...missingWhen(plugin.expectsMcp && !mcpConfigHasServers(summary?.mcpJson.get('mcp.json')), `${plugin.name}:mcp.json valid MCP config`),
+    ]
+  })
+  const badPointers = expectations
+    .filter((plugin) => {
+      const summary = summaries.get(plugin.name)
+      const notes = summary?.text.get('CURSOR.md') ?? ''
+      const rule = summary?.text.get('rules/agentrig-provider.mdc') ?? ''
+      return !/agentrig doctor --provider cursor/.test(notes)
+        || !/provider-neutral/i.test(rule)
+        || !/project-spec-packager/.test(rule)
+        || !/ship-gate/.test(rule)
+    })
+    .map((plugin) => `${plugin.name}:CURSOR.md/rules`)
+  addCheck({
+    id: 'cursor-generated-files',
+    section: 'Provider',
+    status: missing.length || badPointers.length ? 'fail' : 'pass',
+    label: missing.length || badPointers.length ? 'Cursor generated files incomplete' : 'Cursor generated files verified',
+    message: [...missing, ...badPointers].join('; ') || undefined,
+  })
+}
+
+type CanonicalProviderExpectation = {
+  name: string
+  expectsSkills: boolean
+  expectsMcp: boolean
+}
+
+type GeneratedPluginSummary = {
+  name: string
+  files: Set<string>
+  text: Map<string, string>
+  mcpJson: Map<string, Record<string, unknown>>
+  manifest?: Record<string, unknown>
+}
+
+async function collectCanonicalProviderExpectations(
+  result: ProviderExportResult,
+  installProvider: PluginProviderId
+): Promise<CanonicalProviderExpectation[]> {
+  const expectations = await Promise.all(result.plugins.map(async (plugin) => {
+    const pluginPrefix = plugin.pluginName.endsWith(plugin.manifest.name)
+      ? plugin.pluginName.slice(0, -plugin.manifest.name.length)
+      : undefined
+    return {
+      name: providerPluginName(plugin, installProvider, pluginPrefix),
+      expectsSkills: manifestDeclares(plugin.manifest.skills) || await pathExists(path.join(plugin.pluginSourceDir, 'skills')),
+      expectsMcp: manifestDeclares(plugin.manifest.mcpServers) || await sourceHasMcpConfig(plugin.pluginSourceDir),
+    } satisfies CanonicalProviderExpectation
+  }))
+  return expectations.sort((left, right) => left.name.localeCompare(right.name))
+}
+
+async function collectGeneratedPluginSummaries(outRoot: string) {
+  const pluginsRoot = path.join(outRoot, 'plugins')
+  const entries = await fs.readdir(pluginsRoot, { withFileTypes: true })
+  const summaries = new Map<string, GeneratedPluginSummary>()
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const pluginRoot = path.join(pluginsRoot, entry.name)
+    const files = await walkRelativeFiles(pluginRoot)
+    const text = new Map<string, string>()
+    for (const relativePath of ['AGENTS.md', 'CLAUDE.md', 'CURSOR.md', 'rules/agentrig-provider.mdc', '.mcp.json', 'mcp.json']) {
+      if (!files.has(relativePath)) continue
+      const content = await fs.readFile(path.join(pluginRoot, relativePath), 'utf-8').catch(() => undefined)
+      if (content !== undefined) text.set(relativePath, content)
+    }
+    const mcpJson = new Map<string, Record<string, unknown>>()
+    for (const relativePath of ['.mcp.json', 'mcp.json']) {
+      if (!files.has(relativePath)) continue
+      const raw = await readJsonFile<unknown>(path.join(pluginRoot, relativePath)).catch(() => null)
+      if (isRecord(raw)) mcpJson.set(relativePath, raw)
+    }
+    summaries.set(entry.name, {
+      name: entry.name,
+      files,
+      text,
+      mcpJson,
+      manifest: await firstPluginManifest(pluginRoot),
+    })
+  }
+
+  return summaries
+}
+
+async function sourceHasMcpConfig(pluginSourceDir: string) {
+  for (const relativePath of ['.mcp.json', 'mcp.json']) {
+    const raw = await readJsonFile<unknown>(path.join(pluginSourceDir, relativePath))
+    if (mcpConfigHasServers(raw)) return true
+  }
+  return false
+}
+
+function hasGeneratedSkills(summary: GeneratedPluginSummary | undefined) {
+  return Boolean(summary && [...summary.files].some((file) => file.startsWith('skills/')))
+}
+
+function mcpConfigHasServers(config: unknown) {
+  if (!isRecord(config)) return false
+  const servers = toRecord(config.mcpServers) ?? toRecord(config.servers)
+  return Boolean(servers && Object.keys(servers).length > 0)
+}
+
+function claudeMcpUsesRequiredVariables(content: string | undefined) {
+  if (!content) return false
+  return ['CLAUDE_PLUGIN_ROOT', 'CLAUDE_PLUGIN_DATA', 'CLAUDE_PROJECT_DIR']
+    .every((name) => content.includes(`\${${name}}`))
+}
+
+function manifestDeclares(value: unknown) {
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'string') return value.trim().length > 0
+  if (isRecord(value)) return Object.keys(value).length > 0
+  return Boolean(value)
+}
+
+async function firstPluginManifest(pluginRoot: string): Promise<Record<string, unknown> | undefined> {
+  for (const relativePath of [
+    '.codex-plugin/plugin.json',
+    '.claude-plugin/plugin.json',
+    '.cursor-plugin/plugin.json',
+  ]) {
+    const raw = await readJsonFile<unknown>(path.join(pluginRoot, relativePath))
+    if (isRecord(raw)) return raw
+  }
+  return undefined
+}
+
+async function walkRelativeFiles(root: string, current = root): Promise<Set<string>> {
+  const entries = await fs.readdir(current, { withFileTypes: true })
+  const files = new Set<string>()
+  for (const entry of entries) {
+    const next = path.join(current, entry.name)
+    if (entry.isDirectory()) {
+      const childFiles = await walkRelativeFiles(root, next)
+      for (const child of childFiles) files.add(child)
+      continue
+    }
+    if (entry.isFile()) {
+      files.add(path.relative(root, next).split(path.sep).join('/'))
+    }
+  }
+  return files
+}
+
+function missingWhen(condition: boolean, label: string) {
+  return condition ? [label] : []
 }
 
 async function addSmokeTestChecks(
