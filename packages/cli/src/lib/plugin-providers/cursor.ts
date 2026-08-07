@@ -29,6 +29,7 @@ import {
   providerPluginName,
   removeInstalledFiles,
 } from './shared'
+import { writeCursorProviderFiles } from './provider-pointers'
 
 function resolveCursorInstallRoot(cwd: string, scope: 'personal' | 'workspace') {
   if (scope === 'workspace') {
@@ -114,9 +115,10 @@ export const cursorProvider: PluginProviderAdapter = {
       const pluginDir = path.join(pluginRoot, pluginName)
       await copyCursorPlugin(plugin.pluginSourceDir, pluginDir)
       const features = await detectPluginFeatures(pluginDir)
+      await writeCursorProviderFiles(pluginDir, plugin, features)
       await writeJsonFile(
         path.join(pluginDir, '.cursor-plugin', 'plugin.json'),
-        buildCursorPluginManifest(plugin, cfg.owner, features, pluginName)
+        buildCursorPluginManifest(plugin, cfg.owner, { ...features, hasRules: true }, pluginName)
       )
     }
 

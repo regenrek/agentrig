@@ -14,17 +14,35 @@ AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plug
 ```json
 {
   "$schema": "https://agentrig.ai/schema/plugin.v1.json",
-  "name": "agentrig.core-committer",
-  "version": "0.1.0",
-  "description": "Adds a committer skill with a safe commit helper script.",
-  "author": { "name": "AgentRig" },
+  "name": "instructa.core",
+  "version": "1.0.0",
+  "description": "Lean reusable anti-drift engineering skills for agentic coding.",
   "license": "MIT",
-  "keywords": ["git", "workflow"],
   "x-agentrig": {
-    "displayName": "Committer Skill",
-    "kind": "plugin",
-    "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
-    "pluginDependencies": []
+    "profile": "core",
+    "publicSkills": [
+      "project-spec-packager",
+      "plan-ledger",
+      "architecture-ownership",
+      "duplicate-ownership-audit",
+      "hard-cut",
+      "root-cause-finder",
+      "search-context",
+      "test-ownership",
+      "security-boundary-review",
+      "code-review-gate",
+      "ship-gate"
+    ],
+    "supportSkills": ["gitwhat", "git-safe-workflow", "stage-review", "no-mistakes", "package-security-check", "secleak-check", "shellck", "local-health"],
+    "optionalCapabilities": ["plan.ledger", "docs.latest", "repo.remote", "ci.status", "repo.security", "secrets.scan", "supplychain.scan", "shell.lint"],
+    "aliases": {
+      "app-spec-packager": "project-spec-packager",
+      "find-duplicate-ownership": "duplicate-ownership-audit",
+      "consolidate-test-suites": "test-ownership",
+      "stage-review": "ship-gate",
+      "no-mistakes": "ship-gate"
+    },
+    "providerTargets": ["codex", "claude-code", "cursor"]
   }
 }
 ```
@@ -43,8 +61,120 @@ AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plug
 | `commands`, `agents`, `skills`, `rules`, `hooks`, `mcpServers`, `lspServers`, `outputStyles` | No | Standard Open Plugins metadata-only fields in this release. |
 | `x-agentrig.displayName` | No | AgentRig display label. |
 | `x-agentrig.kind` | No | AgentRig artifact kind, usually `plugin`. |
+| `x-agentrig.profile` | No | AgentRig plugin profile: `kit-entry`, `base`, `core`, `project`, `third-party`, or `other`. Omit it when no profile applies. |
+| `x-agentrig.owner` | No | AgentRig ownership classification, for example `external` for curated third-party providers. |
+| `x-agentrig.supportLevel` | No | AgentRig support classification, for example `curated`. |
 | `x-agentrig.configSchema` | No | AgentRig-specific plugin configuration schema. |
 | `x-agentrig.pluginDependencies` | No | AgentRig plugin dependencies installed before this plugin. |
+| `x-agentrig.publicSkills` | No | Public workflow skills exposed by a core or project plugin. |
+| `x-agentrig.supportSkills` | No | Helper skills shipped by a plugin but not marketed as public workflow surfaces. |
+| `x-agentrig.optionalCapabilities` | No | Array of canonical capability ids this plugin can use when available. |
+| `x-agentrig.requiredCapabilities` | No | Map of canonical capability id to requirement metadata. Used by base and project plugins. |
+| `x-agentrig.aliases` | No | Map from old local skill names to canonical skill names. |
+| `x-agentrig.providerTargets` | No | Export targets: `codex`, `claude-code`, or `cursor`. |
+| `x-agentrig.providesCapabilities` | No | Map of canonical capability id to provider metadata. Used by third-party provider plugins. |
+| `x-agentrig.verification` | No | Provider verification metadata: `lastVerified`, `cadence`, and `smokeTest`. |
+| `x-agentrig.security` | No | Provider safety metadata such as consent and required env vars. |
+| `x-agentrig.replacementPolicy` | No | Replacement metadata for course-stable provider swaps across one or more capabilities. |
+| `x-agentrig.risk` | No | Top-level provider risk metadata with a `level` of `low`, `medium`, `high`, or `critical`. |
+
+## Capability metadata
+
+Capabilities are metadata, not installable artifacts. They stay under
+`x-agentrig` so the manifest remains Open Plugins 1.0.0 compatible.
+
+Project plugins declare what they need:
+
+```json
+{
+  "x-agentrig": {
+    "kind": "plugin",
+    "profile": "project",
+    "pluginDependencies": [
+      "agentrig/instructa.base@^1.0.0",
+      "agentrig/instructa.core@^1.0.0",
+      "agentrig/third-party.context7@^1.0.0"
+    ],
+    "requiredCapabilities": {
+      "plan.ledger": {
+        "required": true,
+        "provider": "third-party.plandb",
+        "fallback": "docs/plan-ledger/events.jsonl"
+      },
+      "docs.latest": {
+        "required": true,
+        "provider": "third-party.context7"
+      },
+      "browser.verify": {
+        "required": true,
+        "provider": "third-party.playwright-mcp"
+      }
+    },
+    "optionalCapabilities": ["repo.remote"],
+    "providerTargets": ["codex", "claude-code", "cursor"]
+  }
+}
+```
+
+Third-party provider plugins declare what they provide:
+
+```json
+{
+  "x-agentrig": {
+    "kind": "plugin",
+    "profile": "third-party",
+    "owner": "external",
+    "supportLevel": "curated",
+    "providesCapabilities": {
+      "plan.ledger": {
+        "type": "ledger",
+        "requiredByCore": false,
+        "riskLevel": "medium",
+        "fallback": "docs/plan-ledger/events.jsonl"
+      }
+    },
+    "providerTargets": ["codex", "claude-code", "cursor"],
+    "verification": {
+      "lastVerified": "2026-06-04",
+      "cadence": "30d",
+      "smokeTest": "verify/plandb-smoke.md"
+    },
+    "security": {
+      "requiresConsent": true,
+      "showsExactCommands": true,
+      "requiresEnvVars": [],
+      "notes": "Provider manifest only. Does not own PlanDB upstream code."
+    },
+    "replacementPolicy": {
+      "capabilities": ["plan.ledger"],
+      "replaceWithoutCourseChange": true
+    },
+    "risk": {
+      "level": "medium"
+    }
+  }
+}
+```
+
+Capability ids follow the AgentRig package schema pattern
+`^[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)*$`. Known AgentRig 1.0 ids include:
+
+```txt
+plan.ledger
+docs.latest
+browser.verify
+repo.remote
+ci.status
+repo.security
+deploy.preview
+observability.logs
+mcp.verify
+secrets.scan
+supplychain.scan
+shell.lint
+desktop.runtime
+native.debug
+```
 
 <Callout title="Schemas">
 The CLI generates `$schema` using `https://agentrig.ai/schema/plugin.v1.json`.

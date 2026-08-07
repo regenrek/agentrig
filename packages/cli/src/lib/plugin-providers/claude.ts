@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { ensureDir, pathExists, removeIfExists, writeJsonFile } from '../fs'
+import { ensureDir, pathExists, readJsonFile, removeIfExists, writeJsonFile } from '../fs'
 import { getClaudeMarketplaceCacheRoot } from '../paths'
 import { getPluginInstallRecordId } from '../plugin-install-ledger'
 import type { ClaudePluginInstallRecord } from '../types'
@@ -26,6 +26,7 @@ import {
   pluginAuthor,
   providerPluginName,
 } from './shared'
+import { writeClaudeProviderPointer } from './provider-pointers'
 
 /**
  * Stage the rendered Claude marketplace into a persistent directory under
@@ -94,6 +95,79 @@ async function copyClaudePlugin(pluginSourceDir: string, pluginDir: string) {
   ])
 }
 
+const CLAUDE_PLUGIN_ROOT_REF = '${CLAUDE_PLUGIN_ROOT}'
+const CLAUDE_PLUGIN_DATA_REF = '${CLAUDE_PLUGIN_DATA}'
+const CLAUDE_PROJECT_DIR_REF = '${CLAUDE_PROJECT_DIR}'
+
+async function normalizeClaudeMcpConfig(pluginDir: string) {
+  const configPath = path.join(pluginDir, '.mcp.json')
+  const raw = await readJsonFile<unknown>(configPath)
+  if (!isRecord(raw)) return
+
+  const normalized = normalizeClaudeMcpDocument(raw)
+  await writeJsonFile(configPath, normalized)
+}
+
+function normalizeClaudeMcpDocument(config: Record<string, unknown>) {
+  const serverKey = isRecord(config.mcpServers)
+    ? 'mcpServers'
+    : isRecord(config.servers)
+      ? 'servers'
+      : null
+  if (!serverKey) return config
+
+  const servers = config[serverKey] as Record<string, unknown>
+  return {
+    ...config,
+    [serverKey]: Object.fromEntries(
+      Object.entries(servers).map(([name, server]) => [name, normalizeClaudeMcpServer(server)])
+    ),
+  }
+}
+
+function normalizeClaudeMcpServer(server: unknown) {
+  if (!isRecord(server)) return server
+  const env = isRecord(server.env) ? server.env : {}
+  return {
+    ...server,
+    ...(typeof server.command === 'string' ? { command: normalizeClaudeCommand(server.command) } : {}),
+    ...(Array.isArray(server.args) ? { args: server.args.map(normalizeClaudeArg) } : {}),
+    cwd: typeof server.cwd === 'string' ? normalizeClaudePath(server.cwd) : CLAUDE_PLUGIN_ROOT_REF,
+    env: {
+      ...env,
+      CLAUDE_PLUGIN_ROOT: CLAUDE_PLUGIN_ROOT_REF,
+      CLAUDE_PLUGIN_DATA: CLAUDE_PLUGIN_DATA_REF,
+      CLAUDE_PROJECT_DIR: CLAUDE_PROJECT_DIR_REF,
+    },
+  }
+}
+
+function normalizeClaudeCommand(value: string) {
+  return looksLikeRelativePath(value) ? normalizeClaudePath(value) : value
+}
+
+function normalizeClaudeArg(value: unknown) {
+  return typeof value === 'string' && looksLikeRelativePath(value) ? normalizeClaudePath(value) : value
+}
+
+function normalizeClaudePath(value: string) {
+  if (value.includes('${CLAUDE_')) return value
+  const normalized = value.replace(/^\.\//, '')
+  return `${CLAUDE_PLUGIN_ROOT_REF}/${normalized}`
+}
+
+function looksLikeRelativePath(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.startsWith('-') || path.isAbsolute(trimmed)) return false
+  return trimmed.startsWith('./')
+    || trimmed.startsWith('../')
+    || /^[\w.-]+\.(?:c?m?js|ts|tsx|py|sh)$/.test(trimmed)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
 function buildClaudePluginManifest(
   plugin: PluginEntry,
   owner: PluginOwner,
@@ -145,11 +219,13 @@ export const claudeProvider: PluginProviderAdapter = {
       const pluginName = providerPluginName(plugin, 'claude', cfg.pluginPrefix)
       const pluginDir = path.join(pluginRoot, pluginName)
       await copyClaudePlugin(plugin.pluginSourceDir, pluginDir)
+      await normalizeClaudeMcpConfig(pluginDir)
       const features = await detectPluginFeatures(pluginDir)
       await writeJsonFile(
         path.join(pluginDir, '.claude-plugin', 'plugin.json'),
         buildClaudePluginManifest(plugin, cfg.owner, features, pluginName)
       )
+      await writeClaudeProviderPointer(pluginDir, plugin, features)
     }
 
     await writeJsonFile(

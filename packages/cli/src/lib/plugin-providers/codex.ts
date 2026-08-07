@@ -31,6 +31,7 @@ import {
   pluginDisplayName,
   providerPluginName,
 } from './shared'
+import { writeCodexProviderPointer } from './provider-pointers'
 
 async function copyCodexPlugin(pluginSourceDir: string, pluginDir: string) {
   await copyEntries(pluginSourceDir, pluginDir, [
@@ -190,6 +191,7 @@ export const codexProvider: PluginProviderAdapter = {
         path.join(pluginDir, '.codex-plugin', 'plugin.json'),
         buildCodexPluginManifest(plugin, cfg.owner, features, pluginName)
       )
+      await writeCodexProviderPointer(pluginDir, plugin, features)
     }
 
     await writeJsonFile(marketplacePath, buildCodexMarketplaceManifest(cfg, plugins))
