@@ -1,20 +1,23 @@
 import type {
+  AgentRigPluginExtension,
   CapabilityId,
   PluginManifest,
   PluginProfile,
+  ProviderTarget,
+} from '../agent-plugins'
+import type {
   RegistryInstallability,
   TrustTier,
 } from '../marketplace-listing'
-import { PROVIDER_TARGETS } from '../marketplace-listing'
+import { PROVIDER_TARGETS } from '../agent-plugins'
 import type { ProviderCompatState } from '../repo-scan/types'
 
 export const CAPABILITY_RESOLUTION_TARGETS = PROVIDER_TARGETS
 
-export type CapabilityTarget = (typeof CAPABILITY_RESOLUTION_TARGETS)[number]
+export type CapabilityTarget = ProviderTarget
 export type CapabilityProviderCompatibilityState = ProviderCompatState | 'unknown'
 export type CapabilityProviderCompatibility = Record<CapabilityTarget, CapabilityProviderCompatibilityState>
 
-export type AgentRigPluginExtension = NonNullable<PluginManifest['x-agentrig']>
 export type AgentRigProvidedCapability = NonNullable<AgentRigPluginExtension['providesCapabilities']>[string]
 export type AgentRigRequiredCapability = NonNullable<AgentRigPluginExtension['requiredCapabilities']>[string]
 export type AgentRigVerification = NonNullable<AgentRigPluginExtension['verification']>

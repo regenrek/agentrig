@@ -31,18 +31,16 @@ describe('command:plugin create', () => {
       },
     })
 
-    const manifestPath = path.join(pluginDir, '.plugin', 'plugin.json')
+    const manifestPath = path.join(pluginDir, 'plugin.json')
     const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf-8')) as {
       name: string
       description: string
-      'x-agentrig': {
-        displayName: string
-      }
+      extensions: { 'ai.agentrig': { displayName: string } }
     }
 
     expect(manifest.name).toBe('demo-plugin')
     expect(manifest.description).toBeTruthy()
     expect(manifest.description).toContain('AgentRig')
-    expect(manifest['x-agentrig'].displayName).toBe('Demo Plugin')
+    expect(manifest.extensions['ai.agentrig'].displayName).toBe('Demo Plugin')
   })
 })

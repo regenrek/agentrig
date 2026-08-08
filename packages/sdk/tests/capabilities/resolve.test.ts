@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+  agentRigPluginExtension,
   capabilityResolutionToJson,
   parseCapabilityPluginRef,
   resolveCapabilityGraph,
   type CapabilityPluginLoader,
   type CapabilityPluginRecord,
+  type AgentRigPluginExtension,
 } from '../../src'
 
 const NOW = '2026-06-04T00:00:00.000Z'
@@ -317,14 +320,14 @@ function memoryLoader(records: readonly CapabilityPluginRecord[]): CapabilityPlu
       return byName.get(parseCapabilityPluginRef(ref).name) ?? null
     },
     async findCapabilityProviders(capability) {
-      return records.filter((record) => Boolean(record.manifest['x-agentrig']?.providesCapabilities?.[capability]))
+      return records.filter((record) => Boolean(agentRigPluginExtension(record.manifest)?.providesCapabilities?.[capability]))
     },
   }
 }
 
 function basePlugin(
   name: string,
-  extension: Partial<NonNullable<CapabilityPluginRecord['manifest']['x-agentrig']>> = {}
+  extension: Partial<AgentRigPluginExtension> = {}
 ): CapabilityPluginRecord {
   return pluginRecord(name, {
     profile: 'base',
@@ -335,7 +338,7 @@ function basePlugin(
 
 function projectPlugin(
   name: string,
-  extension: NonNullable<CapabilityPluginRecord['manifest']['x-agentrig']>
+  extension: AgentRigPluginExtension
 ): CapabilityPluginRecord {
   return pluginRecord(name, {
     profile: 'project',
@@ -352,7 +355,7 @@ function providerPlugin(
     installability?: CapabilityPluginRecord['installability']
     lastVerified?: string
     cadence?: string
-    providerTargets?: NonNullable<CapabilityPluginRecord['manifest']['x-agentrig']>['providerTargets']
+    providerTargets?: AgentRigPluginExtension['providerTargets']
     installConstraints?: CapabilityPluginRecord['installConstraints']
   } = {}
 ): CapabilityPluginRecord {
@@ -379,7 +382,7 @@ function providerPlugin(
 
 function pluginRecord(
   name: string,
-  extension: NonNullable<CapabilityPluginRecord['manifest']['x-agentrig']>,
+  extension: AgentRigPluginExtension,
   options: {
     trustTier?: CapabilityPluginRecord['trustTier']
     installability?: CapabilityPluginRecord['installability']
@@ -389,12 +392,15 @@ function pluginRecord(
   return {
     ref: name,
     manifest: {
+      $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
       name,
       version: '1.0.0',
       description: `${name} fixture`,
-      'x-agentrig': {
-        kind: 'plugin',
-        ...extension,
+      extensions: {
+        'ai.agentrig': {
+          kind: 'plugin',
+          ...extension,
+        },
       },
     },
     trustTier: options.trustTier ?? 'reviewed',

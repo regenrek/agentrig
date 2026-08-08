@@ -10,7 +10,7 @@ icon: PackagePlus
 distribution unit: a plugin can bundle skills, MCPs, hooks, commands, assets,
 and provider metadata.
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 If you are consuming plugins from registries, use the top-level commands instead:
 
@@ -100,7 +100,7 @@ agentrig use jxnl/dots --install --provider codex --pick prompts/review
 `inspect` and `use` scan third-party repos deterministically. The scan digest is
 computed from detector output only; AI output never changes it.
 
-`use --as-plugin <name>` writes a local plugin directory with `x-agentrig.source`
+`use --as-plugin <name>` writes a local plugin directory with `extensions["ai.agentrig"].source`
 provenance. `use --install` stages the same external-repo plugin shape and installs
 it through the provider installer. Both paths record external-repo provenance, not
 registry trust.
@@ -146,20 +146,20 @@ agentrig plugin init acme.my-plugin
 ```
 
 `init` requires the canonical plugin id format `namespace.plugin`.
-The scaffold writes that value to `.plugin/plugin.json` as the Open Plugins
-`name`; the display label is stored at `x-agentrig.displayName`.
+The scaffold writes that value to `plugin.json` as the Agent Plugins
+`name`; the display label is stored at `extensions["ai.agentrig"].displayName`.
 
 Options: `--template`, `--dir`, `--title`, `--description`, `--author`, `--force`.
 
 ## create
 
-The scaffold already writes `.plugin/plugin.json`. Use `plugin create` when you need to generate a manifest for an existing plugin directory:
+The scaffold already writes `plugin.json`. Use `plugin create` when you need to generate a manifest for an existing plugin directory:
 
 ```bash
-agentrig plugin create ./acme.my-plugin --out ./acme.my-plugin/.plugin/plugin.json
+agentrig plugin create ./acme.my-plugin --out ./acme.my-plugin/plugin.json
 ```
 
-Scans an existing plugin directory and writes `.plugin/plugin.json`.
+Scans an existing plugin directory and writes `plugin.json`.
 
 ## export
 

@@ -32,15 +32,15 @@ describe('materializePlugin golden fixture', () => {
     })
 
     expect(files.map((file) => file.path)).toEqual([
-      '.mcp.json',
-      '.plugin/plugin.json',
-      'commands/debug.md',
-      'commands/review.md',
+      'ai.agentrig/commands/debug.md',
+      'ai.agentrig/commands/review.md',
+      'mcp.json',
+      'plugin.json',
       'skills/review/SKILL.md',
     ])
 
-    const manifest = JSON.parse(decode(files.find((file) => file.path === '.plugin/plugin.json')?.bytes))
-    expect(manifest['x-agentrig'].source).toMatchObject({
+    const manifest = JSON.parse(decode(files.find((file) => file.path === 'plugin.json')?.bytes))
+    expect(manifest.extensions['ai.agentrig'].source).toMatchObject({
       kind: 'external-repo',
       repoUrl: 'https://github.com/jxnl/dots',
       owner: 'jxnl',

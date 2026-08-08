@@ -50,7 +50,7 @@ export function buildAgentrigUseCommand(input: BuildAgentrigUseCommandInput): st
 
   const mode: AgentrigUseMode = input.mode ?? { kind: 'install' }
   if (mode.kind === 'as-plugin' && !isValidPluginName(mode.pluginId)) {
-    throw new Error(`Invalid Open Plugins name: ${mode.pluginId}`)
+    throw new Error(`Invalid Agent Plugins name: ${mode.pluginId}`)
   }
 
   const refValue = input.commitSha?.trim() || input.ref?.trim() || ''

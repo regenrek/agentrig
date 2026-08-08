@@ -1,4 +1,4 @@
-import type { PluginManifest } from '../marketplace-listing'
+import type { PluginManifest } from '../agent-plugins'
 
 export const SIGNAL_KINDS = [
   'skill',

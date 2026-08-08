@@ -1,4 +1,4 @@
-import type { PluginManifest } from '../marketplace-listing'
+import { agentRigPluginExtension, type PluginManifest } from '../agent-plugins'
 
 export type CapabilityProviderVerificationStatus =
   | {
@@ -18,12 +18,12 @@ export type CapabilityProviderVerificationStatus =
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export function evaluateCapabilityProviderVerification(
-  manifest: Pick<PluginManifest, 'x-agentrig'>,
+  manifest: Pick<PluginManifest, 'extensions'>,
   now: Date
 ): CapabilityProviderVerificationStatus {
-  const verification = manifest['x-agentrig']?.verification
+  const verification = agentRigPluginExtension(manifest)?.verification
   if (!verification) {
-    return { stale: true, reason: 'Provider is missing x-agentrig.verification metadata.' }
+    return { stale: true, reason: 'Provider is missing extensions["ai.agentrig"].verification metadata.' }
   }
 
   const lastVerified = parseUtcDateOnly(verification.lastVerified)

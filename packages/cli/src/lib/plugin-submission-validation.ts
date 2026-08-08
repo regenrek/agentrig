@@ -96,9 +96,9 @@ export async function validatePluginBundle(
     const entries = allEntries.filter((entry): entry is FileEntry => !entry.directory)
     const entryIndex = buildEntryIndex(entries)
 
-    const manifestEntry = entryIndex.get('.plugin/plugin.json')
+    const manifestEntry = entryIndex.get('plugin.json')
     if (!manifestEntry) {
-      errors.push('.plugin/plugin.json is required in the archive')
+      errors.push('plugin.json is required in the archive')
     }
 
     const readmeEntry = entryIndex.get('README.md')
@@ -117,15 +117,15 @@ export async function validatePluginBundle(
         manifest = validatePluginManifest(JSON.parse(raw), policy)
       } catch (error) {
         errors.push(
-          error instanceof Error ? error.message : 'Failed to parse .plugin/plugin.json'
+          error instanceof Error ? error.message : 'Failed to parse plugin.json'
         )
       }
     }
 
     for (const entry of entries) {
-      if (entry.filename === '.plugin/plugin.json') continue
-      if (entry.filename === '.plugin/install.json') {
-        errors.push('Bundles must not include .plugin/install.json — it is a derived delivery artifact')
+      if (entry.filename === 'plugin.json') continue
+      if (entry.filename === 'ai.agentrig/install.json') {
+        errors.push('Bundles must not include ai.agentrig/install.json — it is a derived delivery artifact')
         continue
       }
       if (entry.filename === 'README.md') continue

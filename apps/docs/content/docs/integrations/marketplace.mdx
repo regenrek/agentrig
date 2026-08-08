@@ -8,7 +8,7 @@ icon: Store
 
 Use `agentrig plugin export` when you are authoring local plugins and want provider-native marketplace output.
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 Consumers do not need this command for normal installs.
 They should use:
@@ -72,7 +72,7 @@ Create `agentrig.plugins.json` to customize output:
     "cursor": {
       "marketplaceName": "agentrig-marketplace"
     }
-  },
+  }
 }
 ```
 

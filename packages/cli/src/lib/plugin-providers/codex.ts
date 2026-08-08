@@ -37,10 +37,10 @@ async function copyCodexPlugin(pluginSourceDir: string, pluginDir: string) {
   await copyEntries(pluginSourceDir, pluginDir, [
     'skills',
     'assets',
+    'scripts',
     'README.md',
-    '.mcp.json',
     { source: 'mcp.json', destination: '.mcp.json' },
-    '.app.json',
+    { source: 'ai.agentrig/app.json', destination: '.app.json' },
   ])
 }
 

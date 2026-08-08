@@ -4,52 +4,20 @@ import {
   CLI_SUPPORTED_ARTIFACT_KINDS,
   type ArtifactKind,
 } from './provider/artifact-kinds'
-import { isValidPluginName } from './provider/plugin-names'
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/
-const SHA256_DIGEST_RE = /^sha256:[a-f0-9]{64}$/
-const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
-const CAPABILITY_ID_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)*$/
 
 export const SUBMISSION_STATUSES = ['pending_review', 'approved', 'rejected', 'blocked'] as const
 export const REGISTRY_MIRROR_STATUSES = ['queued', 'opened', 'merged', 'failed'] as const
 export const MARKETPLACE_INSTALLABILITIES = ['available', 'yanked', 'taken_down'] as const
 export const REGISTRY_TRUST_TIERS = ['official', 'reviewed', 'listed', 'blocked', 'yanked'] as const
 export const INSTALLABILITY_STATES = ['installable', 'discovery_only', 'blocked', 'yanked'] as const
-export const PLUGIN_PROFILES = ['kit-entry', 'base', 'core', 'project', 'third-party', 'other'] as const
-export const PROVIDER_TARGETS = ['codex', 'claude-code', 'cursor'] as const
-export const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const
-// Known AgentRig 1.0 capability IDs from the Instructa ADR package. Validation
-// intentionally stays open and follows agentrig-capability.schema.json.
-export const CAPABILITY_IDS = [
-  'plan.ledger',
-  'docs.latest',
-  'browser.verify',
-  'repo.remote',
-  'ci.status',
-  'repo.security',
-  'deploy.preview',
-  'observability.logs',
-  'mcp.verify',
-  'secrets.scan',
-  'supplychain.scan',
-  'shell.lint',
-  'desktop.runtime',
-  'native.debug',
-] as const
 
 export const SubmissionStatusSchema = z.enum(SUBMISSION_STATUSES)
 export const RegistryMirrorStatusSchema = z.enum(REGISTRY_MIRROR_STATUSES)
 export const MarketplaceInstallabilitySchema = z.enum(MARKETPLACE_INSTALLABILITIES)
 export const RegistryTrustTierSchema = z.enum(REGISTRY_TRUST_TIERS)
 export const InstallabilityStateSchema = z.enum(INSTALLABILITY_STATES)
-export const PluginProfileSchema = z.enum(PLUGIN_PROFILES)
-export const ProviderTargetSchema = z.enum(PROVIDER_TARGETS)
-export const RiskLevelSchema = z.enum(RISK_LEVELS)
-export const CapabilityIdSchema = z.string().regex(
-  CAPABILITY_ID_RE,
-  'Capability id must match the AgentRig capability id pattern',
-)
 export const ArtifactKindSchema = z.enum(ARTIFACT_KINDS)
 export const CliSupportedKindSchema = z.enum(CLI_SUPPORTED_ARTIFACT_KINDS)
 
@@ -61,12 +29,6 @@ export type CanonicalTrustTier = RegistryTrustTier
 export type TrustTier = RegistryTrustTier
 export type InstallabilityState = z.infer<typeof InstallabilityStateSchema>
 export type RegistryInstallability = InstallabilityState
-export type PluginProfile = z.infer<typeof PluginProfileSchema>
-export type ProviderTarget = z.infer<typeof ProviderTargetSchema>
-export type RiskLevel = z.infer<typeof RiskLevelSchema>
-export type CapabilityId = z.infer<typeof CapabilityIdSchema>
-
-const YYYY_MM_DD_RE = /^\d{4}-\d{2}-\d{2}$/
 
 const MarketplaceListingPublicBaseSchema = z.object({
   kind: CliSupportedKindSchema,
@@ -157,7 +119,7 @@ export const InstallBundleFileSchema = z.object({
   // the consumer must prefer this over the `source`-derived URL.
   url: z.string().trim().min(1).optional(),
   // Base64-encoded inline payload for synthesized files (e.g. server-built
-  // `.plugin/plugin.json`) that have no upstream source bytes. When present,
+  // `plugin.json`) that have no upstream source bytes. When present,
   // the consumer must use these bytes directly and skip any network fetch.
   inline: z.string().trim().min(1).optional(),
 })
@@ -364,155 +326,6 @@ export type DirectoryEntry = {
   keywords?: string[]
 }
 
-const OpenPluginAuthorSchema = z.object({
-  name: z.string().trim().min(1).optional(),
-  email: z.string().trim().min(1).optional(),
-  url: z.string().trim().min(1).optional(),
-})
-
-const AgentRigPluginListingSchema = z.object({
-  category: z.string().trim().min(1),
-})
-
-const CapabilityIdKeySchema = CapabilityIdSchema
-
-const AgentRigProvidedCapabilitySchema = z
-  .object({
-    type: z.enum(['tool', 'workflow', 'ledger', 'scanner', 'runtime']),
-    requiredByCore: z.boolean(),
-    riskLevel: RiskLevelSchema.optional(),
-    fallback: z.string().trim().min(1).optional(),
-  })
-  .strict()
-
-const AgentRigRequiredCapabilitySchema = z
-  .object({
-    required: z.boolean(),
-    provider: z.string().trim().min(1).optional(),
-    fallback: z.string().trim().min(1).optional(),
-  })
-  .strict()
-
-const AgentRigVerificationSchema = z
-  .object({
-    lastVerified: z.string().regex(YYYY_MM_DD_RE, 'lastVerified must use YYYY-MM-DD format'),
-    cadence: z.string().trim().min(1),
-    smokeTest: z.string().trim().min(1),
-    commandFingerprint: z.string().regex(SHA256_DIGEST_RE, 'commandFingerprint must be a sha256:<hex> digest').optional(),
-  })
-  .strict()
-
-const AgentRigReplacementPolicySchema = z
-  .object({
-    capabilities: z.array(CapabilityIdKeySchema).min(1),
-    replaceWithoutCourseChange: z.boolean(),
-  })
-  .strict()
-
-const AgentRigSecuritySchema = z
-  .object({
-    requiresConsent: z.boolean(),
-    showsExactCommands: z.boolean(),
-    requiresEnvVars: z.array(z.string().trim()),
-    notes: z.string().trim().min(1).optional(),
-  })
-  .strict()
-
-const AgentRigRiskSchema = z
-  .object({
-    level: RiskLevelSchema,
-    notes: z.string().trim().min(1).optional(),
-  })
-  .strict()
-
-const AgentRigPluginExtensionSchema = z
-  .object({
-    displayName: z.string().optional(),
-    kind: z.string().trim().min(1).optional(),
-    profile: PluginProfileSchema.optional(),
-    owner: z.string().trim().min(1).optional(),
-    supportLevel: z.string().trim().min(1).optional(),
-    listing: AgentRigPluginListingSchema.optional(),
-    configSchema: z.record(z.string(), z.any()).optional(),
-    pluginDependencies: z.array(z.string().trim().min(1)).optional(),
-    publicSkills: z.array(z.string().trim().min(1)).optional(),
-    supportSkills: z.array(z.string().trim().min(1)).optional(),
-    optionalCapabilities: z.array(CapabilityIdKeySchema).optional(),
-    requiredCapabilities: z.record(CapabilityIdKeySchema, AgentRigRequiredCapabilitySchema).optional(),
-    aliases: z.record(z.string().trim().min(1), z.string().trim().min(1)).optional(),
-    providerTargets: z.array(ProviderTargetSchema).optional(),
-    providesCapabilities: z.record(CapabilityIdKeySchema, AgentRigProvidedCapabilitySchema).optional(),
-    verification: AgentRigVerificationSchema.optional(),
-    security: AgentRigSecuritySchema.optional(),
-    replacementPolicy: AgentRigReplacementPolicySchema.optional(),
-    risk: AgentRigRiskSchema.optional(),
-    source: z.any().optional(),
-  })
-  .catchall(z.any())
-
-export const PluginManifestSchema = z.object({
-  $schema: z.string().trim().min(1).optional(),
-  name: z.string().trim().refine(
-    isValidPluginName,
-    'Open Plugins name must be 1-64 lowercase letters, numbers, dots, or hyphens; start and end alphanumeric; and not contain "--" or ".."',
-  ),
-  description: z.string().optional(),
-  version: z.string().trim().regex(SEMVER_RE, 'Plugin version must be valid semver (x.y.z)').optional(),
-  author: OpenPluginAuthorSchema.optional(),
-  license: z.string().optional(),
-  homepage: z.string().optional(),
-  repository: z.string().optional(),
-  logo: z.string().optional(),
-  commands: z.any().optional(),
-  agents: z.any().optional(),
-  skills: z.any().optional(),
-  rules: z.any().optional(),
-  hooks: z.any().optional(),
-  mcpServers: z.any().optional(),
-  lspServers: z.any().optional(),
-  outputStyles: z.any().optional(),
-  keywords: z.array(z.string()).optional(),
-  'x-agentrig': AgentRigPluginExtensionSchema.optional(),
-})
-
-export type PluginManifest = z.infer<typeof PluginManifestSchema>
-
-export type PluginSkillResolution = {
-  plugin: string
-  requestedName: string
-  canonicalName: string
-  matched: 'canonical' | 'alias'
-}
-
-export function resolvePluginSkillName(
-  manifest: Pick<PluginManifest, 'name' | 'skills' | 'x-agentrig'>,
-  requestedName: string
-): PluginSkillResolution | null {
-  const requested = requestedName.trim()
-  if (!requested) return null
-
-  const declaredNames = declaredPluginSkillNames(manifest)
-  if (declaredNames.has(requested)) {
-    return {
-      plugin: manifest.name,
-      requestedName: requested,
-      canonicalName: requested,
-      matched: 'canonical',
-    }
-  }
-
-  const aliasTarget = manifest['x-agentrig']?.aliases?.[requested]?.trim()
-  if (!aliasTarget) return null
-  if (declaredNames.size > 0 && !declaredNames.has(aliasTarget)) return null
-
-  return {
-    plugin: manifest.name,
-    requestedName: requested,
-    canonicalName: aliasTarget,
-    matched: 'alias',
-  }
-}
-
 export type AgentRigInstallCommandEntry = {
   server: string
   command: string
@@ -559,39 +372,6 @@ export async function agentRigInstallCommandFingerprint(sources: readonly unknow
     kind: 'agentrig.provider-install-commands.v1',
     commands,
   })
-}
-
-export function pluginManifestListingCategory(manifest: Pick<PluginManifest, 'name' | 'x-agentrig'>) {
-  const category = manifest['x-agentrig']?.listing?.category?.trim()
-  if (!category) {
-    throw new Error(`Plugin ${manifest.name} is missing x-agentrig.listing.category.`)
-  }
-  return category
-}
-
-function declaredPluginSkillNames(manifest: Pick<PluginManifest, 'skills' | 'x-agentrig'>) {
-  const names = new Set<string>()
-  for (const name of [
-    ...(manifest['x-agentrig']?.publicSkills ?? []),
-    ...(manifest['x-agentrig']?.supportSkills ?? []),
-    ...skillNamesFromManifestField(manifest.skills),
-  ]) {
-    const trimmed = name.trim()
-    if (trimmed) names.add(trimmed)
-  }
-  return names
-}
-
-function skillNamesFromManifestField(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((entry) => {
-      if (typeof entry === 'string') return [entry]
-      if (isRecord(entry) && typeof entry.name === 'string') return [entry.name]
-      return []
-    })
-  }
-  if (isRecord(value)) return Object.keys(value)
-  return []
 }
 
 function stringValues(value: unknown) {
@@ -873,9 +653,12 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
   const kind = listing.kind
   const category = kind === 'plugin' ? requiredPluginListingCategory(listing) : undefined
   const layout = registryLayoutForKind(kind)
+  if (kind === 'plugin' && !bundle.file_list.some((file) => file.path === 'plugin.json')) {
+    throw new Error(`Cannot mirror plugin ${artifactId}: install bundle is missing root plugin.json`)
+  }
   const version = listing.registryVersion ?? listing.version
   const versionRoot = `${layout.root}/${namespace}/${artifactName}/versions/${version}`
-  const manifestPath = `${versionRoot}/${layout.manifestDir}/${layout.manifestFile}`
+  const manifestPath = [versionRoot, layout.manifestDir, layout.manifestFile].filter(Boolean).join('/')
   const historyPath = `${layout.root}/${namespace}/${artifactName}/${layout.historyFile}`
   const reviewedAtIso = new Date(args.reviewedAt).toISOString()
   const source = bundle.source
@@ -1196,7 +979,7 @@ function bytesFromFetchedFile(value: FetchedInstallFileBytes) {
 
 function registryLayoutForKind(kind: ArtifactKind) {
   if (kind === 'plugin') {
-    return { root: 'plugins', historyFile: 'plugin.json', manifestDir: '.plugin', manifestFile: 'plugin.json' }
+    return { root: 'plugins', historyFile: 'plugin.json', manifestDir: '', manifestFile: 'plugin.json' }
   }
   if (kind === 'skill') {
     return { root: 'skills', historyFile: 'skill.json', manifestDir: '.skill', manifestFile: 'skill.json' }

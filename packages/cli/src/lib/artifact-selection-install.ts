@@ -124,6 +124,12 @@ export type ArtifactSelectionUninstallResult = {
   clearedRecordIds: string[]
 }
 
+export type SelectionRecordsUninstallInput = {
+  cwd: string
+  records: SelectionInstallRecord[]
+  dryRun?: boolean
+}
+
 export async function installArtifactSelection(input: ArtifactSelectionInstallInput): Promise<ArtifactSelectionInstallResult> {
   if (input.sourceKind !== 'registry-artifact' && input.picks.length === 0) {
     throw new Error('Selection install requires at least one --pick value.')
@@ -440,11 +446,21 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
     return { removed: [], kept: [], missing: [], clearedRecordIds: [] }
   }
 
+  return uninstallSelectionInstallRecords({
+    cwd: input.cwd,
+    records,
+    dryRun: input.dryRun,
+  })
+}
+
+export async function uninstallSelectionInstallRecords(
+  input: SelectionRecordsUninstallInput,
+): Promise<ArtifactSelectionUninstallResult> {
   const removed: string[] = []
   const kept: string[] = []
   const missing: string[] = []
   const clearedRecordIds: string[] = []
-  for (const record of records) {
+  for (const record of input.records) {
     const rootDir = resolveSelectionRoot(input.cwd, record.provider, record.scope)
     let recordKept = false
     const removedFileParents = new Set<string>()
@@ -486,7 +502,7 @@ export async function uninstallArtifactSelection(input: ArtifactSelectionUninsta
 
   if (!input.dryRun) {
     const idsByScope = new Map<PluginInstallScopeName, string[]>()
-    for (const record of records) {
+    for (const record of input.records) {
       if (!clearedRecordIds.includes(record.id)) continue
       idsByScope.set(record.scope, [...(idsByScope.get(record.scope) ?? []), record.id])
     }

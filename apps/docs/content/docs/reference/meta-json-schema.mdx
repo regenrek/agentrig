@@ -1,6 +1,6 @@
 ---
 title: Plugin schema
-description: JSON schema for plugin .plugin/plugin.json.
+description: JSON schema for plugin plugin.json.
 icon: FileBraces
 ---
 
@@ -9,20 +9,21 @@ icon: FileBraces
 The plugin schema is served at:
 
 ```
-https://agentrig.ai/schema/plugin.v1.json
+https://agent-plugins.org/schemas/1.0.0/plugin.schema.json
 ```
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 It validates:
 
-- `name` as the canonical Open Plugins machine identifier
-- optional Open Plugins metadata such as `version`, `description`, `author`, `license`, `keywords`, `homepage`, `repository`, and `logo`
-- metadata-only Open Plugins root fields including `commands`, `agents`, `skills`, `rules`, `hooks`, `mcpServers`, `lspServers`, and `outputStyles`
-- optional AgentRig-specific metadata under `x-agentrig`
+- `name` as the canonical Agent Plugins machine identifier
+- optional Agent Plugins metadata such as `version`, `description`, `author`, `license`, `keywords`, `homepage`, and `repository`
+- optional AgentRig-specific metadata under `extensions["ai.agentrig"]`
 
-Use `$schema` in your `.plugin/plugin.json` for editor hints:
+Portable components are discovered from `skills/*/SKILL.md` and root `mcp.json`; they are not declared as manifest fields.
+
+Use `$schema` in your `plugin.json` for editor hints:
 
 ```json
-{ "$schema": "https://agentrig.ai/schema/plugin.v1.json" }
+{ "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json" }
 ```

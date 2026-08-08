@@ -48,14 +48,14 @@ Public install refs are registry-only and latest-first by default:
 
 Add `@<version>` only when you need an exact reproducibility or rollback pin.
 Install ledgers record the concrete resolved version and snapshot digest either
-way. Direct `.plugin/plugin.json` paths, arbitrary URLs, ZIPs, and author repos
+way. Direct `plugin.json` paths, arbitrary URLs, ZIPs, and author repos
 are outside the public install contract.
 
 ## Author flow
 
 If you are publishing or testing local plugins, export provider-native marketplaces from plugin directories:
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 ```bash
 agentrig plugin export --agent <provider|all> --pluginsDir registry/plugins

@@ -1,8 +1,13 @@
 import path from 'node:path'
 import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
+import { uninstallSelectionInstallRecords } from '../../lib/artifact-selection-install'
 import { loadConfig } from '../../lib/config'
-import { loadPluginInstallLedgers, listPluginInstallRecords } from '../../lib/plugin-install-ledger'
+import {
+  loadPluginInstallLedgers,
+  listPluginInstallRecords,
+  listSelectionInstallRecords,
+} from '../../lib/plugin-install-ledger'
 import {
   isSamePluginInstallSpecIdentity,
   resolvePluginInstallSpecIdentity,
@@ -86,6 +91,7 @@ const command = defineCommand({
 
     const ledgers = await loadPluginInstallLedgers(cwd)
     const allRecords = listPluginInstallRecords(ledgers, scope)
+    const allSelectionRecords = listSelectionInstallRecords(ledgers, scope)
     const providerRecords = allRecords.filter(
       (record) =>
         record.provider === provider &&
@@ -96,6 +102,33 @@ const command = defineCommand({
         record.specIdentity.kind === 'external-repo' &&
         (record.pluginId === spec || record.pluginName === spec)
     )
+    const externalSelectionRecords = allSelectionRecords.filter(
+      (record) =>
+        record.provider === provider &&
+        (!scope || record.scope === scope) &&
+        record.specIdentity.kind === 'external-repo' &&
+        record.pluginId === spec
+    )
+    if (externalSelectionRecords.length > 0) {
+      printUninstallPlan(
+        provider,
+        spec,
+        externalSelectionRecords.map((record) => ({
+          scope: record.scope,
+          pluginName: record.selectedSelectors.join(', '),
+          targetPaths: record.targetPaths,
+        }))
+      )
+      const result = await uninstallSelectionInstallRecords({
+        cwd,
+        records: externalSelectionRecords,
+        dryRun: args.dryRun,
+      })
+      console.log(
+        `${provider} selection: removed ${result.removed.length}, kept ${result.kept.length}, missing ${result.missing.length}`
+      )
+      if (externalRecords.length === 0) return
+    }
     const cfg = await loadConfig(cwd)
     const specIdentity = externalRecords.length > 0
       ? undefined

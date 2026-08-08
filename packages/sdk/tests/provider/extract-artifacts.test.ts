@@ -15,7 +15,7 @@ describe('artifact extraction', () => {
       snapshot_digest: 'sha256:snapshot',
       capability_set: ['filesystem'],
       file_digests: [
-        { path: '.plugin/plugin.json', digest: 'sha256:plugin' },
+        { path: 'plugin.json', digest: 'sha256:plugin' },
         { path: 'skills/review/SKILL.md', digest: 'sha256:skill' },
         { path: 'skills/review/references/rules.md', digest: 'sha256:rules' },
         { path: '.mcp.json', digest: 'sha256:mcp' },
@@ -134,6 +134,32 @@ describe('artifact closure', () => {
     await expect(detectArtifactClosure(tree, artifact)).resolves.toMatchObject({
       status: 'requires-full-source',
       requiredPaths: ['skills/review/SKILL.md'],
+    })
+  })
+
+  it('requires full source when portable MCP config references a plugin-local executable', async () => {
+    const tree = createMemoryTree({
+      'mcp.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: {
+          local: {
+            type: 'stdio',
+            command: 'node',
+            args: ['./scripts/server.mjs'],
+            cwd: '${PLUGIN_ROOT}',
+          },
+        },
+      }),
+      'scripts/server.mjs': 'process.stdin.resume()',
+    })
+    const scan = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
+    const artifact = extractArtifactsFromRepoScan(scan).find((candidate) => candidate.selector === 'mcp:mcp')
+    expect(artifact).toBeDefined()
+
+    await expect(detectArtifactClosure(tree, artifact!)).resolves.toMatchObject({
+      selector: 'mcp:mcp',
+      status: 'requires-full-source',
+      requiredPaths: ['mcp.json'],
     })
   })
 

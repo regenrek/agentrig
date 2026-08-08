@@ -1,4 +1,5 @@
-import type { CapabilityId, PluginManifest, RegistryInstallability, TrustTier } from '../marketplace-listing'
+import { agentRigPluginExtension, type CapabilityId, type PluginManifest } from '../agent-plugins'
+import type { RegistryInstallability, TrustTier } from '../marketplace-listing'
 import { evaluateCapabilityProviderVerification } from './validate'
 import {
   CAPABILITY_RESOLUTION_TARGETS,
@@ -196,7 +197,8 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
       continue
     }
 
-    const providedCapability = provider.manifest['x-agentrig']?.providesCapabilities?.[group.capability]
+    const providerExtension = agentRigPluginExtension(provider.manifest)
+    const providedCapability = providerExtension?.providesCapabilities?.[group.capability]
     if (!providedCapability) {
       addIssue({
         severity: group.required ? 'error' : 'warning',
@@ -250,7 +252,7 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
       trustTier: provider.trustTier,
       installability: provider.installability,
       providedCapability: providedCapability as AgentRigProvidedCapability,
-      verification: provider.manifest['x-agentrig']?.verification,
+      verification: providerExtension?.verification,
       stale: verification.stale,
       staleReason: verification.stale ? verification.reason : undefined,
       compatibility,
@@ -420,7 +422,7 @@ function validateProviderTrust(args: {
 function collectRequirements(records: readonly CapabilityPluginRecord[]): CapabilityRequirement[] {
   const requirements: CapabilityRequirement[] = []
   for (const record of [...records].sort((left, right) => left.manifest.name.localeCompare(right.manifest.name))) {
-    const extension = record.manifest['x-agentrig']
+    const extension = agentRigPluginExtension(record.manifest)
     const requiredCapabilities = extension?.requiredCapabilities ?? {}
     for (const [capability, requirement] of Object.entries(requiredCapabilities) as Array<[CapabilityId, AgentRigRequiredCapability]>) {
       requirements.push({
@@ -500,7 +502,7 @@ function collectProjectProviderConflicts(requirements: readonly CapabilityRequir
 
 function bestProviderForCapability(records: readonly CapabilityPluginRecord[], capability: CapabilityId) {
   return records
-    .filter((record) => Boolean(record.manifest['x-agentrig']?.providesCapabilities?.[capability]))
+    .filter((record) => Boolean(agentRigPluginExtension(record.manifest)?.providesCapabilities?.[capability]))
     .sort(compareProviderCandidates)[0]
 }
 
@@ -510,8 +512,8 @@ function compareProviderCandidates(left: CapabilityPluginRecord, right: Capabili
     || left.manifest.name.localeCompare(right.manifest.name)
 }
 
-function pluginDependencies(manifest: Pick<PluginManifest, 'x-agentrig'>) {
-  return [...(manifest['x-agentrig']?.pluginDependencies ?? [])].sort()
+function pluginDependencies(manifest: Pick<PluginManifest, 'extensions'>) {
+  return [...(agentRigPluginExtension(manifest)?.pluginDependencies ?? [])].sort()
 }
 
 function resolvedPluginSummary(record: CapabilityPluginRecord): CapabilityResolvedPlugin {
@@ -519,7 +521,7 @@ function resolvedPluginSummary(record: CapabilityPluginRecord): CapabilityResolv
     ref: record.ref,
     plugin: record.manifest.name,
     version: record.version ?? record.manifest.version,
-    profile: record.manifest['x-agentrig']?.profile,
+    profile: agentRigPluginExtension(record.manifest)?.profile,
     trustTier: record.trustTier,
     installability: record.installability,
     registryAlias: record.registryAlias,
@@ -538,8 +540,8 @@ function compatibilityForProvider(record: CapabilityPluginRecord): CapabilityPro
   ) as CapabilityProviderCompatibility
 }
 
-function compatibilityFromExtension(manifest: Pick<PluginManifest, 'x-agentrig'>) {
-  const extension = manifest['x-agentrig'] as Record<string, unknown> | undefined
+function compatibilityFromExtension(manifest: Pick<PluginManifest, 'extensions'>) {
+  const extension = agentRigPluginExtension(manifest)
   const compatibility: Partial<Record<CapabilityTarget, CapabilityProviderCompatibilityState>> = {}
   const providerTargets = extension?.providerTargets
 
@@ -553,10 +555,7 @@ function compatibilityFromExtension(manifest: Pick<PluginManifest, 'x-agentrig'>
 }
 
 function installConstraintsForProvider(record: CapabilityPluginRecord): CapabilityProviderInstallConstraints {
-  return normalizeInstallConstraints(record.installConstraints)
-    ?? normalizeInstallConstraints((record.manifest['x-agentrig'] as Record<string, unknown> | undefined)?.installConstraints)
-    ?? normalizeInstallConstraints((record.manifest['x-agentrig'] as Record<string, unknown> | undefined)?.providerInstallConstraints)
-    ?? {}
+  return normalizeInstallConstraints(record.installConstraints) ?? {}
 }
 
 function normalizeInstallConstraints(input: unknown): CapabilityProviderInstallConstraints | undefined {

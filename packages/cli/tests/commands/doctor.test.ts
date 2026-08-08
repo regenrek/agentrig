@@ -105,7 +105,6 @@ describe('command:doctor', () => {
   it('hard-fails when a required provider install command changed since verification', async () => {
     const fixture = await createDoctorFixture({
       context7: {
-        declareMcp: true,
         commandFingerprint: `sha256:${'0'.repeat(64)}`,
       },
     })
@@ -204,46 +203,6 @@ describe('command:doctor', () => {
     }))
   })
 
-  it('fails provider generated-file checks when canonical skills are dropped', async () => {
-    const fixture = await createDoctorFixture({
-      context7: {
-        declareSkills: true,
-        includeSkillFile: false,
-      },
-    })
-
-    const result = await runDoctor({
-      spec: 'agentrig/instructa.saas',
-      provider: 'cursor',
-      cwd: fixture.cwd,
-    })
-
-    expect(checkById(result.checks, 'cursor-generated-files')).toEqual(expect.objectContaining({
-      status: 'fail',
-      message: expect.stringContaining('agentrig-third-party-context7:skills/'),
-    }))
-  })
-
-  it('fails provider generated-file checks when canonical MCP is dropped', async () => {
-    const fixture = await createDoctorFixture({
-      context7: {
-        declareMcp: true,
-        includeMcpFile: false,
-      },
-    })
-
-    const result = await runDoctor({
-      spec: 'agentrig/instructa.saas',
-      provider: 'claude-code',
-      cwd: fixture.cwd,
-    })
-
-    expect(checkById(result.checks, 'claude-generated-files')).toEqual(expect.objectContaining({
-      status: 'fail',
-      message: expect.stringContaining('agentrig-third-party-context7:.mcp.json'),
-    }))
-  })
-
   it('fails Claude generated-file checks when .mcp.json omits Claude variables', async () => {
     const root = await fs.mkdtemp(path.join(tmpdir(), 'agentrig-doctor-generated-test-'))
     tempDirs.push(root)
@@ -317,9 +276,7 @@ async function createDoctorFixture(options: {
     installability?: 'installable' | 'discovery_only' | 'blocked' | 'yanked'
     lastVerified?: string
     requiredEnvVars?: string[]
-    declareSkills?: boolean
     includeSkillFile?: boolean
-    declareMcp?: boolean
     includeMcpFile?: boolean
     commandFingerprint?: string
   }
@@ -391,20 +348,25 @@ async function createDoctorFixture(options: {
           }
         : {}),
     },
-    courseCompatibility: {
-      kit: 'instructa-agentic-engineer-kit',
-      version: '1.0.0',
-    },
   })
   const base = pluginManifest('instructa.base', {
     profile: 'base',
   })
   const includeContext7Skill = options.context7?.includeSkillFile ?? true
   const includeContext7Mcp = options.context7?.includeMcpFile ?? true
-  const context7McpConfig = { mcpServers: { context7: { command: 'node', args: ['server.js'] } } }
+  const context7McpConfig = {
+    $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+    mcpServers: {
+      context7: {
+        type: 'stdio',
+        command: 'node',
+        args: ['./scripts/server.mjs'],
+        cwd: '${PLUGIN_ROOT}',
+      },
+    },
+  }
   const context7CommandFingerprint = options.context7?.commandFingerprint
     ?? await agentRigInstallCommandFingerprint([
-      ...(options.context7?.declareMcp ? [context7McpConfig] : []),
       ...(includeContext7Mcp ? [context7McpConfig] : []),
     ])
   const context7 = {
@@ -419,7 +381,7 @@ async function createDoctorFixture(options: {
         },
       },
       verification: {
-        lastVerified: options.context7?.lastVerified ?? '2026-06-01',
+        lastVerified: options.context7?.lastVerified ?? '2026-08-01',
         cadence: '30d',
         smokeTest: 'verify/context7-smoke.md',
         ...(context7CommandFingerprint
@@ -437,8 +399,6 @@ async function createDoctorFixture(options: {
         replaceWithoutCourseChange: true,
       },
     }),
-    ...(options.context7?.declareSkills ? { skills: ['context7-docs'] } : {}),
-    ...(options.context7?.declareMcp ? context7McpConfig : {}),
   } satisfies PluginManifest
   const github = options.github
     ? pluginManifest('third-party.github-mcp', {
@@ -474,7 +434,10 @@ async function createDoctorFixture(options: {
   const context7Files: Record<string, string> = {
     'verify/context7-smoke.md': '# Context7 smoke\n',
     ...(includeContext7Mcp
-      ? { '.mcp.json': JSON.stringify(context7McpConfig, null, 2) }
+      ? {
+          'mcp.json': JSON.stringify(context7McpConfig, null, 2),
+          'scripts/server.mjs': 'process.stdin.resume()\n',
+        }
       : {}),
     ...(includeContext7Skill
       ? { 'skills/context7-docs/SKILL.md': [
@@ -539,17 +502,19 @@ async function createDoctorFixture(options: {
 
 function pluginManifest(name: string, extension: Record<string, unknown>): PluginManifest {
   return {
-    $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+    $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
     name,
     version: '1.0.0',
     description: `${name} fixture`,
     author: { name: 'AgentRig Test' },
     license: 'MIT',
     keywords: ['test'],
-    'x-agentrig': {
-      kind: 'plugin',
-      listing: { category: 'Development' },
-      ...extension,
+    extensions: {
+      'ai.agentrig': {
+        kind: 'plugin',
+        listing: { category: 'Development' },
+        ...extension,
+      },
     },
   }
 }
@@ -563,7 +528,7 @@ function installBundle(
 ): InstallBundle {
   const manifestJson = JSON.stringify(manifest, null, 2)
   const fileEntries = {
-    '.plugin/plugin.json': manifestJson,
+    'plugin.json': manifestJson,
     ...files,
   }
   const fileList = Object.entries(fileEntries).map(([filePath, content]) => ({
@@ -666,19 +631,21 @@ async function installLedgerRecords(cwd: string, pluginIds: string[]) {
 
 async function writeProviderPluginSource(pluginsRoot: string) {
   const pluginDir = path.join(pluginsRoot, 'third-party.context7')
-  await fs.mkdir(path.join(pluginDir, '.plugin'), { recursive: true })
+  await fs.mkdir(pluginDir, { recursive: true })
   await fs.mkdir(path.join(pluginDir, 'skills', 'context7-docs'), { recursive: true })
   await fs.writeFile(
-    path.join(pluginDir, '.plugin', 'plugin.json'),
+    path.join(pluginDir, 'plugin.json'),
     JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
       name: 'third-party.context7',
       version: '1.0.0',
       description: 'Context7 provider fixture.',
-      skills: ['context7-docs'],
-      'x-agentrig': {
-        kind: 'plugin',
-        displayName: 'Context7',
-        listing: { category: 'Development' },
+      extensions: {
+        'ai.agentrig': {
+          kind: 'plugin',
+          displayName: 'Context7',
+          listing: { category: 'Development' },
+        },
       },
     }, null, 2),
     'utf-8'
@@ -696,10 +663,22 @@ async function writeProviderPluginSource(pluginsRoot: string) {
     'utf-8'
   )
   await fs.writeFile(
-    path.join(pluginDir, '.mcp.json'),
-    JSON.stringify({ mcpServers: { context7: { command: 'node', args: ['server.js'] } } }, null, 2),
+    path.join(pluginDir, 'mcp.json'),
+    JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+      mcpServers: {
+        context7: {
+          type: 'stdio',
+          command: 'node',
+          args: ['./scripts/server.mjs'],
+          cwd: '${PLUGIN_ROOT}',
+        },
+      },
+    }, null, 2),
     'utf-8'
   )
+  await fs.mkdir(path.join(pluginDir, 'scripts'), { recursive: true })
+  await fs.writeFile(path.join(pluginDir, 'scripts', 'server.mjs'), 'process.stdin.resume()\n', 'utf-8')
 }
 
 async function collectGeneratedChecks(

@@ -5,6 +5,7 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import {
   PluginManifestSchema,
+  agentRigPluginExtension,
   agentRigInstallCommandFingerprint,
   capabilityResolutionToJson,
   parseCapabilityPluginRef,
@@ -541,9 +542,9 @@ class RegistryCapabilityPluginLoader implements CapabilityPluginLoader {
 }
 
 async function readPluginManifestFromBundle(bundle: InstallBundle): Promise<PluginManifest> {
-  const manifestFile = bundle.file_list.find((file) => file.path === '.plugin/plugin.json')
+  const manifestFile = bundle.file_list.find((file) => file.path === 'plugin.json')
   if (!manifestFile) {
-    throw new Error(`Install bundle ${bundle.listing.artifactId} is missing .plugin/plugin.json.`)
+    throw new Error(`Install bundle ${bundle.listing.artifactId} is missing plugin.json.`)
   }
   const bytes = manifestFile.inline
     ? new Uint8Array(Buffer.from(manifestFile.inline, 'base64'))
@@ -552,12 +553,12 @@ async function readPluginManifestFromBundle(bundle: InstallBundle): Promise<Plug
   try {
     raw = JSON.parse(new TextDecoder().decode(bytes))
   } catch (error) {
-    throw new Error(`Invalid .plugin/plugin.json in ${bundle.listing.artifactId}: ${errorMessage(error)}`)
+    throw new Error(`Invalid plugin.json in ${bundle.listing.artifactId}: ${errorMessage(error)}`)
   }
   const parsed = PluginManifestSchema.safeParse(raw)
   if (!parsed.success) {
     const issue = parsed.error.issues[0]
-    throw new Error(`Invalid .plugin/plugin.json in ${bundle.listing.artifactId}: ${issue?.message ?? 'invalid data'}`)
+    throw new Error(`Invalid plugin.json in ${bundle.listing.artifactId}: ${issue?.message ?? 'invalid data'}`)
   }
   return parsed.data
 }
@@ -662,7 +663,7 @@ function addCapabilityProviderChecks(
     status: unsupported.some((chosen) => chosen.required) ? 'fail' : unknown.length ? 'unknown' : 'pass',
     label: providerCompatibilityLabel(provider, supported, unknown, unsupported),
     message: unknown.length
-      ? 'Provider compatibility is unknown because x-agentrig.providerTargets did not declare this target.'
+      ? 'Provider compatibility is unknown because extensions["ai.agentrig"].providerTargets did not declare this target.'
       : unsupported.length
         ? `Unsupported provider(s): ${unsupported.map((chosen) => chosen.plugin).join(', ')}`
         : undefined,
@@ -942,8 +943,8 @@ async function collectCanonicalProviderExpectations(
       : undefined
     return {
       name: providerPluginName(plugin, installProvider, pluginPrefix),
-      expectsSkills: manifestDeclares(plugin.manifest.skills) || await pathExists(path.join(plugin.pluginSourceDir, 'skills')),
-      expectsMcp: manifestDeclares(plugin.manifest.mcpServers) || await sourceHasMcpConfig(plugin.pluginSourceDir),
+      expectsSkills: await pathExists(path.join(plugin.pluginSourceDir, 'skills')),
+      expectsMcp: await sourceHasMcpConfig(plugin.pluginSourceDir),
     } satisfies CanonicalProviderExpectation
   }))
   return expectations.sort((left, right) => left.name.localeCompare(right.name))
@@ -1006,13 +1007,6 @@ function claudeMcpUsesRequiredVariables(content: string | undefined) {
     .every((name) => content.includes(`\${${name}}`))
 }
 
-function manifestDeclares(value: unknown) {
-  if (Array.isArray(value)) return value.length > 0
-  if (typeof value === 'string') return value.trim().length > 0
-  if (isRecord(value)) return Object.keys(value).length > 0
-  return Boolean(value)
-}
-
 async function firstPluginManifest(pluginRoot: string): Promise<Record<string, unknown> | undefined> {
   for (const relativePath of [
     '.codex-plugin/plugin.json',
@@ -1064,7 +1058,7 @@ async function addSmokeTestChecks(
       section: 'Provider',
       status: 'unknown',
       label: 'smoke tests',
-      message: 'No x-agentrig.verification.smokeTest metadata was declared by chosen providers.',
+      message: 'No extensions["ai.agentrig"].verification.smokeTest metadata was declared by chosen providers.',
     })
     return
   }
@@ -1163,10 +1157,10 @@ async function collectMcpConfigs(pluginsRoot: string, pluginNames: string[]) {
 async function collectPluginExtensions(pluginsRoot: string, pluginNames: string[]) {
   const extensions = new Map<string, Record<string, unknown>>()
   for (const plugin of pluginNames) {
-    const raw = await readJsonFile<unknown>(path.join(pluginsRoot, plugin, '.plugin', 'plugin.json'))
+    const raw = await readJsonFile<unknown>(path.join(pluginsRoot, plugin, 'plugin.json'))
     const parsed = PluginManifestSchema.safeParse(raw)
     if (!parsed.success) continue
-    extensions.set(plugin, (parsed.data['x-agentrig'] as Record<string, unknown> | undefined) ?? {})
+    extensions.set(plugin, (agentRigPluginExtension(parsed.data) as Record<string, unknown> | undefined) ?? {})
   }
   return extensions
 }
@@ -1263,7 +1257,7 @@ async function addProviderSecurityChecks(
       label: `${provider.plugin} security metadata`,
       message: security
         ? 'Required providers must set security.requiresConsent=true and security.showsExactCommands=true.'
-        : 'Required provider is missing x-agentrig.security metadata.',
+        : 'Required provider is missing extensions["ai.agentrig"].security metadata.',
       details: security,
     })
   }
@@ -1339,7 +1333,7 @@ async function addInstallCommandFingerprintChecks(
       failures.push({
         plugin: provider.plugin,
         actual,
-        reason: 'missing x-agentrig.verification.commandFingerprint',
+        reason: 'missing extensions["ai.agentrig"].verification.commandFingerprint',
       })
       continue
     }
@@ -1562,25 +1556,21 @@ function addCourseCompatibilityCheck(
 
   const projectBundles = bundles.filter((bundle) => {
     const manifest = getInlineManifestIfAvailable(bundle)
-    return manifest?.['x-agentrig']?.profile === 'project'
-  })
-  const withMetadata = projectBundles.filter((bundle) => {
-    const extension = getInlineManifestIfAvailable(bundle)?.['x-agentrig'] as Record<string, unknown> | undefined
-    return Boolean(extension?.courseCompatibility ?? extension?.courses ?? extension?.instructaCourse)
+    return manifest ? agentRigPluginExtension(manifest)?.profile === 'project' : false
   })
   addCheck({
     id: 'course-compatibility-metadata',
     section: 'Status',
-    status: withMetadata.length ? 'pass' : 'unknown',
-    label: withMetadata.length ? 'course compatibility metadata present' : 'course compatibility metadata',
-    message: withMetadata.length
-      ? withMetadata.map((bundle) => bundle.listing.artifactId).join(', ')
-      : 'No canonical course compatibility metadata field exists yet; Doctor checks permissive x-agentrig.courseCompatibility/courses/instructaCourse when present.',
+    status: 'pass',
+    label: 'course compatibility not required by Agent Plugins v1',
+    message: projectBundles.length
+      ? 'Agent Plugins v1 and the ai.agentrig extension do not currently define course compatibility metadata.'
+      : 'No project-profile plugin requires course compatibility metadata.',
   })
 }
 
 function getInlineManifestIfAvailable(bundle: InstallBundle): PluginManifest | undefined {
-  const manifestFile = bundle.file_list.find((file) => file.path === '.plugin/plugin.json' && file.inline)
+  const manifestFile = bundle.file_list.find((file) => file.path === 'plugin.json' && file.inline)
   if (!manifestFile?.inline) return undefined
   try {
     const raw = JSON.parse(Buffer.from(manifestFile.inline, 'base64').toString('utf-8')) as unknown

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vite-plus/test'
 import { materializePlugin } from '../../src/provider/materialize'
 import { scanRepo } from '../../src/repo-scan/scan'
 import { createMemoryTree } from '../repo-scan/memory-tree'
+import { AGENT_PLUGIN_MANIFEST_SCHEMA_URL, AGENT_PLUGIN_MCP_SCHEMA_URL } from '../../src/agent-plugins'
 
 describe('materializePlugin', () => {
   it('stages picked signals into a bundle-valid AgentRig plugin layout', async () => {
@@ -37,34 +38,40 @@ describe('materializePlugin', () => {
     })
 
     expect(files.map((file) => file.path)).toEqual([
-      '.mcp.json',
-      '.plugin/plugin.json',
-      'commands/review.md',
-      'rules/typescript.mdc',
+      'ai.agentrig/commands/review.md',
+      'ai.agentrig/rules/typescript.mdc',
+      'mcp.json',
+      'plugin.json',
       'skills/review/SKILL.md',
     ])
 
-    const manifest = JSON.parse(decode(files.find((file) => file.path === '.plugin/plugin.json')?.bytes))
+    const manifest = JSON.parse(decode(files.find((file) => file.path === 'plugin.json')?.bytes))
     expect(manifest).toMatchObject({
-      $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+      $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
       name: 'community.review',
-      'x-agentrig': {
-        displayName: 'Review',
-        kind: 'plugin',
-        listing: {
-          category: 'Development',
-        },
-        configSchema: {},
-        pluginDependencies: [],
-        source: {
-          kind: 'external-repo',
-          owner: 'owner',
-          repo: 'repo',
-          commitSha: 'abc123',
-          scanDigest: scan.digest,
-          pickedSignalPaths: ['.claude/commands/review.md', '.cursor/rules/typescript.mdc', '.mcp.json', 'skills/review'],
+      extensions: {
+        'ai.agentrig': {
+          displayName: 'Review',
+          kind: 'plugin',
+          listing: {
+            category: 'Development',
+          },
+          configSchema: {},
+          pluginDependencies: [],
+          source: {
+            kind: 'external-repo',
+            owner: 'owner',
+            repo: 'repo',
+            commitSha: 'abc123',
+            scanDigest: scan.digest,
+            pickedSignalPaths: ['.claude/commands/review.md', '.cursor/rules/typescript.mdc', '.mcp.json', 'skills/review'],
+          },
         },
       },
+    })
+    expect(JSON.parse(decode(files.find((file) => file.path === 'mcp.json')?.bytes))).toEqual({
+      $schema: AGENT_PLUGIN_MCP_SCHEMA_URL,
+      mcpServers: { fs: { type: 'stdio', command: 'node' } },
     })
   })
 

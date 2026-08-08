@@ -82,16 +82,15 @@ function scopeToClaudeArg(scope: 'personal' | 'workspace') {
 async function copyClaudePlugin(pluginSourceDir: string, pluginDir: string) {
   await copyEntries(pluginSourceDir, pluginDir, [
     'skills',
-    'commands',
-    'agents',
-    'hooks',
+    { source: 'ai.agentrig/commands', destination: 'commands' },
+    { source: 'ai.agentrig/agents', destination: 'agents' },
+    { source: 'ai.agentrig/hooks', destination: 'hooks' },
     'assets',
     'scripts',
     'README.md',
-    'settings.json',
-    '.mcp.json',
+    { source: 'ai.agentrig/settings.json', destination: 'settings.json' },
     { source: 'mcp.json', destination: '.mcp.json' },
-    '.lsp.json',
+    { source: 'ai.agentrig/lsp.json', destination: '.lsp.json' },
   ])
 }
 
@@ -147,13 +146,30 @@ function normalizeClaudeCommand(value: string) {
 }
 
 function normalizeClaudeArg(value: unknown) {
-  return typeof value === 'string' && looksLikeRelativePath(value) ? normalizeClaudePath(value) : value
+  return typeof value === 'string' && (looksLikeRelativePath(value) || looksLikePortablePluginPath(value))
+    ? normalizeClaudePath(value)
+    : value
 }
 
 function normalizeClaudePath(value: string) {
   if (value.includes('${CLAUDE_')) return value
+  if (value === '${PLUGIN_ROOT}') return CLAUDE_PLUGIN_ROOT_REF
+  if (value === '${PLUGIN_DATA}') return CLAUDE_PLUGIN_DATA_REF
+  if (value.startsWith('${PLUGIN_ROOT}/')) {
+    return `${CLAUDE_PLUGIN_ROOT_REF}/${value.slice('${PLUGIN_ROOT}/'.length)}`
+  }
+  if (value.startsWith('${PLUGIN_DATA}/')) {
+    return `${CLAUDE_PLUGIN_DATA_REF}/${value.slice('${PLUGIN_DATA}/'.length)}`
+  }
   const normalized = value.replace(/^\.\//, '')
   return `${CLAUDE_PLUGIN_ROOT_REF}/${normalized}`
+}
+
+function looksLikePortablePluginPath(value: string) {
+  return value === '${PLUGIN_ROOT}'
+    || value === '${PLUGIN_DATA}'
+    || value.startsWith('${PLUGIN_ROOT}/')
+    || value.startsWith('${PLUGIN_DATA}/')
 }
 
 function looksLikeRelativePath(value: string) {

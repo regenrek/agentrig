@@ -78,14 +78,14 @@ async function walkBundleFiles(rootDir: string, currentDir = rootDir): Promise<s
 }
 
 async function readPluginManifestFile(dir: string, policy: PluginUploadPolicySnapshot) {
-  const manifestPath = path.join(dir, '.plugin', 'plugin.json')
+  const manifestPath = path.join(dir, 'plugin.json')
   if (!(await pathExists(manifestPath))) {
-    throw new Error(`.plugin/plugin.json not found in ${dir}`)
+    throw new Error(`plugin.json not found in ${dir}`)
   }
   const { absolutePath: safeManifestPath } = await resolveBundleInputFile(
     dir,
-    '.plugin/plugin.json',
-    '.plugin/plugin.json',
+    'plugin.json',
+    'plugin.json',
   )
   const manifestRaw = await fs.readFile(safeManifestPath, 'utf-8')
   let parsed: unknown
@@ -93,7 +93,7 @@ async function readPluginManifestFile(dir: string, policy: PluginUploadPolicySna
     parsed = JSON.parse(manifestRaw)
   } catch (error) {
     throw new Error(
-      `Failed to parse .plugin/plugin.json: ${
+      `Failed to parse plugin.json: ${
         error instanceof Error ? error.message : String(error)
       }`
     )
@@ -121,13 +121,13 @@ export async function createPluginBundle(options: {
   const bundleFiles = await walkBundleFiles(directory)
   const normalizedManifest = manifestRaw.endsWith('\n') ? manifestRaw : `${manifestRaw}\n`
   await zipWriter.add(
-    '.plugin/plugin.json',
+    'plugin.json',
     new Uint8ArrayReader(new TextEncoder().encode(normalizedManifest)),
   )
 
   for (const relativeFile of bundleFiles) {
-    if (relativeFile === '.plugin/plugin.json') continue
-    if (relativeFile === '.plugin/install.json') continue
+    if (relativeFile === 'plugin.json') continue
+    if (relativeFile === 'ai.agentrig/install.json') continue
     const sourceFile = await resolveBundleInputFile(directory, relativeFile, 'plugin file path')
     const bytes = await fs.readFile(sourceFile.absolutePath)
     const fileStat = await fs.stat(sourceFile.absolutePath)

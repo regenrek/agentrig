@@ -8,7 +8,7 @@ icon: Upload
 
 AgentRig separates publishing from installability.
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 ## Installable publishing paths
 
@@ -102,7 +102,7 @@ Setup requirements:
 - Do not publish through arbitrary reusable workflows.
 - Do not restore or save dependency caches in jobs with `id-token: write`.
 - Pin actions to full commit SHA.
-- Keep `.plugin/plugin.json` in the submitted plugin path, or pass `--artifactId`.
+- Keep `plugin.json` in the submitted plugin path, or pass `--artifactId`.
 - Do not store an AgentRig access token in CI.
 
 ## Self-hosted registry

@@ -62,7 +62,7 @@ function defaultTrustedSource() {
 }
 
 async function readLocalPluginManifest(pluginPath: string) {
-  const manifestPath = path.resolve(process.cwd(), pluginPath, '.plugin', 'plugin.json')
+  const manifestPath = path.resolve(process.cwd(), pluginPath, 'plugin.json')
   return await readJsonFile<PluginManifest>(manifestPath)
 }
 
@@ -90,7 +90,7 @@ const command = defineCommand({
     },
     artifactId: {
       type: 'string',
-      description: 'Plugin artifact id for trusted publishing (defaults to .plugin/plugin.json name)',
+      description: 'Plugin artifact id for trusted publishing (defaults to plugin.json name)',
     },
     trustedPublish: {
       type: 'boolean',
@@ -144,7 +144,7 @@ const command = defineCommand({
     const manifest = trustedPublish ? await readLocalPluginManifest(payload.plugin_path) : null
     const artifactId = optionalArg(args.artifactId) ?? manifest?.name
     if (trustedPublish && !artifactId) {
-      throw new Error('Trusted publishing requires --artifactId or a readable .plugin/plugin.json with a name.')
+      throw new Error('Trusted publishing requires --artifactId or a readable plugin.json with a name.')
     }
     const accessToken = trustedPublish
       ? (await mintPublishToken(baseUrl, {

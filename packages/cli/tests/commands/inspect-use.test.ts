@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import inspectCommand from '../../src/commands/inspect'
 import useCommand from '../../src/commands/use'
+import uninstallCommand from '../../src/commands/plugin/uninstall'
 import { createPluginBundle } from '../../src/lib/plugin-bundle'
 import { LOCAL_PLUGIN_POLICY } from '../../src/lib/registry'
 import { validatePluginBundle } from '../../src/lib/plugin-submission-validation'
@@ -17,6 +18,7 @@ const dotsLikeFixture = fileURLToPath(new URL('../../../sdk/tests/fixtures/dots-
 describe('commands: inspect/use', () => {
   const inspectRun = inspectCommand.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
   const useRun = useCommand.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
+  const uninstallRun = uninstallCommand.run as (ctx: { args: Record<string, unknown> }) => Promise<void>
 
   afterEach(async () => {
     vi.restoreAllMocks()
@@ -86,16 +88,16 @@ describe('commands: inspect/use', () => {
       },
     })
 
-    const manifest = JSON.parse(await fs.readFile(path.join(outDir, '.plugin', 'plugin.json'), 'utf-8')) as {
+    const manifest = JSON.parse(await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')) as {
       name: string
-      'x-agentrig': { source: { kind: string; repoUrl: string; pickedSignalPaths: string[] } }
+      extensions: { 'ai.agentrig': { source: { kind: string; repoUrl: string; pickedSignalPaths: string[] } } }
     }
     expect(manifest.name).toBe('community.review')
-    expect(manifest['x-agentrig'].source.kind).toBe('external-repo')
-    expect(manifest['x-agentrig'].source.repoUrl).toBe(pathToFileURL(fixture).href)
-    expect(manifest['x-agentrig'].source.pickedSignalPaths).toEqual(['.mcp.json', 'skills/review'])
+    expect(manifest.extensions['ai.agentrig'].source.kind).toBe('external-repo')
+    expect(manifest.extensions['ai.agentrig'].source.repoUrl).toBe(pathToFileURL(fixture).href)
+    expect(manifest.extensions['ai.agentrig'].source.pickedSignalPaths).toEqual(['.mcp.json', 'skills/review'])
     await expect(fs.readFile(path.join(outDir, 'skills', 'review', 'SKILL.md'), 'utf-8')).resolves.toContain('Reviews code.')
-    await expect(fs.readFile(path.join(outDir, '.mcp.json'), 'utf-8')).resolves.toContain('mcpServers')
+    await expect(fs.readFile(path.join(outDir, 'mcp.json'), 'utf-8')).resolves.toContain('mcpServers')
 
     const bundle = await createPluginBundle({
       dir: outDir,
@@ -134,16 +136,16 @@ describe('commands: inspect/use', () => {
     const validation = await validatePluginBundle(bundle.zipBytes, LOCAL_PLUGIN_POLICY)
     expect(validation.fileCount).toBeGreaterThan(0)
 
-    const manifest = JSON.parse(await fs.readFile(path.join(outDir, '.plugin', 'plugin.json'), 'utf-8')) as {
-      'x-agentrig': { source: { kind: string; repoUrl: string; pickedSignalPaths: string[] } }
+    const manifest = JSON.parse(await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')) as {
+      extensions: { 'ai.agentrig': { source: { kind: string; repoUrl: string; pickedSignalPaths: string[] } } }
     }
-    expect(manifest['x-agentrig'].source).toMatchObject({
+    expect(manifest.extensions['ai.agentrig'].source).toMatchObject({
       kind: 'external-repo',
       repoUrl: pathToFileURL(dotsLikeFixture).href,
       pickedSignalPaths: ['.claude/commands/review.md', '.mcp.json', 'prompts/debug.md', 'skills/review'],
     })
-    await expect(fs.readFile(path.join(outDir, 'commands', 'review.md'), 'utf-8')).resolves.toContain('risk-first')
-    await expect(fs.readFile(path.join(outDir, 'commands', 'debug.md'), 'utf-8')).resolves.toContain('first incorrect')
+    await expect(fs.readFile(path.join(outDir, 'ai.agentrig', 'commands', 'review.md'), 'utf-8')).resolves.toContain('risk-first')
+    await expect(fs.readFile(path.join(outDir, 'ai.agentrig', 'commands', 'debug.md'), 'utf-8')).resolves.toContain('first incorrect')
   })
 
   it('installs picked signals with external-repo ledger provenance', async () => {
@@ -226,6 +228,24 @@ describe('commands: inspect/use', () => {
     ).resolves.toContain('external.repo')
     await expect(fs.stat(path.join(realHome, '.cursor'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(fs.stat(path.join(realHome, '.agentrig'))).rejects.toMatchObject({ code: 'ENOENT' })
+
+    await uninstallRun({
+      args: {
+        provider: 'cursor',
+        spec: 'external.repo',
+        cwd,
+        scope: 'personal',
+        dryRun: false,
+        help: false,
+      },
+    })
+
+    await expect(fs.stat(path.join(agentrigHome, '.cursor', 'skills', 'review', 'SKILL.md')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+    const ledger = JSON.parse(
+      await fs.readFile(path.join(agentrigHome, '.agentrig', 'plugin-installs.json'), 'utf-8')
+    ) as { selections: Record<string, unknown> }
+    expect(ledger.selections).toEqual({})
   })
 
   it('applies local BYOK enrichment to plugin metadata', async () => {
@@ -273,7 +293,7 @@ describe('commands: inspect/use', () => {
       },
     })
 
-    const manifest = JSON.parse(await fs.readFile(path.join(outDir, '.plugin', 'plugin.json'), 'utf-8')) as {
+    const manifest = JSON.parse(await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')) as {
       description: string
       keywords: string[]
     }
@@ -305,11 +325,11 @@ describe('commands: inspect/use', () => {
       },
     })
 
-    const manifest = JSON.parse(await fs.readFile(path.join(outDir, '.plugin', 'plugin.json'), 'utf-8')) as {
-      'x-agentrig': { source: { repoUrl: string } }
+    const manifest = JSON.parse(await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')) as {
+      extensions: { 'ai.agentrig': { source: { repoUrl: string } } }
     }
-    expect(manifest['x-agentrig'].source.repoUrl).toBe(pathToFileURL(fixture).href)
-    expect(manifest['x-agentrig'].source.repoUrl).toContain('%20')
+    expect(manifest.extensions['ai.agentrig'].source.repoUrl).toBe(pathToFileURL(fixture).href)
+    expect(manifest.extensions['ai.agentrig'].source.repoUrl).toContain('%20')
   })
 })
 

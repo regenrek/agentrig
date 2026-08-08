@@ -1,9 +1,8 @@
 import { normalizeVirtualPath, type VirtualTreeFile } from '../virtual-tree'
-import { PluginManifestSchema, type PluginManifest } from '../../marketplace-listing'
+import { PluginManifestSchema, type PluginManifest } from '../../agent-plugins'
 import type { DetectorInput, PluginCandidate, PluginProviderId } from './common'
 
 const PLUGIN_MANIFEST_DIRS: Record<string, PluginProviderId> = {
-  '.plugin': 'agentrig',
   '.claude-plugin': 'claude',
   '.codex-plugin': 'codex',
   '.cursor-plugin': 'cursor',
@@ -75,17 +74,16 @@ async function candidateFromPluginManifest(input: Pick<DetectorInput, 'files' | 
   if (parts.at(-1) !== 'plugin.json') return undefined
 
   const manifestDir = parts.at(-2)
-  if (!manifestDir) return undefined
-
-  const provider = PLUGIN_MANIFEST_DIRS[manifestDir]
-  if (!provider) return undefined
+  const provider = manifestDir ? PLUGIN_MANIFEST_DIRS[manifestDir] : undefined
+  const isPortableManifest = !provider
 
   const candidate = {
-    provider,
+    provider: provider ?? 'agentrig' as const,
     manifestPath: path,
-    rootPath: parts.slice(0, -2).join('/'),
+    rootPath: parts.slice(0, isPortableManifest ? -1 : -2).join('/'),
   }
-  const manifest = provider === 'agentrig' ? await parseAgentrigPluginManifestCandidate(input, path) : undefined
+  const manifest = isPortableManifest ? await parseAgentrigPluginManifestCandidate(input, path) : undefined
+  if (isPortableManifest && !manifest) return undefined
   const scanCandidate = manifest ? scanPluginCandidateFromManifest(input, candidate, manifest) : undefined
   return {
     ...candidate,

@@ -10,6 +10,7 @@ import {
   type SubmitSource,
 } from '../../src/provider/publish-shape'
 import { scanRepo } from '../../src/repo-scan/scan'
+import { AGENT_PLUGIN_MANIFEST_SCHEMA_URL } from '../../src/agent-plugins'
 import { createMemoryTree } from '../repo-scan/memory-tree'
 
 const source: SubmitSource = {
@@ -24,29 +25,32 @@ const pluginCandidate: PublishPluginCandidate = {
   artifactId: 'acme.tools',
   version: '1.0.0',
   sourcePath: '.',
-  manifestPath: '.plugin/plugin.json',
+  manifestPath: 'plugin.json',
   manifest: {
+    $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
     name: 'acme.tools',
     version: '1.0.0',
     description: 'Acme tools.',
     author: { name: 'Acme' },
-    'x-agentrig': {
-      displayName: 'Acme Tools',
-      kind: 'plugin',
-      listing: {
-        category: 'Development',
+    extensions: {
+      'ai.agentrig': {
+        displayName: 'Acme Tools',
+        kind: 'plugin',
+        listing: {
+          category: 'Development',
+        },
+        configSchema: {},
+        pluginDependencies: [],
       },
-      configSchema: {},
-      pluginDependencies: [],
     },
   },
   manifestFile: {
-    path: '.plugin/plugin.json',
+    path: 'plugin.json',
     digest: 'sha256:plugin',
     bytes: 42,
     content: '{"name":"acme.tools","version":"1.0.0"}',
   },
-  files: [{ path: '.plugin/plugin.json', digest: 'sha256:plugin' }],
+  files: [{ path: 'plugin.json', digest: 'sha256:plugin' }],
 }
 
 async function scanFixture() {
@@ -97,7 +101,7 @@ describe('publish shape primitives', () => {
     expect(payload.publishShape.includedSelectors).toEqual(['mcp:mcp', 'skill:review'])
     expect(candidates.find((candidate) => candidate.shape === 'generated_plugin')).toMatchObject({
       allowed: false,
-      blockedReason: expect.stringMatching(/no \.plugin\/plugin\.json/i),
+      blockedReason: expect.stringMatching(/plugin\.json candidate exists/i),
     })
   })
 
@@ -105,21 +109,23 @@ describe('publish shape primitives', () => {
     const report = await scanRepo({
       source: { type: 'virtual', label: 'fixture', ref: source.ref, commitSha: source.commitSha },
       tree: createMemoryTree({
-        'plugins/regenrek.agentic-engineer-core/.plugin/plugin.json': JSON.stringify({
-          $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+        'plugins/regenrek.agentic-engineer-core/plugin.json': JSON.stringify({
+          $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
           name: 'regenrek.agentic-engineer-core',
           description: 'Agentic engineer core workflow skills.',
           version: '0.3.0',
           author: { name: 'Regenrek' },
           keywords: ['agentic', 'engineering'],
-          'x-agentrig': {
-            displayName: 'Agentic Engineer Core',
-            kind: 'plugin',
-            listing: {
-              category: 'Development',
+          extensions: {
+            'ai.agentrig': {
+              displayName: 'Agentic Engineer Core',
+              kind: 'plugin',
+              listing: {
+                category: 'Development',
+              },
+              configSchema: {},
+              pluginDependencies: [],
             },
-            configSchema: {},
-            pluginDependencies: [],
           },
         }),
         'plugins/regenrek.agentic-engineer-core/skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
@@ -150,20 +156,22 @@ describe('publish shape primitives', () => {
     const report = await scanRepo({
       source: { type: 'virtual', label: 'fixture', ref: source.ref, commitSha: source.commitSha },
       tree: createMemoryTree({
-        '.plugin/plugin.json': JSON.stringify({
-          $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+        'plugin.json': JSON.stringify({
+          $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
           name: 'regenrek.test-submission',
           description: 'Reference plugin.',
           version: '0.2.0',
           author: { name: 'AgentRig' },
-          'x-agentrig': {
-            displayName: 'Test Submission',
-            kind: 'plugin',
-            listing: {
-              category: 'Development',
+          extensions: {
+            'ai.agentrig': {
+              displayName: 'Test Submission',
+              kind: 'plugin',
+              listing: {
+                category: 'Development',
+              },
+              configSchema: {},
+              pluginDependencies: [],
             },
-            configSchema: {},
-            pluginDependencies: [],
           },
         }),
         'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
@@ -180,7 +188,7 @@ describe('publish shape primitives', () => {
       artifactId: 'regenrek.test-submission',
       version: '0.2.0',
       sourcePath: '.',
-      manifestPath: '.plugin/plugin.json',
+      manifestPath: 'plugin.json',
       manifest: {
         name: 'regenrek.test-submission',
         version: '0.2.0',
@@ -188,12 +196,12 @@ describe('publish shape primitives', () => {
         author: { name: 'AgentRig' },
       },
       manifestFile: {
-        path: '.plugin/plugin.json',
+        path: 'plugin.json',
         content: expect.stringContaining('regenrek.test-submission'),
       },
     })
     expect(scan.pluginCandidate?.files.map((file) => file.path)).toEqual([
-      '.plugin/plugin.json',
+      'plugin.json',
       'skills/review/SKILL.md',
     ])
   })

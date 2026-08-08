@@ -235,7 +235,7 @@ describe('plugin provider command runner', () => {
       installMetadataByPluginId: {
         'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
       },
-    })).rejects.toThrow(/x-agentrig\.listing\.category/)
+    })).rejects.toThrow(/extensions\["ai\.agentrig"\]\.listing\.category/)
     expect(codexAppServerMocks.codexInstallPlugin).not.toHaveBeenCalled()
   })
 
@@ -540,6 +540,7 @@ describe('plugin provider command runner', () => {
       skill: true,
       mcp: true,
       settings: true,
+      components: true,
     })
 
     await exportPluginProviders({
@@ -559,15 +560,23 @@ describe('plugin provider command runner', () => {
     await expect(readJson(path.join(codexRoot, '.codex-plugin', 'plugin.json'))).resolves.toMatchObject({
       skills: './skills/',
       mcpServers: './.mcp.json',
+      apps: './.app.json',
     })
+    await expect(fs.access(path.join(codexRoot, 'scripts', 'server.mjs'))).resolves.toBeUndefined()
 
     await expect(fs.readFile(path.join(claudeRoot, 'CLAUDE.md'), 'utf-8')).resolves.toContain('/mcp')
     await expect(fs.readFile(path.join(claudeRoot, 'CLAUDE.md'), 'utf-8')).resolves.toContain('CLAUDE_PLUGIN_ROOT')
     await expect(fs.access(path.join(claudeRoot, '.mcp.json'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(claudeRoot, 'commands', 'review.md'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(claudeRoot, 'agents', 'reviewer.md'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(claudeRoot, 'hooks', 'hooks.json'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(claudeRoot, 'settings.json'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(claudeRoot, '.lsp.json'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(claudeRoot, 'scripts', 'server.mjs'))).resolves.toBeUndefined()
     await expect(readJson(path.join(claudeRoot, '.mcp.json'))).resolves.toMatchObject({
       mcpServers: {
         docs: {
-          args: ['${CLAUDE_PLUGIN_ROOT}/server.js'],
+          args: ['${CLAUDE_PLUGIN_ROOT}/scripts/server.mjs'],
           cwd: '${CLAUDE_PLUGIN_ROOT}',
           env: {
             CLAUDE_PLUGIN_ROOT: '${CLAUDE_PLUGIN_ROOT}',
@@ -580,6 +589,11 @@ describe('plugin provider command runner', () => {
 
     await expect(fs.readFile(path.join(cursorRoot, 'CURSOR.md'), 'utf-8')).resolves.toContain('agentrig doctor --provider cursor')
     await expect(fs.readFile(path.join(cursorRoot, 'rules', 'agentrig-provider.mdc'), 'utf-8')).resolves.toContain('provider-neutral')
+    await expect(fs.access(path.join(cursorRoot, 'rules', 'typescript.mdc'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(cursorRoot, 'commands', 'review.md'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(cursorRoot, 'agents', 'reviewer.md'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(cursorRoot, 'hooks', 'hooks.json'))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(cursorRoot, 'scripts', 'server.mjs'))).resolves.toBeUndefined()
     await expect(readJson(path.join(cursorRoot, '.cursor-plugin', 'plugin.json'))).resolves.toMatchObject({
       rules: './rules',
       skills: './skills',
@@ -598,10 +612,10 @@ async function tempRoot() {
 async function writePluginSource(
   pluginsRoot: string,
   pluginId: string,
-  options: { category?: boolean; skill?: boolean; mcp?: boolean; settings?: boolean } = {}
+  options: { category?: boolean; skill?: boolean; mcp?: boolean; settings?: boolean; components?: boolean } = {}
 ) {
   const pluginDir = path.join(pluginsRoot, pluginId)
-  await fs.mkdir(path.join(pluginDir, '.plugin'), { recursive: true })
+  await fs.mkdir(pluginDir, { recursive: true })
   if (options.skill) {
     await fs.mkdir(path.join(pluginDir, 'skills', 'project-spec-packager'), { recursive: true })
     await fs.writeFile(
@@ -617,23 +631,53 @@ async function writePluginSource(
     )
   }
   if (options.mcp) {
+    await fs.mkdir(path.join(pluginDir, 'scripts'), { recursive: true })
+    await fs.writeFile(path.join(pluginDir, 'scripts', 'server.mjs'), 'process.stdin.resume()\n')
     await fs.writeFile(
-      path.join(pluginDir, '.mcp.json'),
-      JSON.stringify({ mcpServers: { docs: { command: 'node', args: ['server.js'] } } }, null, 2)
+      path.join(pluginDir, 'mcp.json'),
+      JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: {
+          docs: {
+            type: 'stdio',
+            command: 'node',
+            args: ['./scripts/server.mjs'],
+            cwd: '${PLUGIN_ROOT}',
+          },
+        },
+      }, null, 2)
     )
   }
   if (options.settings) {
-    await fs.writeFile(path.join(pluginDir, 'settings.json'), JSON.stringify({ permissions: {} }, null, 2))
+    await fs.mkdir(path.join(pluginDir, 'ai.agentrig'), { recursive: true })
+    await fs.writeFile(path.join(pluginDir, 'ai.agentrig', 'settings.json'), JSON.stringify({ permissions: {} }, null, 2))
+  }
+  if (options.components) {
+    await fs.mkdir(path.join(pluginDir, 'ai.agentrig', 'commands'), { recursive: true })
+    await fs.mkdir(path.join(pluginDir, 'ai.agentrig', 'agents'), { recursive: true })
+    await fs.mkdir(path.join(pluginDir, 'ai.agentrig', 'hooks'), { recursive: true })
+    await fs.mkdir(path.join(pluginDir, 'ai.agentrig', 'rules'), { recursive: true })
+    await fs.writeFile(path.join(pluginDir, 'ai.agentrig', 'commands', 'review.md'), '# Review\n')
+    await fs.writeFile(path.join(pluginDir, 'ai.agentrig', 'agents', 'reviewer.md'), '# Reviewer\n')
+    await fs.writeFile(
+      path.join(pluginDir, 'ai.agentrig', 'hooks', 'hooks.json'),
+      JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo ok' }] }] } }, null, 2)
+    )
+    await fs.writeFile(path.join(pluginDir, 'ai.agentrig', 'rules', 'typescript.mdc'), '# TypeScript\n')
+    await fs.writeFile(path.join(pluginDir, 'ai.agentrig', 'lsp.json'), '{}\n')
+    await fs.writeFile(path.join(pluginDir, 'ai.agentrig', 'app.json'), '{}\n')
   }
   const includeCategory = options.category !== false
-  await fs.writeFile(path.join(pluginDir, '.plugin', 'plugin.json'), `${JSON.stringify({
+  await fs.writeFile(path.join(pluginDir, 'plugin.json'), `${JSON.stringify({
+    $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
     name: pluginId,
     description: 'Dotted artifact plugin for provider install tests.',
     version: '1.0.0',
-    ...(options.skill ? { skills: ['project-spec-packager'] } : {}),
-    'x-agentrig': {
-      displayName: 'Agent Skills',
-      ...(includeCategory ? { listing: { category: 'Development' } } : {}),
+    extensions: {
+      'ai.agentrig': {
+        displayName: 'Agent Skills',
+        ...(includeCategory ? { listing: { category: 'Development' } } : {}),
+      },
     },
   }, null, 2)}\n`)
 }
