@@ -1,4 +1,10 @@
 import { z } from 'zod'
+import {
+  AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+  AGENT_PLUGIN_MCP_SCHEMA_URL,
+  AGENTRIG_EXTENSION_NAMESPACE,
+  AgentPluginMcpConfigSchema,
+} from '../agent-plugins'
 import type { SignalKind } from '../repo-scan/types'
 import { joinVirtualPath, normalizeVirtualPath, virtualBasename } from '../repo-scan/virtual-tree'
 import { isValidPluginName } from './plugin-names'
@@ -42,13 +48,14 @@ export async function materializePlugin(options: MaterializePluginOptions): Prom
   const manifest = buildPluginManifest(options.manifest, options.pickedSignals.map((signal) => signal.sourcePath))
   const files = new Map<string, MaterializedPluginFile>()
 
-  addMaterializedFile(files, '.plugin/plugin.json', encodeJson(manifest))
+  addMaterializedFile(files, 'plugin.json', encodeJson(manifest))
   for (const signal of options.pickedSignals) {
     for (const file of signal.files) {
       const destinationPath = destinationPathForSignalFile(signal.kind, signal.id, signal.sourcePath, file.path)
-      const bytes = await readVirtualFileBytes(options.tree, file.path)
-      await assertFileDigest(file.path, bytes, file.sha256)
-      addMaterializedFile(files, destinationPath, bytes, file.sha256)
+      const sourceBytes = await readVirtualFileBytes(options.tree, file.path)
+      await assertFileDigest(file.path, sourceBytes, file.sha256)
+      const outputBytes = signal.kind === 'mcp' ? materializeMcpConfig(sourceBytes, file.path) : sourceBytes
+      addMaterializedFile(files, destinationPath, outputBytes, file.sha256)
     }
   }
 
@@ -58,25 +65,27 @@ export async function materializePlugin(options: MaterializePluginOptions): Prom
 export function buildPluginManifest(input: MaterializedPluginManifestInput, pickedSignalPaths: string[]) {
   const parsed = manifestInputSchema.parse(input)
   return {
-    $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+    $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
     name: parsed.name,
     description: parsed.description,
     version: parsed.version,
     ...(parsed.author ? { author: parsed.author } : {}),
     ...(parsed.license ? { license: parsed.license } : {}),
     ...(parsed.keywords?.length ? { keywords: parsed.keywords } : {}),
-    'x-agentrig': {
-      displayName: parsed.displayName ?? parsed.name,
-      kind: 'plugin',
-      listing: {
-        category: parsed.category,
-      },
-      configSchema: {},
-      pluginDependencies: [],
-      source: {
-        kind: 'external-repo',
-        ...parsed.source,
-        pickedSignalPaths: [...new Set(pickedSignalPaths)].sort(),
+    extensions: {
+      [AGENTRIG_EXTENSION_NAMESPACE]: {
+        displayName: parsed.displayName ?? parsed.name,
+        kind: 'plugin',
+        listing: {
+          category: parsed.category,
+        },
+        configSchema: {},
+        pluginDependencies: [],
+        source: {
+          kind: 'external-repo',
+          ...parsed.source,
+          pickedSignalPaths: [...new Set(pickedSignalPaths)].sort(),
+        },
       },
     },
   }
@@ -88,18 +97,63 @@ export function destinationPathForSignalFile(kind: SignalKind, signalId: string,
   const basename = virtualBasename(file)
 
   if (kind === 'skill') return joinVirtualPath('skills', safeSignalId(signalId), relativeWithin(source, file))
-  if (kind === 'command' || kind === 'prompt') return joinVirtualPath('commands', basename)
-  if (kind === 'rule') return joinVirtualPath('rules', basename)
-  if (kind === 'mcp') return '.mcp.json'
-  if (kind === 'hook') return 'hooks/hooks.json'
-  if (kind === 'lsp') return '.lsp.json'
-  if (kind === 'codex-app') return '.app.json'
-  if (kind === 'settings') return 'settings.json'
-  if (kind === 'agent') return joinVirtualPath('agents', basename)
-  if (file.startsWith('.plugin/')) {
-    throw new Error(`Signal file cannot materialize under .plugin: ${file}`)
+  if (kind === 'mcp') return 'mcp.json'
+  if (kind === 'command' || kind === 'prompt') return joinVirtualPath(AGENTRIG_EXTENSION_NAMESPACE, 'commands', basename)
+  if (kind === 'rule') return joinVirtualPath(AGENTRIG_EXTENSION_NAMESPACE, 'rules', basename)
+  if (kind === 'hook') return joinVirtualPath(AGENTRIG_EXTENSION_NAMESPACE, 'hooks', 'hooks.json')
+  if (kind === 'lsp') return joinVirtualPath(AGENTRIG_EXTENSION_NAMESPACE, 'lsp.json')
+  if (kind === 'codex-app') return joinVirtualPath(AGENTRIG_EXTENSION_NAMESPACE, 'app.json')
+  if (kind === 'settings') return joinVirtualPath(AGENTRIG_EXTENSION_NAMESPACE, 'settings.json')
+  if (kind === 'agent') return joinVirtualPath(AGENTRIG_EXTENSION_NAMESPACE, 'agents', basename)
+  return joinVirtualPath(AGENTRIG_EXTENSION_NAMESPACE, 'source', file)
+}
+
+function materializeMcpConfig(bytes: Uint8Array, sourcePath: string) {
+  let raw: unknown
+  try {
+    raw = JSON.parse(new TextDecoder().decode(bytes))
+  } catch {
+    throw new Error(`Invalid MCP JSON: ${normalizeVirtualPath(sourcePath)}`)
   }
-  return file
+  if (!isRecord(raw) || !isRecord(raw.mcpServers)) {
+    throw new Error(`Invalid MCP configuration: ${normalizeVirtualPath(sourcePath)}`)
+  }
+  const mcpServers = Object.fromEntries(
+    Object.entries(raw.mcpServers).map(([name, server]) => [name, normalizeMcpServer(server, name)]),
+  )
+  return encodeJson(AgentPluginMcpConfigSchema.parse({
+    $schema: AGENT_PLUGIN_MCP_SCHEMA_URL,
+    mcpServers,
+  }))
+}
+
+function normalizeMcpServer(server: unknown, name: string) {
+  if (!isRecord(server)) throw new Error(`Invalid MCP server ${name}`)
+  if (typeof server.command === 'string') {
+    return compactObject({
+      type: 'stdio',
+      command: server.command,
+      args: server.args,
+      env: server.env,
+      cwd: server.cwd,
+    })
+  }
+  if (typeof server.url === 'string') {
+    return compactObject({
+      type: server.type === 'sse' ? 'sse' : 'streamable-http',
+      url: server.url,
+      headers: server.headers,
+    })
+  }
+  throw new Error(`Invalid MCP server ${name}`)
+}
+
+function compactObject(value: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined))
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function relativeWithin(sourcePath: string, filePath: string) {

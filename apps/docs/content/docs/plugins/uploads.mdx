@@ -47,7 +47,7 @@ agentrig plugin status <submission-id>
 
 The hosted web submission UI at `/submit` is disabled for 1.0.
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 ## What happens after submission
 
@@ -96,7 +96,7 @@ Submission validates at least:
 - repo reachability and normalization
 - tag-to-SHA consistency
 - exact plugin root existence
-- `.plugin/plugin.json` presence and validity
+- `plugin.json` presence and validity
 - manifest version consistency with the submitted tag
 - path safety, symlink/submodule rejection, and forbidden file types
 - install surface and scan results needed for later registry artifacts

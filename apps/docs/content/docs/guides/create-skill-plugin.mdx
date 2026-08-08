@@ -18,30 +18,32 @@ agentrig plugin init acme.my-skill-plugin
 
 Place your skill under `skills/<skill-name>/SKILL.md` and any supporting scripts alongside it.
 
-## 3. Update `.plugin/plugin.json`
+## 3. Update `plugin.json`
 
-The scaffold already creates `.plugin/plugin.json`. Edit it in place after you add your real metadata and files.
-It uses the Open Plugins manifest shape:
+The scaffold already creates `plugin.json`. Edit it in place after you add your real metadata and files.
+It uses the Agent Plugins manifest shape:
 
 ```json
 {
-  "$schema": "https://agentrig.ai/schema/plugin.v1.json",
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "acme.my-skill-plugin",
   "version": "0.1.0",
   "description": "A reusable skill plugin.",
   "author": { "name": "Your Name" },
   "license": "MIT",
   "keywords": [],
-  "x-agentrig": {
-    "displayName": "My Skill Plugin",
-    "kind": "plugin",
-    "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
-    "pluginDependencies": []
+  "extensions": {
+    "ai.agentrig": {
+      "displayName": "My Skill Plugin",
+      "kind": "plugin",
+      "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+      "pluginDependencies": []
+    }
   }
 }
 ```
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 ## 4. Test locally
 

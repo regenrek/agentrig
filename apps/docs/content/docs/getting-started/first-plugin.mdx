@@ -9,7 +9,7 @@ icon: Box
 This page is for plugin authors.
 If you want to consume plugins from registries, start with [Getting started](/getting-started).
 
-A plugin is a folder with `.plugin/plugin.json` and the files you want to distribute.
+A plugin is a folder with `plugin.json` and the files you want to distribute.
 
 ## Scaffold the plugin
 
@@ -21,40 +21,42 @@ This creates a folder like:
 
 ```text
 acme.hello-skills/
-  .plugin/plugin.json
+  plugin.json
   skills/hello-skills/SKILL.md
   README.md
 ```
 
-The scaffolded manifest uses the Open Plugins shape:
+The scaffolded manifest uses the Agent Plugins shape:
 
 ```json
 {
-  "$schema": "https://agentrig.ai/schema/plugin.v1.json",
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "acme.hello-skills",
   "version": "0.1.0",
   "description": "A reusable AgentRig plugin.",
   "author": { "name": "Your Name" },
   "license": "MIT",
   "keywords": [],
-  "x-agentrig": {
-    "displayName": "Hello Skills",
-    "kind": "plugin",
-    "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
-    "pluginDependencies": []
+  "extensions": {
+    "ai.agentrig": {
+      "displayName": "Hello Skills",
+      "kind": "plugin",
+      "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+      "pluginDependencies": []
+    }
   }
 }
 ```
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 ## Add files
 
 Add skills, scripts, hooks, agents, or MCP config under the plugin directory.
-The scaffold already creates `.plugin/plugin.json`. Update it after you add your real files:
+The scaffold already creates `plugin.json`. Update it after you add your real files:
 
 ```bash
-$EDITOR .plugin/plugin.json
+$EDITOR plugin.json
 ```
 
 ## Test locally
@@ -66,4 +68,4 @@ cd ..
 agentrig plugin export --agent codex --pluginsDir ./acme.hello-skills --out dist/codex-marketplace
 ```
 
-Next, learn about [`.plugin/plugin.json`](/plugins/meta-json) and [`agentrig plugin`](/cli/plugin).
+Next, learn about [`plugin.json`](/plugins/meta-json) and [`agentrig plugin`](/cli/plugin).

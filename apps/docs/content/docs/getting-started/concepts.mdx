@@ -11,7 +11,7 @@ Agentrig is built around a few simple primitives.
 ## Plugins
 
 A plugin is a versioned bundle of files identified by the canonical id format `namespace.plugin`.
-Published versions carry `.plugin/plugin.json` plus the required source, lock, and review artifacts.
+Published versions carry `plugin.json` plus the required source, lock, and review artifacts.
 
 Plugins are AgentRig's primary distribution unit. A plugin can contain skills,
 MCP servers, hooks, commands, assets, and supporting files.
@@ -77,9 +77,9 @@ AgentRig trust tiers are:
 
 ## Manifests
 
-Plugin source directories carry `.plugin/plugin.json`. AgentRig plugin manifests
-are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification)
+Plugin source directories carry `plugin.json`. AgentRig plugin manifests
+are [Agent Plugins 1.0.0](https://agent-plugins.org/specification)
 conformant. `name` is the canonical plugin id, and AgentRig-specific fields live
-under `x-agentrig`.
+under `extensions["ai.agentrig"]`.
 
 The CLI stores installed plugins in `.agentrig/manifest.json` so it can remove or update them safely later.

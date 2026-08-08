@@ -5,6 +5,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import {
   PluginManifestSchema as pluginManifestSchema,
+  agentRigPluginExtension,
   pluginManifestListingCategory,
   sanitizeProviderPluginName,
   type PluginManifest,
@@ -371,7 +372,7 @@ export function pluginAuthor(meta: PluginSourceManifest, owner: PluginOwner) {
 }
 
 export function pluginDisplayName(meta: PluginSourceManifest) {
-  return meta['x-agentrig']?.displayName ?? meta.name
+  return agentRigPluginExtension(meta)?.displayName ?? meta.name
 }
 
 export function pluginCategory(meta: PluginSourceManifest) {
@@ -387,15 +388,15 @@ export function providerPluginName(
 }
 
 export async function readPluginManifest(pluginSourceDir: string) {
-  const manifestPath = path.join(pluginSourceDir, '.plugin', 'plugin.json')
+  const manifestPath = path.join(pluginSourceDir, 'plugin.json')
   const raw = await readJsonFile<unknown>(manifestPath)
   if (!raw) {
-    throw new Error(`Missing .plugin/plugin.json in ${pluginSourceDir}`)
+    throw new Error(`Missing plugin.json in ${pluginSourceDir}`)
   }
   const meta = pluginManifestSchema.safeParse(raw)
   if (!meta.success) {
     const issue = meta.error.issues[0]
-    throw new Error(`Invalid .plugin/plugin.json in ${pluginSourceDir}: ${issue?.message ?? 'invalid data'}`)
+    throw new Error(`Invalid plugin.json in ${pluginSourceDir}: ${issue?.message ?? 'invalid data'}`)
   }
   return meta.data
 }

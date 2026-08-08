@@ -74,7 +74,7 @@ export function validatePluginManifest(raw: unknown, _policy?: PluginUploadPolic
   const parsed = PluginManifestSchema.safeParse(raw)
   if (!parsed.success) {
     const issue = parsed.error.issues[0]
-    throw new Error(`Invalid .plugin/plugin.json: ${issue?.message ?? 'invalid data'}`)
+    throw new Error(`Invalid plugin.json: ${issue?.message ?? 'invalid data'}`)
   }
   return parsed.data
 }

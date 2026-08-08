@@ -198,7 +198,7 @@ async function cutOverLegacyPluginInstallLedger(
   }
   await savePluginInstallLedger(cwd, scope, emptyLedger)
   console.warn(
-    `AgentRig reset the plugin install ledger for the Open Plugins manifest cut. Previously installed plugins must be reinstalled. Archived the previous ledger to ${backupPath}.`
+    `AgentRig reset the plugin install ledger for the Agent Plugins manifest cut. Previously installed plugins must be reinstalled. Archived the previous ledger to ${backupPath}.`
   )
   return emptyLedger
 }

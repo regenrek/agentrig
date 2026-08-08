@@ -93,15 +93,13 @@ describe('validatePluginBundle', () => {
   it('accepts a tiny canonical bundle under the local plugin policy', async () => {
     const zipBytes = await buildZip([
       {
-        path: '.plugin/plugin.json',
+        path: 'plugin.json',
         content: JSON.stringify({
-          $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+          $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
           name: 'demo.test-plugin',
           description: 'Demo plugin',
           version: '1.0.0',
-          'x-agentrig': {
-            displayName: 'Test Plugin',
-          },
+          extensions: { 'ai.agentrig': { displayName: 'Test Plugin' } },
         }),
       },
       {
@@ -125,19 +123,17 @@ describe('validatePluginBundle', () => {
   it('rejects user-supplied derived install metadata', async () => {
     const zipBytes = await buildZip([
       {
-        path: '.plugin/plugin.json',
+        path: 'plugin.json',
         content: JSON.stringify({
-          $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+          $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
           name: 'demo.demo-plugin',
           description: 'Demo plugin',
           version: '1.0.0',
-          'x-agentrig': {
-            displayName: 'Demo Plugin',
-          },
+          extensions: { 'ai.agentrig': { displayName: 'Demo Plugin' } },
         }),
       },
       {
-        path: '.plugin/install.json',
+        path: 'ai.agentrig/install.json',
         content: JSON.stringify({ files: [{ path: 'skills/demo/SKILL.md' }] }),
       },
       {
@@ -149,7 +145,7 @@ describe('validatePluginBundle', () => {
     await expect(validatePluginBundle(zipBytes, TEST_POLICY)).rejects.toEqual(
       expect.objectContaining<Partial<PluginSubmissionValidationError>>({
         errors: expect.arrayContaining([
-          expect.stringMatching(/must not include \.plugin\/install\.json/i),
+          expect.stringMatching(/must not include ai\.agentrig\/install\.json/i),
         ]),
       })
     )

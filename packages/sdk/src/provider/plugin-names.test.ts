@@ -4,13 +4,13 @@ import { isValidPluginName, sanitizeProviderPluginName, type ProviderPluginNameT
 const targets: ProviderPluginNameTarget[] = ['codex', 'cursor', 'claude']
 
 describe('isValidPluginName', () => {
-  it('accepts Open Plugins names with lowercase letters, digits, dots, and hyphens', () => {
+  it('accepts Agent Plugins names with lowercase letters, digits, dots, and hyphens', () => {
     expect(isValidPluginName('regenrek.agent-skills')).toBe(true)
     expect(isValidPluginName('agentrig')).toBe(true)
     expect(isValidPluginName('a1.b2-c3')).toBe(true)
   })
 
-  it('rejects malformed Open Plugins names', () => {
+  it('rejects malformed Agent Plugins names', () => {
     expect(isValidPluginName('')).toBe(false)
     expect(isValidPluginName('AgentRig')).toBe(false)
     expect(isValidPluginName('-agentrig')).toBe(false)

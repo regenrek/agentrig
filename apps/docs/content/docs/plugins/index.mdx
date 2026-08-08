@@ -6,13 +6,13 @@ icon: Package
 
 # Plugins overview
 
-A plugin is a portable unit of workflow logic. Each plugin ships files plus a `.plugin/plugin.json` file that describes how to install them.
+A plugin is a portable unit of workflow logic. Each plugin ships files plus a `plugin.json` file that describes how to install them.
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 <Files>
   <Folder name="plugin-name" defaultOpen>
-    <File name=".plugin/plugin.json" />
+    <File name="plugin.json" />
     <Folder name="skills" defaultOpen>
       <Folder name="committer" defaultOpen>
         <File name="SKILL.md" />
@@ -27,7 +27,7 @@ AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plug
 
 ## What the CLI does
 
-- Reads the plugin `.plugin/plugin.json`.
+- Reads the plugin `plugin.json`.
 - Validates target paths and hashes.
 - Writes files to the target directory (`{{skillsDir}}` by default).
 - Records the install in `.agentrig/manifest.json`.

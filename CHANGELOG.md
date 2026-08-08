@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### BREAKING: Agent Plugins 1.0.0
+
+- Adopted [Agent Plugins v1](https://agent-plugins.org/specification) as the canonical package contract.
+- New plugins use root `plugin.json`, portable `skills/*/SKILL.md`, root `mcp.json`, and the official schema URLs.
+- AgentRig metadata now lives under `extensions["ai.agentrig"]`; AgentRig-specific files live under `ai.agentrig/`.
+- Removed the live `.plugin/plugin.json` and `x-agentrig` authoring paths. Immutable already-published registry snapshots remain the only historical exception.
+
 ## [0.8.2] - 2026-05-12
 
 ### Fixed

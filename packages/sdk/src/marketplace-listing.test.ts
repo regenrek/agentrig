@@ -1,10 +1,10 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   buildRegistryMirrorArtifactsFromInstallBundle,
   InstallBundleSchema,
   MarketplaceListingPublicSchema,
   MarketplaceListingSchema,
-  PluginManifestSchema,
   isResolvable,
   verifyInstallBundleHashes,
   type InstallBundle,
@@ -40,6 +40,30 @@ const bundle: InstallBundle = InstallBundleSchema.parse({
       path: 'README.md',
       sha256: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
       size: 5,
+    },
+  ],
+})
+
+const pluginManifestText = `${JSON.stringify({
+  $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+  name: 'acme.demo',
+  version: '1.0.0',
+  description: 'A demo plugin.',
+  extensions: {
+    'ai.agentrig': {
+      listing: { category: 'Development' },
+    },
+  },
+}, null, 2)}\n`
+
+const mirrorBundle: InstallBundle = InstallBundleSchema.parse({
+  ...bundle,
+  file_list: [
+    ...bundle.file_list,
+    {
+      path: 'plugin.json',
+      sha256: createHash('sha256').update(pluginManifestText).digest('hex'),
+      size: Buffer.byteLength(pluginManifestText),
     },
   ],
 })
@@ -136,46 +160,13 @@ describe('marketplace listing contracts', () => {
     expect(isResolvable({ ...listing, installability: 'taken_down' })).toBe(false)
   })
 
-  it('parses the Open Plugins manifest shape with only name required', () => {
-    const manifest = PluginManifestSchema.parse({
-      $schema: 'https://agentrig.ai/schema/plugin.v1.json',
-      name: 'agentrig.core',
-      author: { email: 'plugins@example.com' },
-      homepage: 'https://example.com/agentrig.core',
-      commands: { review: './commands/review.md' },
-      'x-agentrig': {
-        displayName: 'Core',
-        listing: {
-          category: 'Development',
-        },
-      },
-    })
-
-    expect(manifest).toMatchObject({
-      name: 'agentrig.core',
-      author: { email: 'plugins@example.com' },
-      homepage: 'https://example.com/agentrig.core',
-      'x-agentrig': {
-        displayName: 'Core',
-        listing: {
-          category: 'Development',
-        },
-      },
-    })
-    expect(manifest.version).toBeUndefined()
-    expect(manifest.description).toBeUndefined()
-    expect((manifest as Record<string, unknown>).commands).toEqual({ review: './commands/review.md' })
-  })
-
-  it('validates Open Plugins name and version syntax', () => {
-    expect(() => PluginManifestSchema.parse({ name: 'agentrig--core' })).toThrow()
-    expect(() => PluginManifestSchema.parse({ name: 'agentrig.core', version: 'latest' })).toThrow()
-  })
-
   it('emits the required registry LICENSE file from listing license metadata', async () => {
     const artifacts = await buildRegistryMirrorArtifactsFromInstallBundle({
-      bundle,
-      files: [{ path: 'README.md', bytes: 'hello' }],
+      bundle: mirrorBundle,
+      files: [
+        { path: 'README.md', bytes: 'hello' },
+        { path: 'plugin.json', bytes: pluginManifestText },
+      ],
       submissionId: 'submission-1',
       reviewedAt: 1,
       advisoriesDocument: { generated_at: '1970-01-01T00:00:00Z', items: [] },
@@ -186,6 +177,12 @@ describe('marketplace listing contracts', () => {
     const lockFile = artifacts.generatedFiles.find((file) => file.path.endsWith('/AGENTRIG_LOCK.json'))
 
     expect(licenseFile).toMatchObject({ content: 'MIT\n' })
+    expect(artifacts.historyDocument.active_version.manifest).toBe(
+      'plugins/acme/demo/versions/1.0.0/plugin.json'
+    )
+    expect(artifacts.generatedFiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'plugins/acme/demo/versions/1.0.0/plugin.json' }),
+    ]))
     expect(JSON.parse(lockFile!.content).file_digests).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

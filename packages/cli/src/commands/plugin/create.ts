@@ -4,11 +4,12 @@ import { promises as fs } from 'node:fs'
 import { defineCommand, showUsage } from 'citty'
 import { writeJsonFile } from '../../lib/fs'
 import type { PluginManifest } from '../../lib/types'
+import { AGENT_PLUGIN_MANIFEST_SCHEMA_URL, AGENTRIG_EXTENSION_NAMESPACE } from '@agentrig/sdk'
 
 const args = {
   dir: {
     type: 'positional',
-    description: 'Plugin directory to scan (contains .plugin/, skills/, etc.)',
+    description: 'Plugin directory to scan (contains plugin.json, skills/, etc.)',
     required: true,
   },
   id: {
@@ -30,7 +31,7 @@ const args = {
   },
   out: {
     type: 'string',
-    description: 'Output plugin manifest path (defaults to <dir>/.plugin/plugin.json)',
+    description: 'Output plugin manifest path (defaults to <dir>/plugin.json)',
   },
   force: {
     type: 'boolean',
@@ -55,7 +56,7 @@ function deriveDisplayName(id: string) {
 const command = defineCommand({
   meta: {
     name: 'create',
-    description: 'Create a .plugin/plugin.json manifest for a plugin directory.',
+    description: 'Create a plugin.json manifest for a plugin directory.',
   },
   args,
   async run({ args }) {
@@ -66,7 +67,7 @@ const command = defineCommand({
     const pluginId = args.id ?? path.basename(dirAbs)
     const outPath = args.out
       ? (path.isAbsolute(args.out) ? args.out : path.join(cwd, args.out))
-      : path.join(dirAbs, '.plugin', 'plugin.json')
+      : path.join(dirAbs, 'plugin.json')
 
     if (!args.force) {
       try {
@@ -80,12 +81,14 @@ const command = defineCommand({
     await fs.mkdir(path.dirname(outPath), { recursive: true })
 
     const manifest: PluginManifest = {
-      $schema: 'https://agentrig.ai/schema/plugin.v1.json',
+      $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
       name: pluginId,
       description: args.description ?? `${deriveDisplayName(pluginId)} plugin for AgentRig`,
       version: args.version,
-      'x-agentrig': {
-        displayName: args.name ?? deriveDisplayName(pluginId),
+      extensions: {
+        [AGENTRIG_EXTENSION_NAMESPACE]: {
+          displayName: args.name ?? deriveDisplayName(pluginId),
+        },
       },
     }
 

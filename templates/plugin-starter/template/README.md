@@ -2,7 +2,7 @@
 
 __PLUGIN_DESCRIPTION__
 
-This manifest is compatible with the [Open Plugins specification](https://open-plugins.com/plugin-builders/specification).
+This manifest is compatible with the [Agent Plugins specification](https://agent-plugins.org/specification).
 
 ## Publishing
 
@@ -32,17 +32,15 @@ After installation, the provider plugin will expose this plugin's skills, comman
 
 ```
 __PLUGIN_ID__/
-├── .plugin/
-│   └── plugin.json     # Plugin manifest
+├── plugin.json         # Agent Plugins v1 manifest
 ├── skills/             # Skills directory
 │   └── __PLUGIN_SLUG__/  # Main skill
 │       └── SKILL.md    # Skill instructions
-├── agents/             # Subagents (optional)
-├── hooks/              # Hooks (optional)
-│   └── hooks.json
-├── rules/              # Rule files (optional)
-├── .mcp.json           # MCP servers (optional)
-├── .lsp.json           # LSP servers (optional)
+├── mcp.json            # Portable MCP servers (optional)
+├── ai.agentrig/        # AgentRig-specific components (optional)
+│   ├── agents/
+│   ├── hooks/
+│   └── rules/
 └── CHANGELOG.md        # Plugin changelog
 ```
 
@@ -50,8 +48,8 @@ __PLUGIN_ID__/
 
 ### Refresh plugin metadata
 
-Update `.plugin/plugin.json` when plugin identity or public metadata changes.
-AgentRig-specific configuration belongs under `x-agentrig`.
+Update `plugin.json` when plugin identity or public metadata changes.
+AgentRig-specific configuration belongs under `extensions["ai.agentrig"]`; AgentRig-specific files belong under `ai.agentrig/`.
 
 ### Export for Claude Marketplace
 

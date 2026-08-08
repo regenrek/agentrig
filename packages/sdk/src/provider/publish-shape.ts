@@ -25,7 +25,7 @@ export const PUBLISH_SHAPE_DEFINITIONS = {
   plugin_all: {
     id: 'plugin_all',
     label: 'Submit full plugin',
-    description: "Publish this repo's existing detected `.plugin/plugin.json` plugin as-is.",
+    description: "Publish this repo's existing detected Agent Plugins v1 `plugin.json` as-is.",
   },
   generated_plugin: {
     id: 'generated_plugin',
@@ -300,7 +300,7 @@ function blockedReasonForShape(
   }
   if (selectedArtifacts.length === 0) return `${shape} requires at least one selected artifact.`
   if (shape === 'generated_plugin') {
-    if (scan.pluginCandidate) return 'generated_plugin is only available when no .plugin/plugin.json candidate exists.'
+    if (scan.pluginCandidate) return 'generated_plugin is only available when no Agent Plugins v1 plugin.json candidate exists.'
     return transformPlan?.includedSelectors.length ? undefined : 'generated_plugin requires at least one transformable selected artifact.'
   }
   const notClosed = selectedArtifacts.filter((artifact) => artifact.closureStatus !== 'closed')

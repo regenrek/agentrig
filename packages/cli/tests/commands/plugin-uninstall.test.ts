@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   loadPluginInstallLedgers: vi.fn(),
   listPluginInstallRecords: vi.fn(),
+  listSelectionInstallRecords: vi.fn(),
+  uninstallSelectionInstallRecords: vi.fn(),
   resolvePluginInstallSpecIdentity: vi.fn(),
   isSamePluginInstallSpecIdentity: vi.fn(),
   parsePluginProviderSelector: vi.fn(),
@@ -18,6 +20,11 @@ vi.mock('../../src/lib/config', () => ({
 vi.mock('../../src/lib/plugin-install-ledger', () => ({
   loadPluginInstallLedgers: mocks.loadPluginInstallLedgers,
   listPluginInstallRecords: mocks.listPluginInstallRecords,
+  listSelectionInstallRecords: mocks.listSelectionInstallRecords,
+}))
+
+vi.mock('../../src/lib/artifact-selection-install', () => ({
+  uninstallSelectionInstallRecords: mocks.uninstallSelectionInstallRecords,
 }))
 
 vi.mock('../../src/lib/plugin-install-spec', () => ({
@@ -41,6 +48,13 @@ describe('command:plugin uninstall', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     mocks.parsePluginProviderSelector.mockReturnValue('cursor')
     mocks.loadPluginInstallLedgers.mockResolvedValue({})
+    mocks.listSelectionInstallRecords.mockReturnValue([])
+    mocks.uninstallSelectionInstallRecords.mockResolvedValue({
+      removed: [],
+      kept: [],
+      missing: [],
+      clearedRecordIds: [],
+    })
     mocks.loadConfig.mockResolvedValue({ registries: [{ name: 'agentrig', url: 'https://agentrig.ai/registry' }] })
     mocks.resolvePluginInstallSpecIdentity.mockResolvedValue({
       kind: 'registry',
@@ -151,5 +165,45 @@ describe('command:plugin uninstall', () => {
       ],
       { cwd: '/sandbox/workspace', dryRun: false },
     )
+  })
+
+  it('uninstalls external-repo Selection records by generated plugin id', async () => {
+    const selection = {
+      id: 'selection:cursor:personal:sha256:test',
+      provider: 'cursor',
+      scope: 'personal',
+      pluginId: 'external.skills',
+      selectedSelectors: ['skill:doc-coauthoring'],
+      targetPaths: ['/sandbox/.cursor/skills/doc-coauthoring/SKILL.md'],
+      specIdentity: {
+        kind: 'external-repo',
+        repoUrl: 'https://github.com/anthropics/skills',
+        scanDigest: 'abc123',
+        pickedSignalPaths: ['skills/doc-coauthoring'],
+        pluginId: 'external.skills',
+        version: '0.1.0',
+      },
+    }
+    mocks.listPluginInstallRecords.mockReturnValue([])
+    mocks.listSelectionInstallRecords.mockReturnValue([selection])
+
+    await run({
+      args: {
+        provider: 'cursor',
+        spec: 'external.skills',
+        cwd: '/sandbox/workspace',
+        scope: 'personal',
+        dryRun: false,
+        help: false,
+      },
+    })
+
+    expect(mocks.resolvePluginInstallSpecIdentity).not.toHaveBeenCalled()
+    expect(mocks.uninstallSelectionInstallRecords).toHaveBeenCalledWith({
+      cwd: '/sandbox/workspace',
+      records: [selection],
+      dryRun: false,
+    })
+    expect(mocks.uninstallPluginProviders).not.toHaveBeenCalled()
   })
 })

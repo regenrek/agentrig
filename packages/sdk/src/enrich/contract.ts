@@ -50,7 +50,7 @@ export const aiEnrichmentDraftSchema: z.ZodType<AiEnrichmentDraft> = z
       .string()
       .trim()
       .toLowerCase()
-      .refine(isValidPluginName, 'Suggested plugin name must be a valid Open Plugins name')
+      .refine(isValidPluginName, 'Suggested plugin name must be a valid Agent Plugins name')
       .optional(),
   })
   .strict()
@@ -109,7 +109,7 @@ export function buildEnrichmentPrompt(input: EnrichmentPromptInput) {
     'You fill missing AgentRig plugin metadata from deterministic evidence.',
     'Return only JSON matching: { "description"?: string, "keywords"?: string[], "suggestedPluginId"?: string }.',
     'Keywords must be lowercase slug tokens: letters, numbers, or hyphens only; no spaces, underscores, punctuation, marketing terms, or duplicates.',
-    'suggestedPluginId must be a lowercase Open Plugins name using letters, numbers, dots, and hyphens only.',
+    'suggestedPluginId must be a lowercase Agent Plugins name using letters, numbers, dots, and hyphens only.',
     'Do not invent capabilities. Do not include markdown links. Keep output draft-only and evidence-bound.',
   ].join(' ')
 

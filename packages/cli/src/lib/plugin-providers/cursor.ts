@@ -29,6 +29,7 @@ import {
   providerPluginName,
   removeInstalledFiles,
 } from './shared'
+import { writeCursorProviderFiles } from './provider-pointers'
 
 function resolveCursorInstallRoot(cwd: string, scope: 'personal' | 'workspace') {
   if (scope === 'workspace') {
@@ -39,15 +40,14 @@ function resolveCursorInstallRoot(cwd: string, scope: 'personal' | 'workspace') 
 
 async function copyCursorPlugin(pluginSourceDir: string, pluginDir: string) {
   await copyEntries(pluginSourceDir, pluginDir, [
-    'rules',
+    { source: 'ai.agentrig/rules', destination: 'rules' },
     'skills',
-    'agents',
-    'commands',
-    'hooks',
+    { source: 'ai.agentrig/agents', destination: 'agents' },
+    { source: 'ai.agentrig/commands', destination: 'commands' },
+    { source: 'ai.agentrig/hooks', destination: 'hooks' },
     'assets',
     'scripts',
     'README.md',
-    { source: '.mcp.json', destination: 'mcp.json' },
     'mcp.json',
   ])
 }
@@ -114,9 +114,10 @@ export const cursorProvider: PluginProviderAdapter = {
       const pluginDir = path.join(pluginRoot, pluginName)
       await copyCursorPlugin(plugin.pluginSourceDir, pluginDir)
       const features = await detectPluginFeatures(pluginDir)
+      await writeCursorProviderFiles(pluginDir, plugin, features)
       await writeJsonFile(
         path.join(pluginDir, '.cursor-plugin', 'plugin.json'),
-        buildCursorPluginManifest(plugin, cfg.owner, features, pluginName)
+        buildCursorPluginManifest(plugin, cfg.owner, { ...features, hasRules: true }, pluginName)
       )
     }
 

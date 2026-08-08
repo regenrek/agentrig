@@ -13,7 +13,7 @@ Instead of rebuilding the same setup for every repo or assistant, you can author
 
 <Cards>
   <Card title="Getting started" href="/getting-started" description="Learn how agentrig helps and how to try it quickly." />
-  <Card title="Plugins" href="/plugins" description="Define .plugin/plugin.json, files, and dependencies." />
+  <Card title="Plugins" href="/plugins" description="Define plugin.json, files, and dependencies." />
   <Card title="Registry" href="/registry" description="Understand verified mirrors and how install trust differs from discovery." />
   <Card title="Rigs" href="/rigs" description="Combine plugins into reusable setups for teams and projects." />
   <Card title="CLI" href="/cli" description="Commands and flags with examples." />
@@ -25,8 +25,8 @@ Instead of rebuilding the same setup for every repo or assistant, you can author
 </Cards>
 
 <Callout title="What is a plugin?">
-A plugin is a folder with `.plugin/plugin.json` plus the files you want to install (skills, scripts, hooks, agents, MCP, and more).
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant, with AgentRig-specific fields under `x-agentrig`.
+A plugin is a folder with `plugin.json` plus the files you want to install (skills, scripts, hooks, agents, MCP, and more).
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant, with AgentRig-specific fields under `extensions["ai.agentrig"]`.
 The CLI's public install contract is the AgentRig `InstallBundle` resolved from
 approved registry/catalog listings.
 </Callout>

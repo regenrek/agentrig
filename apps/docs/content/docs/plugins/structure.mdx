@@ -6,35 +6,33 @@ icon: FolderTree
 
 # Plugin structure
 
-Plugins are flexible; the required files are `.plugin/plugin.json` and `README.md`.
-The rest of the tree can include any files you want installed.
+Every plugin requires a root `plugin.json`. A README is recommended but not required.
 
-AgentRig plugin manifests are [Open Plugins 1.0.0](https://open-plugins.com/plugin-builders/specification) conformant. AgentRig-specific fields live under `x-agentrig`.
+AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 ## Common layout
 
 ```
 plugin-name/
-  .plugin/plugin.json
+  plugin.json
   skills/
     <skill-name>/
       SKILL.md
       scripts/
-  scripts/
-  agents/
-  commands/
-  hooks/
-    hooks.json
-  .mcp.json
-  .lsp.json
+  mcp.json
+  ai.agentrig/
+    scripts/
+    agents/
+    commands/
+    hooks/
+      hooks.json
+    lsp.json
 ```
 
 ## Notes
 
-- **skills/** maps to `{{skillsDir}}` by default during install.
-- **scripts/** and other folders install exactly where `.plugin/plugin.json` targets specify.
-- **hooks/**, **agents/**, **commands/** are bundled into plugin exports when the target integration supports them.
-- **.mcp.json** is bundled into plugin exports that support MCP servers.
-- **.lsp.json** is bundled into plugin exports that support LSP configuration.
+- **skills/** and root **mcp.json** are the portable Agent Plugins v1 components.
+- **ai.agentrig/** contains AgentRig-specific components such as commands, hooks, agents, rules, and LSP settings.
+- Provider emitters translate AgentRig-specific components into each provider's native layout.
 
-Use `agentrig plugin create` to scan a directory and generate a matching `.plugin/plugin.json`.
+Use `agentrig plugin create` to scan a directory and generate a matching `plugin.json`.

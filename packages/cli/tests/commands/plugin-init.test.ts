@@ -33,10 +33,10 @@ describe('command:plugin:init', () => {
     })
 
     const manifest = JSON.parse(
-      await fs.readFile(path.join(root, 'acme.review-tools', '.plugin', 'plugin.json'), 'utf-8'),
-    ) as { 'x-agentrig'?: { listing?: { category?: string } } }
+      await fs.readFile(path.join(root, 'acme.review-tools', 'plugin.json'), 'utf-8'),
+    ) as { extensions?: { 'ai.agentrig'?: { listing?: { category?: string } } } }
 
-    expect(manifest['x-agentrig']?.listing?.category).toBe('Development')
+    expect(manifest.extensions?.['ai.agentrig']?.listing?.category).toBe('Development')
   })
 })
 

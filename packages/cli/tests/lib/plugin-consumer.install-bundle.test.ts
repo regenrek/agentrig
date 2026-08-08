@@ -36,7 +36,7 @@ describe('install bundle resolution and materialization', () => {
             },
           }),
         },
-        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        { pathname: '/raw/plugin.json', handler: () => ({ body: pluginJson }) },
         { pathname: '/raw/skills/typescript/SKILL.md', handler: () => ({ body: skill }) },
       ],
     })
@@ -129,7 +129,7 @@ describe('install bundle resolution and materialization', () => {
             },
           }),
         },
-        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        { pathname: '/raw/plugin.json', handler: () => ({ body: pluginJson }) },
       ],
     })
     servers.push(server)
@@ -153,7 +153,7 @@ describe('install bundle resolution and materialization', () => {
     const current = bundle('https://raw.githubusercontent.com/acme/repo/main', pluginJson, skill)
 
     await expect(verifyFetchedInstallBundleFiles(current, [
-      { path: '.plugin/plugin.json', bytes: pluginJson },
+      { path: 'plugin.json', bytes: pluginJson },
       {
         path: 'skills/typescript/SKILL.md',
         missing: true,
@@ -171,7 +171,7 @@ describe('install bundle resolution and materialization', () => {
     const current = {
       ...bundle('https://example.test', pluginJson, files.join('')),
       file_list: [
-        { path: '.plugin/plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
+        { path: 'plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
         ...files.map((content, index) => ({
           path: `skills/typescript/file-${index + 1}.md`,
           sha256: sha256Hex(content),
@@ -181,7 +181,7 @@ describe('install bundle resolution and materialization', () => {
     } satisfies InstallBundle
 
     await expect(verifyFetchedInstallBundleFiles(current, [
-      { path: '.plugin/plugin.json', bytes: pluginJson },
+      { path: 'plugin.json', bytes: pluginJson },
       { path: 'skills/typescript/file-1.md', bytes: files[0]! },
       {
         path: 'skills/typescript/file-2.md',
@@ -222,7 +222,7 @@ describe('install bundle resolution and materialization', () => {
 
     await expect(materializeResolvedPluginGraph(graph, {
       fetchInstallBundleFiles: async () => [
-        { path: '.plugin/plugin.json', bytes: pluginJson },
+        { path: 'plugin.json', bytes: pluginJson },
         { path: 'skills/typescript/SKILL.md', bytes: skill },
         { path: 'extras/secret.txt', bytes: 'extra' },
       ],
@@ -235,7 +235,7 @@ describe('install bundle resolution and materialization', () => {
     const current = bundle('https://example.test', pluginJson, '# Skill\n')
 
     await expect(verifyFetchedInstallBundleFiles(current, [
-      { path: '.plugin/plugin.json', bytes: pluginJson },
+      { path: 'plugin.json', bytes: pluginJson },
       { path: 'skills/typescript/SKILL.md', bytes: '# Skill\n' },
       { path: 'extra.txt', bytes: 'extra' },
     ])).rejects.toThrow(/extra.txt: extra/)
@@ -248,7 +248,7 @@ describe('install bundle resolution and materialization', () => {
     let maxActiveRequests = 0
     const server = await startFixtureServer({
       routes: [
-        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        { pathname: '/raw/plugin.json', handler: () => ({ body: pluginJson }) },
         {
           pathname: /^\/raw\/skills\/typescript\/file-(\d+)\.md$/,
           handler: async (_request, match) => {
@@ -265,7 +265,7 @@ describe('install bundle resolution and materialization', () => {
     const current = {
       ...bundle(server.baseUrl, pluginJson, files.join('')),
       file_list: [
-        { path: '.plugin/plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
+        { path: 'plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
         ...files.map((content, index) => ({
           path: `skills/typescript/file-${index + 1}.md`,
           sha256: sha256Hex(content),
@@ -285,7 +285,7 @@ describe('install bundle resolution and materialization', () => {
     const skill = '# URL-only skill\n'
     const server = await startFixtureServer({
       routes: [
-        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        { pathname: '/raw/plugin.json', handler: () => ({ body: pluginJson }) },
         { pathname: '/signed/skills/typescript/SKILL.md', handler: () => ({ body: skill }) },
       ],
     })
@@ -312,7 +312,7 @@ describe('install bundle resolution and materialization', () => {
     const urlSkill = '# URL skill\n'
     const server = await startFixtureServer({
       routes: [
-        { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+        { pathname: '/raw/plugin.json', handler: () => ({ body: pluginJson }) },
         { pathname: '/inline-url/skills/typescript/SKILL.md', handler: () => ({ body: urlSkill }) },
       ],
     })
@@ -328,7 +328,7 @@ describe('install bundle resolution and materialization', () => {
 
     try {
       await expect(
-        fs.readFile(path.join(materialized.pluginDir, '.plugin', 'plugin.json'), 'utf-8')
+        fs.readFile(path.join(materialized.pluginDir, 'plugin.json'), 'utf-8')
       ).resolves.toBe(pluginJson)
       await expect(
         fs.readFile(path.join(materialized.pluginDir, 'skills', 'typescript', 'SKILL.md'), 'utf-8')
@@ -356,7 +356,7 @@ describe('install bundle resolution and materialization', () => {
 async function installBundleServer(pluginJson: string, fetchedSkill: string, expectedSkill: string) {
   const server = await startFixtureServer({
     routes: [
-      { pathname: '/raw/.plugin/plugin.json', handler: () => ({ body: pluginJson }) },
+      { pathname: '/raw/plugin.json', handler: () => ({ body: pluginJson }) },
       { pathname: '/raw/skills/typescript/SKILL.md', handler: () => ({ body: fetchedSkill }) },
     ],
   })
@@ -391,7 +391,7 @@ function bundle(
     },
     source: { type: 'registry', url: `${baseUrl}/raw/` },
     file_list: [
-      { path: '.plugin/plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
+      { path: 'plugin.json', sha256: sha256Hex(pluginJson), size: Buffer.byteLength(pluginJson) },
       {
         path: 'skills/typescript/SKILL.md',
         sha256: sha256Hex(skill),
@@ -409,11 +409,10 @@ function sha256Hex(input: string) {
 
 function pluginManifestJson(name: string, displayName: string) {
   return JSON.stringify({
+    $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
     name,
     description: `${displayName} patterns.`,
     version: '0.1.0',
-    'x-agentrig': {
-      displayName,
-    },
+    extensions: { 'ai.agentrig': { displayName } },
   })
 }

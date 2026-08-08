@@ -4,10 +4,8 @@ import {
   CLI_SUPPORTED_ARTIFACT_KINDS,
   type ArtifactKind,
 } from './provider/artifact-kinds'
-import { isValidPluginName } from './provider/plugin-names'
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/
-const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 
 export const SUBMISSION_STATUSES = ['pending_review', 'approved', 'rejected', 'blocked'] as const
 export const REGISTRY_MIRROR_STATUSES = ['queued', 'opened', 'merged', 'failed'] as const
@@ -121,7 +119,7 @@ export const InstallBundleFileSchema = z.object({
   // the consumer must prefer this over the `source`-derived URL.
   url: z.string().trim().min(1).optional(),
   // Base64-encoded inline payload for synthesized files (e.g. server-built
-  // `.plugin/plugin.json`) that have no upstream source bytes. When present,
+  // `plugin.json`) that have no upstream source bytes. When present,
   // the consumer must use these bytes directly and skip any network fetch.
   inline: z.string().trim().min(1).optional(),
 })
@@ -328,58 +326,58 @@ export type DirectoryEntry = {
   keywords?: string[]
 }
 
-const OpenPluginAuthorSchema = z.object({
-  name: z.string().trim().min(1).optional(),
-  email: z.string().trim().min(1).optional(),
-  url: z.string().trim().min(1).optional(),
-})
+export type AgentRigInstallCommandEntry = {
+  server: string
+  command: string
+  args: string[]
+  envKeys: string[]
+}
 
-const AgentRigPluginListingSchema = z.object({
-  category: z.string().trim().min(1),
-})
-
-const AgentRigPluginExtensionSchema = z.object({
-  displayName: z.string().optional(),
-  kind: z.string().optional(),
-  listing: AgentRigPluginListingSchema.optional(),
-  configSchema: z.record(z.string(), z.any()).optional(),
-  pluginDependencies: z.array(z.string()).optional(),
-  source: z.any().optional(),
-})
-
-export const PluginManifestSchema = z.object({
-  $schema: z.string().trim().min(1).optional(),
-  name: z.string().trim().refine(
-    isValidPluginName,
-    'Open Plugins name must be 1-64 lowercase letters, numbers, dots, or hyphens; start and end alphanumeric; and not contain "--" or ".."',
-  ),
-  description: z.string().optional(),
-  version: z.string().trim().regex(SEMVER_RE, 'Plugin version must be valid semver (x.y.z)').optional(),
-  author: OpenPluginAuthorSchema.optional(),
-  license: z.string().optional(),
-  homepage: z.string().optional(),
-  repository: z.string().optional(),
-  logo: z.string().optional(),
-  commands: z.any().optional(),
-  agents: z.any().optional(),
-  skills: z.any().optional(),
-  rules: z.any().optional(),
-  hooks: z.any().optional(),
-  mcpServers: z.any().optional(),
-  lspServers: z.any().optional(),
-  outputStyles: z.any().optional(),
-  keywords: z.array(z.string()).optional(),
-  'x-agentrig': AgentRigPluginExtensionSchema.optional(),
-})
-
-export type PluginManifest = z.infer<typeof PluginManifestSchema>
-
-export function pluginManifestListingCategory(manifest: Pick<PluginManifest, 'name' | 'x-agentrig'>) {
-  const category = manifest['x-agentrig']?.listing?.category?.trim()
-  if (!category) {
-    throw new Error(`Plugin ${manifest.name} is missing x-agentrig.listing.category.`)
+export function collectAgentRigInstallCommandEntries(sources: readonly unknown[]): AgentRigInstallCommandEntry[] {
+  const byIdentity = new Map<string, AgentRigInstallCommandEntry>()
+  for (const source of sources) {
+    const sourceRecord = isRecord(source) ? source : undefined
+    if (!sourceRecord) continue
+    for (const servers of [sourceRecord.mcpServers, sourceRecord.servers]) {
+      const serverRecord = isRecord(servers) ? servers : undefined
+      if (!serverRecord) continue
+      for (const [serverName, value] of Object.entries(serverRecord)) {
+        const server = isRecord(value) ? value : undefined
+        if (!server) continue
+        const command = typeof server?.command === 'string' ? server.command.trim() : ''
+        if (!command) continue
+        const entry: AgentRigInstallCommandEntry = {
+          server: serverName,
+          command,
+          args: stringValues(server.args),
+          envKeys: Object.keys(isRecord(server.env) ? server.env : {}).sort(),
+        }
+        byIdentity.set(stableJson(entry), entry)
+      }
+    }
   }
-  return category
+
+  return [...byIdentity.values()].sort((left, right) =>
+    left.server.localeCompare(right.server)
+      || left.command.localeCompare(right.command)
+      || left.args.join('\0').localeCompare(right.args.join('\0'))
+      || left.envKeys.join('\0').localeCompare(right.envKeys.join('\0'))
+  )
+}
+
+export async function agentRigInstallCommandFingerprint(sources: readonly unknown[]): Promise<string | undefined> {
+  const commands = collectAgentRigInstallCommandEntries(sources)
+  if (!commands.length) return undefined
+  return digestJson({
+    kind: 'agentrig.provider-install-commands.v1',
+    commands,
+  })
+}
+
+function stringValues(value: unknown) {
+  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+  if (typeof value === 'string' && value.trim()) return [value.trim()]
+  return []
 }
 
 export type RegistryFileDigest = {
@@ -655,9 +653,12 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
   const kind = listing.kind
   const category = kind === 'plugin' ? requiredPluginListingCategory(listing) : undefined
   const layout = registryLayoutForKind(kind)
+  if (kind === 'plugin' && !bundle.file_list.some((file) => file.path === 'plugin.json')) {
+    throw new Error(`Cannot mirror plugin ${artifactId}: install bundle is missing root plugin.json`)
+  }
   const version = listing.registryVersion ?? listing.version
   const versionRoot = `${layout.root}/${namespace}/${artifactName}/versions/${version}`
-  const manifestPath = `${versionRoot}/${layout.manifestDir}/${layout.manifestFile}`
+  const manifestPath = [versionRoot, layout.manifestDir, layout.manifestFile].filter(Boolean).join('/')
   const historyPath = `${layout.root}/${namespace}/${artifactName}/${layout.historyFile}`
   const reviewedAtIso = new Date(args.reviewedAt).toISOString()
   const source = bundle.source
@@ -978,7 +979,7 @@ function bytesFromFetchedFile(value: FetchedInstallFileBytes) {
 
 function registryLayoutForKind(kind: ArtifactKind) {
   if (kind === 'plugin') {
-    return { root: 'plugins', historyFile: 'plugin.json', manifestDir: '.plugin', manifestFile: 'plugin.json' }
+    return { root: 'plugins', historyFile: 'plugin.json', manifestDir: '', manifestFile: 'plugin.json' }
   }
   if (kind === 'skill') {
     return { root: 'skills', historyFile: 'skill.json', manifestDir: '.skill', manifestFile: 'skill.json' }

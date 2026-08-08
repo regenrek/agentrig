@@ -1,0 +1,18 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "__PLUGIN_ID__",
+  "version": "0.1.0",
+  "description": "__PLUGIN_DESCRIPTION__",
+  "author": { "name": "__PLUGIN_AUTHOR__" },
+  "license": "MIT",
+  "keywords": [],
+  "extensions": {
+    "ai.agentrig": {
+      "displayName": "__PLUGIN_NAME__",
+      "kind": "plugin",
+      "listing": { "category": "__PLUGIN_CATEGORY__" },
+      "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+      "pluginDependencies": []
+    }
+  }
+}

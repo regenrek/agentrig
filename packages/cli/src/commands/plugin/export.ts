@@ -20,7 +20,7 @@ const command = defineCommand({
     },
     pluginsDir: {
       type: 'string',
-      description: 'Directory containing plugin folders (each with .plugin/plugin.json).',
+      description: 'Directory containing plugin folders (each with plugin.json).',
       default: 'plugins',
     },
     out: {
