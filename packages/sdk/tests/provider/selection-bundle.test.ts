@@ -22,8 +22,8 @@ describe('Selection Bundle construction', () => {
       kind: 'mcp',
       name: 'github',
       selector: 'mcp:github',
-      sourcePath: '.mcp.json',
-      fileDigests: [{ path: '.mcp.json', digest: 'sha256:mcp' }],
+      sourcePath: 'mcp.json',
+      fileDigests: [{ path: 'mcp.json', digest: 'sha256:mcp' }],
       dependencies: [],
       closureStatus: 'closed',
     }
@@ -54,7 +54,7 @@ describe('Selection Bundle construction', () => {
         keyPath: 'mcpServers',
         path: '.mcp.json',
         sourceDigest: 'sha256:mcp',
-        sourcePath: '.mcp.json',
+        sourcePath: 'mcp.json',
       },
     ])
   })

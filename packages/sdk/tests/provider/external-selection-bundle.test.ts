@@ -7,7 +7,7 @@ import { createMemoryTree } from '../repo-scan/memory-tree'
 describe('buildExternalSelectionBundle', () => {
   it('builds an installable external-repo-scan Selection Bundle from selected artifact paths', async () => {
     const tree = createMemoryTree({
-      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+      'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
       'README.md': '# Repo',
     })
     const report = await scanRepo({ source: { type: 'virtual', label: 'owner/repo' }, tree })

@@ -11,7 +11,7 @@ describe('local fs adapter', () => {
     await mkdir(path.join(root, 'skills', 'review'), { recursive: true })
     await mkdir(path.join(root, 'node_modules', 'ignored'), { recursive: true })
     await writeFile(path.join(root, 'README.md'), '# Repo\n')
-    await writeFile(path.join(root, 'skills', 'review', 'SKILL.md'), '---\nname: Review\ndescription: Reviews code.\n---\n')
+    await writeFile(path.join(root, 'skills', 'review', 'SKILL.md'), '---\nname: review\ndescription: Reviews code.\n---\n')
     await writeFile(path.join(root, 'node_modules', 'ignored', 'index.js'), 'ignored')
 
     const tree = createLocalFsVirtualTree(root)

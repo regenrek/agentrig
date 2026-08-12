@@ -189,7 +189,7 @@ describe('plugin provider command runner', () => {
       name: providerName,
       interface: {
         displayName: 'Agent Skills',
-        category: 'Development',
+        category: 'Other',
       },
     })
     await expect(
@@ -198,7 +198,7 @@ describe('plugin provider command runner', () => {
       plugins: [
         {
           name: providerName,
-          category: 'Development',
+          category: 'Other',
         },
       ],
     })
@@ -218,14 +218,20 @@ describe('plugin provider command runner', () => {
     })
   })
 
-  it('rejects Codex installs when plugin manifests omit the canonical category', async () => {
+  it('installs standard-only packages without a registry category in plugin.json', async () => {
     const root = await tempRoot()
     const cwd = path.join(root, 'workspace')
     const home = path.join(root, 'home')
     const pluginsRoot = path.join(root, 'plugins')
     await fs.mkdir(home, { recursive: true })
     vi.stubEnv('AGENTRIG_HOME', home)
-    await writePluginSource(pluginsRoot, 'regenrek.agent-skills', { category: false })
+    await writePluginSource(pluginsRoot, 'regenrek.agent-skills')
+    codexAppServerMocks.codexInstallPlugin.mockResolvedValue({
+      ok: true,
+      installPath: path.join(home, '.codex', 'plugins', 'cache', 'agentrig-local', 'agentrig-regenrek-agent-skills', '1.0.0'),
+      authPolicy: 'ON_INSTALL',
+      appsNeedingAuth: [],
+    })
 
     await expect(installPluginProviders({
       cwd,
@@ -235,8 +241,8 @@ describe('plugin provider command runner', () => {
       installMetadataByPluginId: {
         'regenrek.agent-skills': installMetadata('regenrek.agent-skills'),
       },
-    })).rejects.toThrow(/extensions\["ai\.agentrig"\]\.listing\.category/)
-    expect(codexAppServerMocks.codexInstallPlugin).not.toHaveBeenCalled()
+    })).resolves.toHaveLength(1)
+    expect(codexAppServerMocks.codexInstallPlugin).toHaveBeenCalledOnce()
   })
 
   it('passes Codex no-enable through to app-server installs', async () => {
@@ -612,7 +618,7 @@ async function tempRoot() {
 async function writePluginSource(
   pluginsRoot: string,
   pluginId: string,
-  options: { category?: boolean; skill?: boolean; mcp?: boolean; settings?: boolean; components?: boolean } = {}
+  options: { skill?: boolean; mcp?: boolean; settings?: boolean; components?: boolean } = {}
 ) {
   const pluginDir = path.join(pluginsRoot, pluginId)
   await fs.mkdir(pluginDir, { recursive: true })
@@ -641,8 +647,12 @@ async function writePluginSource(
           docs: {
             type: 'stdio',
             command: 'node',
-            args: ['./scripts/server.mjs'],
+            args: ['${PLUGIN_ROOT}/scripts/server.mjs'],
             cwd: '${PLUGIN_ROOT}',
+          },
+          invalid: {
+            type: 'stdio',
+            command: 'node server.mjs',
           },
         },
       }, null, 2)
@@ -667,7 +677,6 @@ async function writePluginSource(
     await fs.writeFile(path.join(pluginDir, 'ai.agentrig', 'lsp.json'), '{}\n')
     await fs.writeFile(path.join(pluginDir, 'ai.agentrig', 'app.json'), '{}\n')
   }
-  const includeCategory = options.category !== false
   await fs.writeFile(path.join(pluginDir, 'plugin.json'), `${JSON.stringify({
     $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
     name: pluginId,
@@ -676,7 +685,6 @@ async function writePluginSource(
     extensions: {
       'ai.agentrig': {
         displayName: 'Agent Skills',
-        ...(includeCategory ? { listing: { category: 'Development' } } : {}),
       },
     },
   }, null, 2)}\n`)

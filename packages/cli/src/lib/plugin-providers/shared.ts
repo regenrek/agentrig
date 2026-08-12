@@ -6,14 +6,15 @@ import { promisify } from 'node:util'
 import {
   PluginManifestSchema as pluginManifestSchema,
   agentRigPluginExtension,
-  pluginManifestListingCategory,
+  compileAgentPluginMcpServers,
+  inspectAgentPluginPackage,
   sanitizeProviderPluginName,
   type PluginManifest,
   type PluginFeatures,
   type ProviderPluginNameTarget,
 } from '@agentrig/sdk'
 import { z } from 'zod'
-import { ensureDir, pathExists, readJsonFile } from '../fs'
+import { ensureDir, pathExists, readJsonFile, writeJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
 import { getAgentRigHome } from '../paths'
 import type {
@@ -376,7 +377,7 @@ export function pluginDisplayName(meta: PluginSourceManifest) {
 }
 
 export function pluginCategory(meta: PluginSourceManifest) {
-  return pluginManifestListingCategory(meta)
+  return 'Other'
 }
 
 export function providerPluginName(
@@ -461,6 +462,38 @@ export async function copyEntries(pluginSourceDir: string, pluginDir: string, en
         : copyEntry(pluginSourceDir, pluginDir, entry.source, entry.destination)
     )
   )
+}
+
+export async function compileProviderMcp(
+  plugin: PluginEntry,
+  pluginDir: string,
+  provider: PluginProviderId,
+  destination: string,
+) {
+  const sourcePath = path.join(plugin.pluginSourceDir, 'mcp.json')
+  if (!(await pathExists(sourcePath))) return false
+  const content = await fs.readFile(sourcePath, 'utf-8')
+  const inspected = inspectAgentPluginPackage({
+    manifest: plugin.manifest,
+    mcp: { path: 'mcp.json', content },
+  })
+  if (!inspected.components.mcpServers.length) return false
+
+  const claude = provider === 'claude'
+  const compiled = compileAgentPluginMcpServers(inspected.components.mcpServers, {
+    provider,
+    pluginRoot: claude ? '${CLAUDE_PLUGIN_ROOT}' : '${PLUGIN_ROOT}',
+    pluginData: claude ? '${CLAUDE_PLUGIN_DATA}' : '${PLUGIN_DATA}',
+    ...(claude ? {
+      injectedEnv: {
+        CLAUDE_PLUGIN_ROOT: '${CLAUDE_PLUGIN_ROOT}',
+        CLAUDE_PLUGIN_DATA: '${CLAUDE_PLUGIN_DATA}',
+        CLAUDE_PROJECT_DIR: '${CLAUDE_PROJECT_DIR}',
+      },
+    } : {}),
+  })
+  await writeJsonFile(path.join(pluginDir, destination), compiled)
+  return true
 }
 
 export function resolveExportBaseOut(cwd: string, target: PluginProviderSelector, out?: string) {

@@ -1,4 +1,4 @@
-import { agentRigPluginExtension, type PluginManifest } from '../agent-plugins'
+import type { CapabilityProviderVerification } from './types'
 
 export type CapabilityProviderVerificationStatus =
   | {
@@ -18,12 +18,11 @@ export type CapabilityProviderVerificationStatus =
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export function evaluateCapabilityProviderVerification(
-  manifest: Pick<PluginManifest, 'extensions'>,
+  verification: CapabilityProviderVerification | undefined,
   now: Date
 ): CapabilityProviderVerificationStatus {
-  const verification = agentRigPluginExtension(manifest)?.verification
   if (!verification) {
-    return { stale: true, reason: 'Provider is missing extensions["ai.agentrig"].verification metadata.' }
+    return { stale: true, reason: 'Provider is missing control-plane verification metadata.' }
   }
 
   const lastVerified = parseUtcDateOnly(verification.lastVerified)

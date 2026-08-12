@@ -372,21 +372,11 @@ async function createDoctorFixture(options: {
   const context7 = {
     ...pluginManifest('third-party.context7', {
       profile: 'third-party',
-      providerTargets: ['codex', 'claude-code', 'cursor'],
       providesCapabilities: {
         'docs.latest': {
           type: 'tool',
           requiredByCore: false,
-          riskLevel: 'medium',
         },
-      },
-      verification: {
-        lastVerified: options.context7?.lastVerified ?? '2026-08-01',
-        cadence: '30d',
-        smokeTest: 'verify/context7-smoke.md',
-        ...(context7CommandFingerprint
-          ? { commandFingerprint: context7CommandFingerprint }
-          : {}),
       },
       security: {
         requiresConsent: true,
@@ -394,27 +384,16 @@ async function createDoctorFixture(options: {
         requiresEnvVars: options.context7?.requiredEnvVars ?? [],
         notes: 'Provider manifest fixture for doctor tests.',
       },
-      replacementPolicy: {
-        capabilities: ['docs.latest'],
-        replaceWithoutCourseChange: true,
-      },
     }),
   } satisfies PluginManifest
   const github = options.github
     ? pluginManifest('third-party.github-mcp', {
         profile: 'third-party',
-        providerTargets: ['codex', 'claude-code', 'cursor'],
         providesCapabilities: {
           'repo.remote': {
             type: 'tool',
             requiredByCore: false,
-            riskLevel: 'high',
           },
-        },
-        verification: {
-          lastVerified: '2026-06-01',
-          cadence: '30d',
-          smokeTest: 'verify/github-smoke.md',
         },
         security: {
           requiresConsent: true,
@@ -424,10 +403,6 @@ async function createDoctorFixture(options: {
         },
         permissions: {
           defaultToolsets: options.github.permissionsDefaultToolsets ?? [],
-        },
-        replacementPolicy: {
-          capabilities: ['repo.remote'],
-          replaceWithoutCourseChange: true,
         },
       })
     : undefined
@@ -457,6 +432,7 @@ async function createDoctorFixture(options: {
     files: Record<string, string>
     trustTier: 'official' | 'reviewed' | 'listed' | 'blocked' | 'yanked'
     installability: 'installable' | 'discovery_only' | 'blocked' | 'yanked'
+    controlPlane?: InstallBundle['controlPlane']
   }> = [
     {
       artifactId: 'instructa.saas',
@@ -478,6 +454,15 @@ async function createDoctorFixture(options: {
       files: context7Files,
       trustTier: options.context7?.trustTier ?? 'reviewed',
       installability: options.context7?.installability ?? 'installable',
+      controlPlane: {
+        providerCompatibility: { codex: 'native', 'claude-code': 'native', cursor: 'native' },
+        verification: {
+          lastVerified: options.context7?.lastVerified ?? '2026-08-01',
+          cadence: '30d',
+          smokeTest: 'verify/context7-smoke.md',
+          ...(context7CommandFingerprint ? { commandFingerprint: context7CommandFingerprint } : {}),
+        },
+      },
     },
   ]
   if (github) {
@@ -487,13 +472,21 @@ async function createDoctorFixture(options: {
       files: { 'verify/github-smoke.md': '# GitHub smoke\n' },
       trustTier: 'reviewed',
       installability: 'installable',
+      controlPlane: {
+        providerCompatibility: { codex: 'native', 'claude-code': 'native', cursor: 'native' },
+        verification: {
+          lastVerified: '2026-06-01',
+          cadence: '30d',
+          smokeTest: 'verify/github-smoke.md',
+        },
+      },
     })
   }
 
-  for (const { artifactId, manifest, files, trustTier, installability } of bundleInputs) {
+  for (const { artifactId, manifest, files, trustTier, installability, controlPlane } of bundleInputs) {
     bundles.set(
       artifactId,
-      installBundle(server.baseUrl, manifest, files, trustTier, installability)
+      installBundle(server.baseUrl, manifest, files, trustTier, installability, controlPlane)
     )
   }
 
@@ -511,8 +504,6 @@ function pluginManifest(name: string, extension: Record<string, unknown>): Plugi
     keywords: ['test'],
     extensions: {
       'ai.agentrig': {
-        kind: 'plugin',
-        listing: { category: 'Development' },
         ...extension,
       },
     },
@@ -524,7 +515,8 @@ function installBundle(
   manifest: PluginManifest,
   files: Record<string, string>,
   trustTier: 'official' | 'reviewed' | 'listed' | 'blocked' | 'yanked',
-  installability: 'installable' | 'discovery_only' | 'blocked' | 'yanked'
+  installability: 'installable' | 'discovery_only' | 'blocked' | 'yanked',
+  controlPlane?: InstallBundle['controlPlane']
 ): InstallBundle {
   const manifestJson = JSON.stringify(manifest, null, 2)
   const fileEntries = {
@@ -563,6 +555,7 @@ function installBundle(
       updatedAt: Date.parse('2026-06-01T00:00:00.000Z'),
     },
     source: { type: 'registry', url: `${baseUrl}/raw/` },
+    controlPlane,
     file_list: fileList,
   }
 }
@@ -642,9 +635,7 @@ async function writeProviderPluginSource(pluginsRoot: string) {
       description: 'Context7 provider fixture.',
       extensions: {
         'ai.agentrig': {
-          kind: 'plugin',
           displayName: 'Context7',
-          listing: { category: 'Development' },
         },
       },
     }, null, 2),

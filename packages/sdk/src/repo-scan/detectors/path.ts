@@ -102,7 +102,6 @@ function isOwnedByStructuredDetector(path: string) {
     path.startsWith('.claude/commands/') ||
     path.startsWith('.codex/prompts/') ||
     path.startsWith('.cursor/commands/') ||
-    path === '.mcp.json' ||
     path === 'mcp.json' ||
     path === 'hooks.json' ||
     path.endsWith('/hooks.json') ||
@@ -124,4 +123,3 @@ function isDocPath(path: string) {
   if (!path.startsWith('docs/')) return false
   return [...DOC_EXTENSIONS].some((extension) => path.endsWith(extension))
 }
-

@@ -7,8 +7,11 @@ import { AGENT_PLUGIN_MANIFEST_SCHEMA_URL, AGENT_PLUGIN_MCP_SCHEMA_URL } from '.
 describe('materializePlugin', () => {
   it('stages picked signals into a bundle-valid AgentRig plugin layout', async () => {
     const tree = createMemoryTree({
-      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
-      '.mcp.json': JSON.stringify({ mcpServers: { fs: { command: 'node' } } }),
+      'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
+      'mcp.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: { fs: { type: 'stdio', command: 'node' } },
+      }),
       '.claude/commands/review.md': '# Review',
       '.cursor/rules/typescript.mdc': '---\ntitle: TypeScript\n---\nUse TS',
       'README.md': '# Repo',
@@ -26,14 +29,7 @@ describe('materializePlugin', () => {
         displayName: 'Review',
         description: 'Review workflow.',
         version: '1.0.0',
-        category: 'Development',
         keywords: ['review'],
-        source: {
-          owner: 'owner',
-          repo: 'repo',
-          commitSha: 'abc123',
-          scanDigest: scan.digest,
-        },
       },
     })
 
@@ -52,20 +48,6 @@ describe('materializePlugin', () => {
       extensions: {
         'ai.agentrig': {
           displayName: 'Review',
-          kind: 'plugin',
-          listing: {
-            category: 'Development',
-          },
-          configSchema: {},
-          pluginDependencies: [],
-          source: {
-            kind: 'external-repo',
-            owner: 'owner',
-            repo: 'repo',
-            commitSha: 'abc123',
-            scanDigest: scan.digest,
-            pickedSignalPaths: ['.claude/commands/review.md', '.cursor/rules/typescript.mdc', '.mcp.json', 'skills/review'],
-          },
         },
       },
     })
@@ -91,8 +73,6 @@ describe('materializePlugin', () => {
           displayName: 'Review',
           description: 'Review workflow.',
           version: '1.0.0',
-          category: 'Development',
-          source: { scanDigest: scan.digest },
         },
       })
     ).rejects.toThrow(/materialized path conflict/i)
@@ -116,8 +96,6 @@ describe('materializePlugin', () => {
           displayName: 'Review',
           description: 'Review workflow.',
           version: '1.0.0',
-          category: 'Development',
-          source: { scanDigest: scan.digest },
         },
       })
     ).rejects.toThrow(/changed after scan/i)

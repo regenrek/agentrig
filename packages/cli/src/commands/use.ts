@@ -46,10 +46,6 @@ const command = defineCommand({
       type: 'string',
       description: 'Materialize picked signals as this plugin id',
     },
-    category: {
-      type: 'string',
-      description: 'Marketplace category for a materialized plugin (required with --as-plugin)',
-    },
     provider: {
       type: 'string',
       description: 'Provider to install for: claude, codex, cursor, or all',
@@ -188,10 +184,6 @@ const command = defineCommand({
         }
         return
       }
-      const category = String(args.category ?? '').trim()
-      if (!category) {
-        throw new Error('Missing required --category <category> for materialized plugins.')
-      }
       const files = await materializePlugin({
         tree: resolved.tree,
         pickedSignals,
@@ -200,15 +192,7 @@ const command = defineCommand({
           displayName: titleFromPluginId(pluginId),
           description: enrichment?.description ?? `AgentRig plugin generated from ${report.source.label}.`,
           version: '0.1.0',
-          category,
           keywords: enrichment?.keywords,
-          source: {
-            ...sourceReferenceForManifest(report.source),
-            ref: report.source.ref,
-            commitSha: report.source.commitSha,
-            subdir: report.source.subdir,
-            scanDigest: report.digest,
-          },
         },
       })
       const outDir = path.resolve(args.out ? String(args.out) : path.join(process.cwd(), pluginId))
@@ -339,21 +323,6 @@ function buildExternalRepoIdentity(input: {
     pluginId: input.pluginId,
     version: input.version,
   }
-}
-
-function sourceReferenceForManifest(source: RepoScanSource) {
-  const repo = parseGitHubSource(source.label)
-  if (repo) {
-    return {
-      repoUrl: repo.repoUrl,
-      owner: repo.owner,
-      repo: repo.repo,
-    }
-  }
-  if (source.type === 'local' && path.isAbsolute(source.label)) {
-    return { repoUrl: pathToFileURL(source.label).href }
-  }
-  return { repoUrl: source.label }
 }
 
 function buildExternalSelectionSource(source: RepoScanSource, scanDigest: string): ExternalRepoSelectionSource {

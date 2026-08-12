@@ -26,7 +26,7 @@ export const skillManifestSchema = baseManifest.extend({
 
 export const mcpManifestSchema = baseManifest.extend({
   kind: z.literal('agentrig:mcp'),
-  config: z.string().trim().min(1).default('.mcp.json'),
+  config: z.string().trim().min(1).default('mcp.json'),
 })
 
 export const hookManifestSchema = baseManifest.extend({

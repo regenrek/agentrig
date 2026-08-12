@@ -7,7 +7,7 @@ describe('plugin feature detection', () => {
     const features = await detectPluginFeatures(
       createMemoryTree({
         'README.md': '# Plugin\n',
-        'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\n',
+        'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\n',
         'commands/audit.md': '# Audit',
         'agents/research.md': '# Research',
         'rules/typescript.mdc': '# Rule',
@@ -15,7 +15,7 @@ describe('plugin feature detection', () => {
         'assets/icon.svg': '<svg />',
         'scripts/bootstrap.sh': 'echo ok',
         'settings.json': '{}',
-        '.mcp.json': '{}',
+        'mcp.json': '{}',
         '.lsp.json': '{}',
         '.app.json': '{}',
       })

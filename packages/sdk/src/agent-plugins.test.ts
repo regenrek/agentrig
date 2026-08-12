@@ -8,11 +8,58 @@ import {
   CAPABILITY_IDS,
   PluginManifestSchema,
   agentRigPluginExtension,
-  pluginManifestListingCategory,
+  attachAgentRigExtension,
+  buildPortablePluginManifest,
   resolvePluginSkillName,
 } from './agent-plugins'
+import {
+  AgentPluginPackageError,
+  assertPublishableAgentPluginPackage,
+  inspectAgentPluginPackage,
+  loadAgentPluginPackage,
+} from './agent-plugin-package'
 
 describe('Agent Plugins v1 manifest contract', () => {
+  it('builds a publishable standard-only manifest without an AgentRig extension', () => {
+    const manifest = buildPortablePluginManifest({
+      name: 'standard-only',
+      description: 'Portable without client metadata.',
+    })
+
+    expect(manifest).toEqual({
+      $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+      name: 'standard-only',
+      description: 'Portable without client metadata.',
+    })
+    expect(assertPublishableAgentPluginPackage({ manifest }).manifest).toEqual(manifest)
+    expect(attachAgentRigExtension(manifest, { displayName: 'Standard Only' })).toMatchObject({
+      extensions: { 'ai.agentrig': { displayName: 'Standard Only' } },
+    })
+  })
+
+  it('loads non-fatal manifest defects but rejects them at the publish policy', () => {
+    const raw = {
+      $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+      name: 'tolerant-client',
+      commands: { review: './review.md' },
+      extensions: {
+        'ai.agentrig': { displayName: 42 },
+        'com.example.client': { enabled: true },
+      },
+    }
+    const inspected = inspectAgentPluginPackage({ manifest: raw })
+
+    expect(inspected.conformance).toEqual({ loadable: true, portable: false, publishable: false })
+    expect(inspected.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      'manifest.unknown-field',
+      'extension.ai-agentrig.invalid',
+    ])
+    expect(loadAgentPluginPackage({ manifest: raw }).manifest.extensions).toEqual({
+      'com.example.client': { enabled: true },
+    })
+    expect(() => assertPublishableAgentPluginPackage({ manifest: raw })).toThrow(AgentPluginPackageError)
+  })
+
   it('parses the canonical closed manifest and typed AgentRig extension', () => {
     const manifest = PluginManifestSchema.parse({
       $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
@@ -23,13 +70,10 @@ describe('Agent Plugins v1 manifest contract', () => {
       extensions: {
         'ai.agentrig': {
           displayName: 'Instructa Core',
-          kind: 'plugin',
           profile: 'core',
-          listing: { category: 'Development' },
           publicSkills: ['project-spec-packager', 'duplicate-ownership-audit'],
           supportSkills: ['ship-gate'],
           aliases: { 'find-duplicate-ownership': 'duplicate-ownership-audit' },
-          providerTargets: ['codex', 'claude-code', 'cursor'],
         },
         'com.example.client': { enabled: true },
       },
@@ -38,9 +82,7 @@ describe('Agent Plugins v1 manifest contract', () => {
     expect(agentRigPluginExtension(manifest)).toMatchObject({
       displayName: 'Instructa Core',
       profile: 'core',
-      listing: { category: 'Development' },
     })
-    expect(pluginManifestListingCategory(manifest)).toBe('Development')
     expect(resolvePluginSkillName(manifest, 'find-duplicate-ownership')).toEqual({
       plugin: 'instructa.core',
       requestedName: 'find-duplicate-ownership',
@@ -58,13 +100,14 @@ describe('Agent Plugins v1 manifest contract', () => {
     })).toThrow()
   })
 
-  it('ignores unknown portable fields and a non-object extensions field per v1 loading rules', () => {
-    expect(PluginManifestSchema.parse({
+  it('loads unknown portable fields and a non-object extensions field through the client policy', () => {
+    const inspected = inspectAgentPluginPackage({ manifest: {
       $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
       name: 'minimal-plugin',
       commands: { review: './commands/review.md' },
       extensions: 'invalid-but-ignored',
-    })).toEqual({
+    } })
+    expect(inspected.package?.manifest).toEqual({
       $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
       name: 'minimal-plugin',
     })
@@ -77,13 +120,8 @@ describe('Agent Plugins v1 manifest contract', () => {
       name: 'third-party.custom-provider',
       extensions: {
         'ai.agentrig': {
-          kind: 'plugin',
           providesCapabilities: {
             'custom.tool-chain': { type: 'tool', requiredByCore: false },
-          },
-          replacementPolicy: {
-            capabilities: ['custom.tool-chain'],
-            replaceWithoutCourseChange: true,
           },
         },
       },

@@ -7,7 +7,12 @@
 - Adopted [Agent Plugins v1](https://agent-plugins.org/specification) as the canonical package contract.
 - New plugins use root `plugin.json`, portable `skills/*/SKILL.md`, root `mcp.json`, and the official schema URLs.
 - AgentRig metadata now lives under `extensions["ai.agentrig"]`; AgentRig-specific files live under `ai.agentrig/`.
+- `ai.agentrig` is optional and contains only stable author metadata. Registry listing, provenance, scan, verification, risk, approval, ownership, support, and advisory data stay outside the package.
+- Added one SDK inspector with tolerant loading and strict publication policies, Agent Skills validation, per-server MCP isolation, provider-native MCP compilation, and realpath/symlink containment checks.
+- `.mcp.json` is no longer accepted as a package source file; portable packages use root `mcp.json`.
 - Removed the live `.plugin/plugin.json` and `x-agentrig` authoring paths. Immutable already-published registry snapshots remain the only historical exception.
+
+> AgentRig packages now use the Agent Plugins v1 package layout as their canonical source format. AgentRig-specific governance and deployment metadata is stored outside the portable package. Legacy AgentRig manifest layouts are no longer accepted.
 
 ## [0.8.2] - 2026-05-12
 

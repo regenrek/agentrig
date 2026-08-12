@@ -145,10 +145,26 @@ export const InstallBundleSourceSchema = z.object({
 
 export type InstallBundleSource = z.infer<typeof InstallBundleSourceSchema>
 
+export const AgentRigControlPlaneSchema = z.object({
+  verification: z.object({
+    lastVerified: z.string().trim().min(1),
+    cadence: z.string().trim().min(1),
+    smokeTest: z.string().trim().min(1).optional(),
+    commandFingerprint: z.string().trim().min(1).optional(),
+  }).strict().optional(),
+  providerCompatibility: z.partialRecord(
+    z.enum(['codex', 'claude-code', 'cursor']),
+    z.enum(['native', 'port', 'unsupported', 'unknown']),
+  ).optional(),
+}).strict()
+
+export type AgentRigControlPlane = z.infer<typeof AgentRigControlPlaneSchema>
+
 export const InstallBundleSchema = z.object({
   schemaVersion: z.literal(1),
   listing: MarketplaceListingPublicSchema,
   source: InstallBundleSourceSchema,
+  controlPlane: AgentRigControlPlaneSchema.optional(),
   readmeFile: InstallBundleReadmeFileSchema.optional(),
   file_list: z.array(InstallBundleFileSchema).min(1),
 })

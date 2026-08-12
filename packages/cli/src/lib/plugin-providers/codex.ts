@@ -23,6 +23,7 @@ import {
 } from './schemas'
 import {
   copyEntries,
+  compileProviderMcp,
   detectPluginFeatures,
   normalizeManifestDescription,
   normalizeManifestVersion,
@@ -39,7 +40,6 @@ async function copyCodexPlugin(pluginSourceDir: string, pluginDir: string) {
     'assets',
     'scripts',
     'README.md',
-    { source: 'mcp.json', destination: '.mcp.json' },
     { source: 'ai.agentrig/app.json', destination: '.app.json' },
   ])
 }
@@ -186,6 +186,7 @@ export const codexProvider: PluginProviderAdapter = {
       const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
       const pluginDir = path.join(pluginRoot, pluginName)
       await copyCodexPlugin(plugin.pluginSourceDir, pluginDir)
+      await compileProviderMcp(plugin, pluginDir, 'codex', '.mcp.json')
       const features = await detectPluginFeatures(pluginDir)
       await writeJsonFile(
         path.join(pluginDir, '.codex-plugin', 'plugin.json'),

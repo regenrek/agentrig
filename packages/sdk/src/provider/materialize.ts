@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import {
-  AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
   AGENT_PLUGIN_MCP_SCHEMA_URL,
   AGENTRIG_EXTENSION_NAMESPACE,
   AgentPluginMcpConfigSchema,
+  attachAgentRigExtension,
+  buildPortablePluginManifest,
 } from '../agent-plugins'
 import type { SignalKind } from '../repo-scan/types'
 import { joinVirtualPath, normalizeVirtualPath, virtualBasename } from '../repo-scan/virtual-tree'
@@ -19,7 +20,6 @@ const manifestInputSchema = z
     displayName: z.string().trim().min(1).optional(),
     description: z.string().trim().min(1),
     version: z.string().trim().max(64).regex(PLUGIN_VERSION_RE),
-    category: z.string().trim().min(1),
     author: z
       .object({
         name: z.string().trim().min(1),
@@ -30,22 +30,11 @@ const manifestInputSchema = z
       .optional(),
     license: z.string().trim().min(1).optional(),
     keywords: z.array(z.string().trim().min(1)).optional(),
-    source: z
-      .object({
-        repoUrl: z.string().trim().min(1).optional(),
-        owner: z.string().trim().min(1).optional(),
-        repo: z.string().trim().min(1).optional(),
-        ref: z.string().trim().min(1).optional(),
-        commitSha: z.string().trim().min(1).optional(),
-        subdir: z.string().trim().min(1).optional(),
-        scanDigest: z.string().regex(/^[a-f0-9]{64}$/),
-      })
-      .strict(),
   })
   .strict()
 
 export async function materializePlugin(options: MaterializePluginOptions): Promise<MaterializedPluginFile[]> {
-  const manifest = buildPluginManifest(options.manifest, options.pickedSignals.map((signal) => signal.sourcePath))
+  const manifest = buildPluginManifest(options.manifest)
   const files = new Map<string, MaterializedPluginFile>()
 
   addMaterializedFile(files, 'plugin.json', encodeJson(manifest))
@@ -62,33 +51,17 @@ export async function materializePlugin(options: MaterializePluginOptions): Prom
   return [...files.values()].sort((left, right) => left.path.localeCompare(right.path))
 }
 
-export function buildPluginManifest(input: MaterializedPluginManifestInput, pickedSignalPaths: string[]) {
+export function buildPluginManifest(input: MaterializedPluginManifestInput) {
   const parsed = manifestInputSchema.parse(input)
-  return {
-    $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+  const manifest = buildPortablePluginManifest({
     name: parsed.name,
     description: parsed.description,
     version: parsed.version,
     ...(parsed.author ? { author: parsed.author } : {}),
     ...(parsed.license ? { license: parsed.license } : {}),
     ...(parsed.keywords?.length ? { keywords: parsed.keywords } : {}),
-    extensions: {
-      [AGENTRIG_EXTENSION_NAMESPACE]: {
-        displayName: parsed.displayName ?? parsed.name,
-        kind: 'plugin',
-        listing: {
-          category: parsed.category,
-        },
-        configSchema: {},
-        pluginDependencies: [],
-        source: {
-          kind: 'external-repo',
-          ...parsed.source,
-          pickedSignalPaths: [...new Set(pickedSignalPaths)].sort(),
-        },
-      },
-    },
-  }
+  })
+  return parsed.displayName ? attachAgentRigExtension(manifest, { displayName: parsed.displayName }) : manifest
 }
 
 export function destinationPathForSignalFile(kind: SignalKind, signalId: string, sourcePath: string, filePath: string) {

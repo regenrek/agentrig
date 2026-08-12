@@ -6,6 +6,18 @@ AgentRig lets you create, install, and share AI workflow plugins for tools like 
 
 A plugin can include skills, agents, MCP servers, commands, hooks, and related files.
 
+## Agent Plugins v1 package contract
+
+AgentRig 2.0 uses one canonical portable source layout: root `plugin.json`, valid
+`skills/*/SKILL.md`, and optional root `mcp.json`. The `ai.agentrig` manifest
+extension is optional and contains stable author-declared metadata only.
+Registry categories, provenance, scan digests, verification, approvals, risk,
+support, ownership, and advisories are stored outside the package.
+
+Legacy `.plugin/plugin.json`, `x-agentrig`, and package-source `.mcp.json` are not
+accepted. The only exception is an isolated read-only decoder for explicitly
+allowlisted immutable registry snapshots.
+
 ## Install the CLI
 
 ```bash

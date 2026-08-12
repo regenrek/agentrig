@@ -35,10 +35,6 @@ const pluginCandidate: PublishPluginCandidate = {
     extensions: {
       'ai.agentrig': {
         displayName: 'Acme Tools',
-        kind: 'plugin',
-        listing: {
-          category: 'Development',
-        },
         configSchema: {},
         pluginDependencies: [],
       },
@@ -50,6 +46,8 @@ const pluginCandidate: PublishPluginCandidate = {
     bytes: 42,
     content: '{"name":"acme.tools","version":"1.0.0"}',
   },
+  diagnostics: [],
+  conformance: { loadable: true, portable: true, publishable: true },
   files: [{ path: 'plugin.json', digest: 'sha256:plugin' }],
 }
 
@@ -57,8 +55,11 @@ async function scanFixture() {
   return await scanRepo({
     source: { type: 'virtual', label: 'fixture', ref: source.ref, commitSha: source.commitSha },
     tree: createMemoryTree({
-      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
-      '.mcp.json': JSON.stringify({ mcpServers: { github: { command: 'node' } } }),
+      'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
+      'mcp.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: { github: { type: 'stdio', command: 'node' } },
+      }),
       'README.md': '# Tools',
     }),
   })
@@ -128,8 +129,8 @@ describe('publish shape primitives', () => {
             },
           },
         }),
-        'plugins/regenrek.agentic-engineer-core/skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
-        'skills/standalone/SKILL.md': '---\nname: Standalone\ndescription: Outside plugin root.\n---\nBody',
+        'plugins/regenrek.agentic-engineer-core/skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
+        'skills/standalone/SKILL.md': '---\nname: standalone\ndescription: Outside plugin root.\n---\nBody',
       }),
     })
     const scan = buildPublishScanResult({
@@ -174,7 +175,7 @@ describe('publish shape primitives', () => {
             },
           },
         }),
-        'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+        'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
       }),
     })
 
@@ -381,8 +382,8 @@ describe('publish shape primitives', () => {
             kind: 'mcp',
             id: 'mcp',
             title: 'Root MCP',
-            sourcePath: '.mcp.json',
-            files: [{ path: '.mcp.json', sha256: 'a'.repeat(64), bytes: 20 }],
+            sourcePath: 'mcp.json',
+            files: [{ path: 'mcp.json', sha256: 'a'.repeat(64), bytes: 20 }],
             providerAffinity: { claude: 1, codex: 1, cursor: 1 },
             providerCompat: { claude: 'native', codex: 'native', cursor: 'native' },
             score: 1,

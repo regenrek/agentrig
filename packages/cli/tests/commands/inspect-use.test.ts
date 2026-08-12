@@ -76,9 +76,8 @@ describe('commands: inspect/use', () => {
       args: {
         source: fixture,
         'as-plugin': 'community.review',
-        category: 'Development',
         out: outDir,
-        pick: 'skills/review,.mcp.json',
+        pick: 'skills/review,mcp.json',
         yes: false,
         'dry-run': false,
         install: false,
@@ -90,12 +89,10 @@ describe('commands: inspect/use', () => {
 
     const manifest = JSON.parse(await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')) as {
       name: string
-      extensions: { 'ai.agentrig': { source: { kind: string; repoUrl: string; pickedSignalPaths: string[] } } }
+      extensions: { 'ai.agentrig': { displayName: string } }
     }
     expect(manifest.name).toBe('community.review')
-    expect(manifest.extensions['ai.agentrig'].source.kind).toBe('external-repo')
-    expect(manifest.extensions['ai.agentrig'].source.repoUrl).toBe(pathToFileURL(fixture).href)
-    expect(manifest.extensions['ai.agentrig'].source.pickedSignalPaths).toEqual(['.mcp.json', 'skills/review'])
+    expect(manifest.extensions['ai.agentrig']).toEqual({ displayName: 'Review' })
     await expect(fs.readFile(path.join(outDir, 'skills', 'review', 'SKILL.md'), 'utf-8')).resolves.toContain('Reviews code.')
     await expect(fs.readFile(path.join(outDir, 'mcp.json'), 'utf-8')).resolves.toContain('mcpServers')
 
@@ -116,9 +113,8 @@ describe('commands: inspect/use', () => {
       args: {
         source: dotsLikeFixture,
         'as-plugin': 'community.dots-like',
-        category: 'Development',
         out: outDir,
-        pick: 'skills/review,.claude/commands/review.md,prompts/debug.md,.mcp.json',
+        pick: 'skills/review,.claude/commands/review.md,prompts/debug.md,mcp.json',
         yes: false,
         'dry-run': false,
         install: false,
@@ -136,14 +132,9 @@ describe('commands: inspect/use', () => {
     const validation = await validatePluginBundle(bundle.zipBytes, LOCAL_PLUGIN_POLICY)
     expect(validation.fileCount).toBeGreaterThan(0)
 
-    const manifest = JSON.parse(await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')) as {
-      extensions: { 'ai.agentrig': { source: { kind: string; repoUrl: string; pickedSignalPaths: string[] } } }
-    }
-    expect(manifest.extensions['ai.agentrig'].source).toMatchObject({
-      kind: 'external-repo',
-      repoUrl: pathToFileURL(dotsLikeFixture).href,
-      pickedSignalPaths: ['.claude/commands/review.md', '.mcp.json', 'prompts/debug.md', 'skills/review'],
-    })
+    const manifestText = await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')
+    expect(manifestText).not.toContain(pathToFileURL(dotsLikeFixture).href)
+    expect(JSON.parse(manifestText).extensions['ai.agentrig']).toEqual({ displayName: 'Dots Like' })
     await expect(fs.readFile(path.join(outDir, 'ai.agentrig', 'commands', 'review.md'), 'utf-8')).resolves.toContain('risk-first')
     await expect(fs.readFile(path.join(outDir, 'ai.agentrig', 'commands', 'debug.md'), 'utf-8')).resolves.toContain('first incorrect')
   })
@@ -279,7 +270,6 @@ describe('commands: inspect/use', () => {
       args: {
         source: fixture,
         'as-plugin': 'community.review',
-        category: 'Development',
         out: outDir,
         pick: 'skills/review',
         'enrich-ai': 'local',
@@ -312,7 +302,6 @@ describe('commands: inspect/use', () => {
       args: {
         source: fixture,
         'as-plugin': 'community.review',
-        category: 'Development',
         out: outDir,
         pick: 'skills/review',
         yes: false,
@@ -325,11 +314,9 @@ describe('commands: inspect/use', () => {
       },
     })
 
-    const manifest = JSON.parse(await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')) as {
-      extensions: { 'ai.agentrig': { source: { repoUrl: string } } }
-    }
-    expect(manifest.extensions['ai.agentrig'].source.repoUrl).toBe(pathToFileURL(fixture).href)
-    expect(manifest.extensions['ai.agentrig'].source.repoUrl).toContain('%20')
+    const manifestText = await fs.readFile(path.join(outDir, 'plugin.json'), 'utf-8')
+    expect(manifestText).not.toContain(pathToFileURL(fixture).href)
+    expect(JSON.parse(manifestText).name).toBe('community.review')
   })
 })
 
@@ -343,9 +330,12 @@ async function createFixtureAt(root: string) {
   await fs.mkdir(path.join(root, 'skills', 'review'), { recursive: true })
   await fs.writeFile(
     path.join(root, 'skills', 'review', 'SKILL.md'),
-    '---\nname: Review\ndescription: Reviews code.\n---\nBody\n'
+    '---\nname: review\ndescription: Reviews code.\n---\nBody\n'
   )
-  await fs.writeFile(path.join(root, '.mcp.json'), JSON.stringify({ mcpServers: { fs: { command: 'node' } } }))
+  await fs.writeFile(path.join(root, 'mcp.json'), JSON.stringify({
+    $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+    mcpServers: { fs: { type: 'stdio', command: 'node' } },
+  }))
 }
 
 async function tempRoot() {

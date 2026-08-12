@@ -6,7 +6,7 @@ describe('tar fs adapter', () => {
   it('materializes a limited virtual tree from a GitHub-style tar archive', async () => {
     const archive = makeTar({
       'owner-repo-abc123/README.md': '# Repo\n',
-      'owner-repo-abc123/skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\n',
+      'owner-repo-abc123/skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\n',
       'owner-repo-abc123/node_modules/pkg/index.js': 'ignored',
     })
 

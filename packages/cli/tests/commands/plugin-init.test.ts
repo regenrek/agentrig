@@ -14,7 +14,7 @@ describe('command:plugin:init', () => {
     await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })))
   })
 
-  it('scaffolds canonical listing category into plugin manifests', async () => {
+  it('scaffolds a portable manifest without registry listing metadata', async () => {
     const root = await tempRoot()
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
@@ -25,7 +25,6 @@ describe('command:plugin:init', () => {
         dir: root,
         title: 'Review Tools',
         description: 'Review workflow tools.',
-        category: 'Development',
         author: 'Acme',
         force: false,
         help: false,
@@ -34,9 +33,9 @@ describe('command:plugin:init', () => {
 
     const manifest = JSON.parse(
       await fs.readFile(path.join(root, 'acme.review-tools', 'plugin.json'), 'utf-8'),
-    ) as { extensions?: { 'ai.agentrig'?: { listing?: { category?: string } } } }
+    ) as { extensions?: { 'ai.agentrig'?: Record<string, unknown> } }
 
-    expect(manifest.extensions?.['ai.agentrig']?.listing?.category).toBe('Development')
+    expect(manifest.extensions?.['ai.agentrig']).toEqual({ displayName: 'Review Tools' })
   })
 })
 

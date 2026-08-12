@@ -10,22 +10,11 @@ export type {
 
 export type PickedSignal = Pick<Signal, 'id' | 'kind' | 'sourcePath' | 'files'>
 
-export type ExternalRepoSource = {
-  repoUrl?: string
-  owner?: string
-  repo?: string
-  ref?: string
-  commitSha?: string
-  subdir?: string
-  scanDigest: string
-}
-
 export type MaterializedPluginManifestInput = {
   name: string
   displayName?: string
   description: string
   version: string
-  category: string
   author?: {
     name: string
     email?: string
@@ -33,7 +22,6 @@ export type MaterializedPluginManifestInput = {
   }
   license?: string
   keywords?: string[]
-  source: ExternalRepoSource
 }
 
 export type MaterializedPluginFile = {

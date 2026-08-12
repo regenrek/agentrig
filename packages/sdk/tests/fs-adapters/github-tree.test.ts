@@ -4,7 +4,7 @@ import { createGitHubTreeVirtualTree, type GitHubTreeEntry } from '../../src'
 describe('github tree fs adapter', () => {
   it('materializes a limited virtual tree from GitHub tree entries', async () => {
     const blobs = new Map([
-      ['a', new TextEncoder().encode('---\nname: Review\ndescription: Reviews code.\n---\nBody\n')],
+      ['a', new TextEncoder().encode('---\nname: review\ndescription: Reviews code.\n---\nBody\n')],
       ['b', new TextEncoder().encode('ignored')],
     ])
     const entries: GitHubTreeEntry[] = [

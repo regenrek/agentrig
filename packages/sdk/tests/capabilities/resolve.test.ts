@@ -355,7 +355,7 @@ function providerPlugin(
     installability?: CapabilityPluginRecord['installability']
     lastVerified?: string
     cadence?: string
-    providerTargets?: AgentRigPluginExtension['providerTargets']
+    providerTargets?: Array<'codex' | 'claude-code' | 'cursor'>
     installConstraints?: CapabilityPluginRecord['installConstraints']
   } = {}
 ): CapabilityPluginRecord {
@@ -369,14 +369,18 @@ function providerPlugin(
           requiredByCore: false,
         },
       },
-      providerTargets: options.providerTargets ?? ['codex', 'claude-code', 'cursor'],
+    },
+    {
+      ...options,
+      providerCompatibility: Object.fromEntries(
+        (options.providerTargets ?? ['codex', 'claude-code', 'cursor']).map((target) => [target, 'native']),
+      ),
       verification: {
         lastVerified: options.lastVerified ?? '2026-06-01',
         cadence: options.cadence ?? '30d',
         smokeTest: `verify/${name}-smoke.md`,
       },
-    },
-    options
+    }
   )
 }
 
@@ -387,6 +391,8 @@ function pluginRecord(
     trustTier?: CapabilityPluginRecord['trustTier']
     installability?: CapabilityPluginRecord['installability']
     installConstraints?: CapabilityPluginRecord['installConstraints']
+    verification?: CapabilityPluginRecord['verification']
+    providerCompatibility?: CapabilityPluginRecord['providerCompatibility']
   } = {}
 ): CapabilityPluginRecord {
   return {
@@ -398,7 +404,6 @@ function pluginRecord(
       description: `${name} fixture`,
       extensions: {
         'ai.agentrig': {
-          kind: 'plugin',
           ...extension,
         },
       },
@@ -406,5 +411,7 @@ function pluginRecord(
     trustTier: options.trustTier ?? 'reviewed',
     installability: options.installability ?? 'installable',
     installConstraints: options.installConstraints,
+    verification: options.verification,
+    providerCompatibility: options.providerCompatibility,
   }
 }

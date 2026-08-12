@@ -73,7 +73,7 @@ Run these only from an approved prod release window, after confirming the deploy
 6. `20260510_remirror_listing_versions_prod`
    - Command: `pnpm exec convex run --prod migrations/20260510_remirror_listing_versions_prod:run '{"confirm":"REMIRROR_LISTING_VERSIONS_PROD_CONFIRM","artifactIds":["regenrek.agent-skills"]}'`
    - Confirm token literal: `REMIRROR_LISTING_VERSIONS_PROD_CONFIRM`
-   - Expected first-run delta: `rewritten` contains each targeted stale listing version that was regenerated with the synthesized `.plugin/plugin.json`.
+   - Expected first-run delta: `rewritten` contains each targeted stale listing version regenerated with the synthesized root `plugin.json`. Historical `.plugin/plugin.json` bytes remain readable only for explicitly allowlisted immutable snapshots.
    - Verification: re-run with the same `artifactIds` and require no stale rewrites and empty `skipped`.
    - Idempotency: re-runs should return zero write delta; coordinate with Worker α if the current mutation still reports rewrites for already re-mirrored targets.
 7. `20260510_drop_listing_install_bundle`

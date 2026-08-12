@@ -1,9 +1,10 @@
 {
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
   "mcpServers": {
     "filesystem": {
+      "type": "stdio",
       "command": "node",
       "args": ["./scripts/mcp-filesystem.js"]
     }
   }
 }
-

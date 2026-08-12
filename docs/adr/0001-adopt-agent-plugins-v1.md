@@ -1,6 +1,6 @@
 # ADR 0001: Adopt Agent Plugins v1 as the canonical package contract
 
-- Status: Accepted for implementation
+- Status: Accepted and implemented for AgentRig 2.0
 - Date: 2026-08-07
 - Owners: `@agentrig/sdk`, CLI, registry, web
 - External specification: [Agent Plugins Specification 1.0.0](https://agent-plugins.org/specification)
@@ -41,6 +41,37 @@ The following invariants apply:
 8. The SDK MUST validate package-root containment and the v1 failure boundaries before downstream code consumes a package.
 9. Web, CLI, and registry code MUST consume the SDK's canonical parsed package and scan outputs rather than implement another manifest interpretation.
 
+### Portable manifest and optional extension
+
+The portable manifest builder owns only `$schema`, `name`, and the standard
+optional metadata fields. `extensions["ai.agentrig"]` is optional. When present,
+it may contain only stable author-declared metadata: display/profile metadata,
+capabilities, configuration schema, plugin dependencies, public/supporting skill
+references and aliases, plus static security and permission requirements. Skill
+references must resolve to valid `skills/*/SKILL.md` components.
+
+Registry category/listing data, scanned repository coordinates, refs and commits,
+scan digests, selected paths, verification, risk, approval, registry ownership,
+support levels, and advisories are control-plane state. They MUST remain outside
+the published package.
+
+### Inspection and failure boundaries
+
+`inspectAgentPluginPackage` is the single parser and returns the package,
+diagnostics, conformance state, and valid components. `loadAgentPluginPackage`
+applies tolerant client behavior; `assertPublishableAgentPluginPackage` applies
+the strict publication gate.
+
+- Unknown top-level fields produce diagnostics but do not prevent loading.
+- Non-object extensions are ignored with diagnostics; unknown object namespaces
+  remain opaque.
+- Invalid `ai.agentrig` is isolated from the portable package but blocks publish.
+- An invalid MCP server is skipped independently; an invalid `mcp.json` disables
+  MCP without disabling valid skills.
+- An invalid core manifest or unsupported schema version rejects the package.
+- Materialization resolves real paths and rejects files or symlink targets that
+  escape the package root.
+
 ## Hard cut and historical exception
 
 There will be no general dual-schema parser, authoring mode, materializer, or fallback path. New source packages using `.plugin/plugin.json` or `x-agentrig` are non-conformant after the cutover.
@@ -60,16 +91,17 @@ This exception belongs at the registry snapshot-reading boundary. It MUST NOT le
 
 The CLI owns user workflows and provider installation. The registry owns immutable publication history and trust state. The web application owns presentation and Convex-safe persistence projections only. Provider adapters own emission into Claude, Codex, and Cursor native layouts, not the source package contract.
 
-## Migration sequence
+## Implemented hard cut
 
-1. Replace the SDK manifest model with the closed Agent Plugins v1 root schema and `ai.agentrig` extension schema.
-2. Replace scanner discovery with root `plugin.json`, fixed `skills/`, root `mcp.json`, and package-containment enforcement.
-3. Replace generated and scaffolded package output with the v1 layout; update provider materializers to consume the canonical SDK package.
-4. Change publishing and registry validation to accept only v1 for new versions while preserving immutable legacy snapshots through the isolated history reader.
-5. Migrate CLI, docs, templates, web inspect, and registry tooling to SDK outputs; remove old Open Plugins terminology and duplicate parsing.
-6. Add cross-provider golden tests proving that one v1 source package produces the intended Claude, Codex, and Cursor installations without changing the source contract.
+1. The SDK manifest model uses the Agent Plugins v1 root schema and optional stable `ai.agentrig` extension.
+2. Scanner discovery uses root `plugin.json`, valid `skills/*/SKILL.md`, and root `mcp.json`, with package-containment enforcement.
+3. Generated and scaffolded packages use the v1 layout; provider materializers compile the canonical package into native Claude, Codex, and Cursor layouts.
+4. Publishing accepts only conforming v1 packages for new versions. Immutable legacy snapshots remain behind the isolated registry history reader.
+5. CLI and web consume SDK outputs. Package listing, provenance, verification, and risk remain control-plane records.
+6. Conformance and cross-provider fixtures cover optional extensions, component isolation, invalid skills and MCP servers, and path/symlink escapes.
 
-Each step is a hard cut in its owning layer. Temporary migration branches may contain intermediate commits, but released code must not expose both source contracts.
+The release exposes one source contract and no compatibility mode, feature flag,
+shape coercion, or automatic migration.
 
 ## Consequences
 

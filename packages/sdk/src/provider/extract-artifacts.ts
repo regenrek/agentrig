@@ -234,7 +234,7 @@ function markdownGroup(path: string, prefix: string, kind: 'command' | 'agent') 
 }
 
 function mcpGroup(path: string) {
-  if (path === '.mcp.json' || path === 'mcp.json') {
+  if (path === 'mcp.json') {
     return { kind: 'mcp' as const, name: 'mcp', sourcePath: path }
   }
   const parts = path.split('/')
