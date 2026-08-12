@@ -49,11 +49,6 @@ const pluginManifestText = `${JSON.stringify({
   name: 'acme.demo',
   version: '1.0.0',
   description: 'A demo plugin.',
-  extensions: {
-    'ai.agentrig': {
-      listing: { category: 'Development' },
-    },
-  },
 }, null, 2)}\n`
 
 const mirrorBundle: InstallBundle = InstallBundleSchema.parse({
@@ -192,6 +187,34 @@ describe('marketplace listing contracts', () => {
         }),
       ])
     )
+  })
+
+  it('blocks registry mirroring when fetched plugin components are not publishable', async () => {
+    const invalidSkill = '---\nname: wrong-name\ndescription: Reviews code.\n---\nBody\n'
+    const invalidBundle = InstallBundleSchema.parse({
+      ...mirrorBundle,
+      file_list: [
+        ...mirrorBundle.file_list,
+        {
+          path: 'skills/review/SKILL.md',
+          sha256: createHash('sha256').update(invalidSkill).digest('hex'),
+          size: Buffer.byteLength(invalidSkill),
+        },
+      ],
+    })
+
+    await expect(buildRegistryMirrorArtifactsFromInstallBundle({
+      bundle: invalidBundle,
+      files: [
+        { path: 'README.md', bytes: 'hello' },
+        { path: 'plugin.json', bytes: pluginManifestText },
+        { path: 'skills/review/SKILL.md', bytes: invalidSkill },
+      ],
+      submissionId: 'submission-1',
+      reviewedAt: 1,
+      advisoriesDocument: { generated_at: '1970-01-01T00:00:00Z', items: [] },
+      registryDocument: { items: [] } as any,
+    })).rejects.toThrow(/package is not publishable/i)
   })
 })
 

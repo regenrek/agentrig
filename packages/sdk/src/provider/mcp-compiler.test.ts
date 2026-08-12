@@ -28,5 +28,15 @@ describe('compileAgentPluginMcpServers', () => {
         events: { type: 'sse', url: 'https://example.com/sse' },
       },
     })
+    expect(compileAgentPluginMcpServers(servers, {
+      provider: 'cursor',
+      pluginRoot: '/plugin',
+      pluginData: '/data',
+    })).toEqual({
+      mcpServers: {
+        docs: { type: 'http', url: 'https://example.com/mcp' },
+        events: { type: 'sse', url: 'https://example.com/sse' },
+      },
+    })
   })
 })

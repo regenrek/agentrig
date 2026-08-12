@@ -4,6 +4,7 @@ import {
   CLI_SUPPORTED_ARTIFACT_KINDS,
   type ArtifactKind,
 } from './provider/artifact-kinds'
+import { inspectAgentPluginPackage } from './agent-plugin-package'
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/
 
@@ -695,6 +696,9 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
   if (!verified.ok) {
     throw new Error(`Fetched install bundle file hash mismatch: ${verified.issues.map((issue) => `${issue.path}:${issue.code}`).join(', ')}`)
   }
+  if (kind === 'plugin') {
+    assertPublishableRegistryPluginPackage(payloadFiles, artifactId, version)
+  }
 
   const licenseBytes = new TextEncoder().encode(`${listing.license?.trim() || 'NOASSERTION'}\n`)
   const mirroredPayloadFiles = payloadFiles.some((file) => file.path === 'LICENSE')
@@ -891,6 +895,50 @@ export async function buildRegistryMirrorArtifactsFromInstallBundle(args: {
     findings: [],
     policyDecisions: ['mirror_input_is_sdk_install_bundle'],
     alreadyPublished,
+  }
+}
+
+function assertPublishableRegistryPluginPackage(
+  payloadFiles: ReadonlyArray<{ path: string; bytes: Uint8Array }>,
+  artifactId: string,
+  version: string,
+) {
+  const manifestFile = payloadFiles.find((file) => file.path === 'plugin.json')
+  if (!manifestFile) throw new Error(`Cannot mirror plugin ${artifactId}: install bundle is missing root plugin.json`)
+
+  let manifest: unknown
+  try {
+    manifest = JSON.parse(new TextDecoder().decode(manifestFile.bytes))
+  } catch {
+    throw new Error(`Cannot mirror plugin ${artifactId}: plugin.json is not valid JSON`)
+  }
+
+  const skills = payloadFiles
+    .filter((file) => /^skills\/[^/]+\/SKILL\.md$/.test(file.path))
+    .map((file) => ({ path: file.path, content: new TextDecoder().decode(file.bytes) }))
+  const mcpFile = payloadFiles.find((file) => file.path === 'mcp.json')
+  const inspection = inspectAgentPluginPackage({
+    manifest,
+    skills,
+    ...(mcpFile
+      ? { mcp: { path: 'mcp.json' as const, content: new TextDecoder().decode(mcpFile.bytes) } }
+      : {}),
+  })
+  if (!inspection.package || !inspection.conformance.publishable) {
+    const diagnostic = inspection.diagnostics.find((entry) => entry.publishBlocking)
+    throw new Error(
+      `Cannot mirror plugin ${artifactId}: package is not publishable${diagnostic ? ` (${diagnostic.path}: ${diagnostic.message})` : ''}`,
+    )
+  }
+  if (inspection.package.manifest.name !== artifactId) {
+    throw new Error(
+      `Cannot mirror plugin ${artifactId}: plugin.json name is ${inspection.package.manifest.name}`,
+    )
+  }
+  if (inspection.package.manifest.version !== version) {
+    throw new Error(
+      `Cannot mirror plugin ${artifactId}@${version}: plugin.json version is ${inspection.package.manifest.version ?? 'missing'}`,
+    )
   }
 }
 

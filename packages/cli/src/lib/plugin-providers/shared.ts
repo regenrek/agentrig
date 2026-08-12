@@ -8,6 +8,7 @@ import {
   agentRigPluginExtension,
   compileAgentPluginMcpServers,
   inspectAgentPluginPackage,
+  resolveContainedAgentPluginPath,
   sanitizeProviderPluginName,
   type PluginManifest,
   type PluginFeatures,
@@ -389,7 +390,8 @@ export function providerPluginName(
 }
 
 export async function readPluginManifest(pluginSourceDir: string) {
-  const manifestPath = path.join(pluginSourceDir, 'plugin.json')
+  const manifestPath = await resolveContainedAgentPluginPath(pluginSourceDir, 'plugin.json', 'file')
+  if (!manifestPath) throw new Error(`Missing plugin.json in ${pluginSourceDir}`)
   const raw = await readJsonFile<unknown>(manifestPath)
   if (!raw) {
     throw new Error(`Missing plugin.json in ${pluginSourceDir}`)
@@ -418,7 +420,9 @@ export async function listPluginDirs(pluginsRoot: string, onlyPlugin?: string) {
 }
 
 export async function detectPluginFeatures(pluginSourceDir: string): Promise<PluginFeatures> {
-  const hasFile = (relativePath: string) => pathExists(path.join(pluginSourceDir, relativePath))
+  const hasFile = async (relativePath: string) => Boolean(
+    await resolveContainedAgentPluginPath(pluginSourceDir, relativePath, 'any', true),
+  )
 
   return {
     hasReadme: await hasFile('README.md'),
@@ -442,19 +446,22 @@ export async function copyEntry(
   sourceRel: string,
   destinationRel = sourceRel
 ) {
-  const sourcePath = path.join(pluginSourceDir, sourceRel)
-  if (!(await pathExists(sourcePath))) return false
+  const sourcePath = await resolveContainedAgentPluginPath(pluginSourceDir, sourceRel, 'any', true)
+  if (!sourcePath) return false
 
   const destinationPath = path.join(pluginDir, destinationRel)
   await ensureDir(path.dirname(destinationPath))
   await fs.cp(sourcePath, destinationPath, {
     recursive: true,
     force: true,
+    dereference: true,
   })
   return true
 }
 
 export async function copyEntries(pluginSourceDir: string, pluginDir: string, entries: CopyEntrySpec[]) {
+  await resolveContainedAgentPluginPath(pluginSourceDir, '.', 'directory')
+  await ensureDir(pluginDir)
   await Promise.all(
     entries.map((entry) =>
       typeof entry === 'string'
@@ -470,8 +477,8 @@ export async function compileProviderMcp(
   provider: PluginProviderId,
   destination: string,
 ) {
-  const sourcePath = path.join(plugin.pluginSourceDir, 'mcp.json')
-  if (!(await pathExists(sourcePath))) return false
+  const sourcePath = await resolveContainedAgentPluginPath(plugin.pluginSourceDir, 'mcp.json', 'file', true)
+  if (!sourcePath) return false
   const content = await fs.readFile(sourcePath, 'utf-8')
   const inspected = inspectAgentPluginPackage({
     manifest: plugin.manifest,

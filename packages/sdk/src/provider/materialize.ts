@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import {
-  AGENT_PLUGIN_MCP_SCHEMA_URL,
   AGENTRIG_EXTENSION_NAMESPACE,
   AgentPluginMcpConfigSchema,
   attachAgentRigExtension,
@@ -88,45 +87,11 @@ function materializeMcpConfig(bytes: Uint8Array, sourcePath: string) {
   } catch {
     throw new Error(`Invalid MCP JSON: ${normalizeVirtualPath(sourcePath)}`)
   }
-  if (!isRecord(raw) || !isRecord(raw.mcpServers)) {
-    throw new Error(`Invalid MCP configuration: ${normalizeVirtualPath(sourcePath)}`)
+  try {
+    return encodeJson(AgentPluginMcpConfigSchema.parse(raw))
+  } catch {
+    throw new Error(`Invalid canonical MCP configuration: ${normalizeVirtualPath(sourcePath)}`)
   }
-  const mcpServers = Object.fromEntries(
-    Object.entries(raw.mcpServers).map(([name, server]) => [name, normalizeMcpServer(server, name)]),
-  )
-  return encodeJson(AgentPluginMcpConfigSchema.parse({
-    $schema: AGENT_PLUGIN_MCP_SCHEMA_URL,
-    mcpServers,
-  }))
-}
-
-function normalizeMcpServer(server: unknown, name: string) {
-  if (!isRecord(server)) throw new Error(`Invalid MCP server ${name}`)
-  if (typeof server.command === 'string') {
-    return compactObject({
-      type: 'stdio',
-      command: server.command,
-      args: server.args,
-      env: server.env,
-      cwd: server.cwd,
-    })
-  }
-  if (typeof server.url === 'string') {
-    return compactObject({
-      type: server.type === 'sse' ? 'sse' : 'streamable-http',
-      url: server.url,
-      headers: server.headers,
-    })
-  }
-  throw new Error(`Invalid MCP server ${name}`)
-}
-
-function compactObject(value: Record<string, unknown>) {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined))
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function relativeWithin(sourcePath: string, filePath: string) {

@@ -607,6 +607,46 @@ describe('plugin provider command runner', () => {
     })
     await expect(fs.access(path.join(cursorRoot, 'mcp.json'))).resolves.toBeUndefined()
   })
+
+  it('rejects nested source symlinks that escape the plugin root before provider copy', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const pluginsRoot = path.join(root, 'plugins')
+    const pluginId = 'community.escape-skill'
+    await writePluginSource(pluginsRoot, pluginId, { skill: true })
+    const outside = path.join(root, 'outside-skill')
+    await fs.mkdir(outside)
+    await fs.writeFile(path.join(outside, 'SKILL.md'), 'outside\n')
+    await fs.symlink(outside, path.join(pluginsRoot, pluginId, 'skills', 'escape'))
+
+    await expect(exportPluginProviders({
+      cwd,
+      agent: 'cursor',
+      pluginsDir: pluginsRoot,
+      out: path.join(root, 'out'),
+    })).rejects.toThrow(/escapes plugin root/i)
+  })
+
+  it('rejects an MCP source symlink that escapes the plugin root before compilation', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const pluginsRoot = path.join(root, 'plugins')
+    const pluginId = 'community.escape-mcp'
+    await writePluginSource(pluginsRoot, pluginId)
+    const outsideMcp = path.join(root, 'outside-mcp.json')
+    await fs.writeFile(outsideMcp, JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+      mcpServers: {},
+    }))
+    await fs.symlink(outsideMcp, path.join(pluginsRoot, pluginId, 'mcp.json'))
+
+    await expect(exportPluginProviders({
+      cwd,
+      agent: 'cursor',
+      pluginsDir: pluginsRoot,
+      out: path.join(root, 'out'),
+    })).rejects.toThrow(/escapes plugin root/i)
+  })
 })
 
 async function tempRoot() {

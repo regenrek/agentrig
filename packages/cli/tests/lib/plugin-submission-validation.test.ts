@@ -108,7 +108,7 @@ describe('validatePluginBundle', () => {
       },
       {
         path: 'skills/test-plugin/SKILL.md',
-        content: '# Demo skill\n',
+        content: '---\nname: test-plugin\ndescription: Demonstrates the plugin.\n---\n# Demo skill\n',
       },
     ])
 
@@ -146,6 +146,59 @@ describe('validatePluginBundle', () => {
       expect.objectContaining<Partial<PluginSubmissionValidationError>>({
         errors: expect.arrayContaining([
           expect.stringMatching(/must not include ai\.agentrig\/install\.json/i),
+        ]),
+      })
+    )
+  })
+
+  it('rejects a bundle whose Skill component is not Agent Skills conformant', async () => {
+    const zipBytes = await buildZip([
+      {
+        path: 'plugin.json',
+        content: JSON.stringify({
+          $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+          name: 'demo.demo-plugin',
+          version: '1.0.0',
+        }),
+      },
+      {
+        path: 'skills/review/SKILL.md',
+        content: '---\nname: wrong-name\ndescription: Reviews code.\n---\nBody\n',
+      },
+    ])
+
+    await expect(validatePluginBundle(zipBytes, TEST_POLICY)).rejects.toEqual(
+      expect.objectContaining<Partial<PluginSubmissionValidationError>>({
+        errors: expect.arrayContaining([
+          expect.stringMatching(/must match parent directory/i),
+        ]),
+      })
+    )
+  })
+
+  it('rejects a bundle whose MCP component is not Agent Plugins conformant', async () => {
+    const zipBytes = await buildZip([
+      {
+        path: 'plugin.json',
+        content: JSON.stringify({
+          $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+          name: 'demo.demo-plugin',
+          version: '1.0.0',
+        }),
+      },
+      {
+        path: 'mcp.json',
+        content: JSON.stringify({
+          $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+          mcpServers: { broken: { type: 'stdio', command: 'node server.js' } },
+        }),
+      },
+    ])
+
+    await expect(validatePluginBundle(zipBytes, TEST_POLICY)).rejects.toEqual(
+      expect.objectContaining<Partial<PluginSubmissionValidationError>>({
+        errors: expect.arrayContaining([
+          expect.stringMatching(/command must be a bare executable/i),
         ]),
       })
     )

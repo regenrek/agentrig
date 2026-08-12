@@ -7,7 +7,7 @@ import {
 } from './agent-plugin-package'
 import type { AgentSkillSource } from './agent-skills'
 
-type ContainedPathKind = 'file' | 'directory'
+export type ContainedPathKind = 'file' | 'directory' | 'any'
 
 class PackagePathError extends Error {
   readonly code: 'filesystem.path-escape' | 'filesystem.unreadable' | 'filesystem.wrong-kind'
@@ -60,6 +60,25 @@ export async function inspectAgentPluginPackageDirectory(
     ...(mcpRead.content !== undefined ? { mcp: { path: 'mcp.json', content: mcpRead.content } } : {}),
   })
   return appendDiagnostics(inspected, filesystemDiagnostics)
+}
+
+export async function resolveContainedAgentPluginPath(
+  packageRoot: string,
+  relativePath: string,
+  kind: ContainedPathKind = 'any',
+  optional = false,
+): Promise<string | undefined> {
+  const requestedRoot = path.resolve(packageRoot)
+  await fs.lstat(requestedRoot)
+  const root = await fs.realpath(requestedRoot)
+  const rootStat = await fs.stat(root)
+  if (!rootStat.isDirectory()) {
+    throw new PackagePathError('filesystem.wrong-kind', 'Package root is not a directory.')
+  }
+  const resolved = await resolveContainedPath(root, relativePath, kind, optional)
+  if (!resolved) return undefined
+  await validateContainedTree(root, resolved, new Set())
+  return resolved
 }
 
 async function readSkills(root: string, diagnostics: AgentPluginDiagnostic[]): Promise<AgentSkillSource[]> {
@@ -136,11 +155,31 @@ async function resolveContainedPath(
   }
 
   const stat = await fs.stat(resolved)
-  const correctKind = kind === 'file' ? stat.isFile() : stat.isDirectory()
+  const correctKind = kind === 'any' ? stat.isFile() || stat.isDirectory() : kind === 'file' ? stat.isFile() : stat.isDirectory()
   if (!correctKind) {
     throw new PackagePathError('filesystem.wrong-kind', `Expected ${relativePath} to be a ${kind}.`)
   }
   return resolved
+}
+
+async function validateContainedTree(root: string, candidate: string, visited: Set<string>): Promise<void> {
+  await fs.lstat(candidate)
+  const resolved = await fs.realpath(candidate)
+  if (!isInside(root, resolved)) {
+    throw new PackagePathError('filesystem.path-escape', `Resolved path escapes plugin root: ${candidate}`)
+  }
+  if (visited.has(resolved)) return
+  visited.add(resolved)
+
+  const stat = await fs.stat(resolved)
+  if (stat.isFile()) return
+  if (!stat.isDirectory()) {
+    throw new PackagePathError('filesystem.wrong-kind', `Unsupported filesystem entry in plugin package: ${candidate}`)
+  }
+  const entries = await fs.readdir(resolved)
+  for (const entry of entries.sort()) {
+    await validateContainedTree(root, path.join(resolved, entry), visited)
+  }
 }
 
 function appendDiagnostics(

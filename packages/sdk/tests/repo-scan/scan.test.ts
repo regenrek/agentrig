@@ -177,15 +177,28 @@ describe('scanRepo', () => {
     })
   })
 
-  it('does not treat unrelated or legacy plugin.json files as plugin candidates', async () => {
+  it('does not treat manifests under hidden metadata directories as portable package roots', async () => {
     const tree = createMemoryTree({
       'vendor/plugin.json': JSON.stringify({ name: 'grafana-panel-plugin' }),
       'vendor/skills/noise/SKILL.md': '---\nname: noise\ndescription: Not an Agent Plugin.\n---\nBody',
       '.plugin/plugin.json': JSON.stringify({
-        $schema: 'https://agentrig.ai/schema/plugin.v1.json',
-        name: 'legacy.plugin',
+        $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+        name: 'hidden.plugin',
       }),
       '.plugin/skills/legacy/SKILL.md': '---\nname: legacy\ndescription: Legacy package.\n---\nBody',
+    })
+
+    const report = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
+
+    expect(report.pluginCandidates).toEqual([])
+  })
+
+  it('does not treat manifests below hidden metadata ancestors as portable package roots', async () => {
+    const tree = createMemoryTree({
+      '.metadata/packages/plugin.json': JSON.stringify({
+        $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+        name: 'hidden.nested',
+      }),
     })
 
     const report = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })

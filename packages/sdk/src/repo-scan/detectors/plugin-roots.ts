@@ -78,6 +78,7 @@ async function candidateFromPluginManifest(input: Pick<DetectorInput, 'files' | 
 
   const manifestDir = parts.at(-2)
   const provider = manifestDir ? PLUGIN_MANIFEST_DIRS[manifestDir] : undefined
+  if (!provider && parts.slice(0, -1).some((part) => part.startsWith('.'))) return undefined
   const isPortableManifest = !provider
 
   const candidate = {

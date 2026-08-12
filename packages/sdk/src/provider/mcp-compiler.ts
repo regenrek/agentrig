@@ -27,7 +27,7 @@ function compileServer(server: AgentPluginMcpServer, options: CompileAgentPlugin
   if (server.type !== 'stdio') {
     return {
       ...server,
-      ...(options.provider === 'claude' && server.type === 'streamable-http'
+      ...((options.provider === 'claude' || options.provider === 'cursor') && server.type === 'streamable-http'
         ? { type: 'http' as const }
         : {}),
     }

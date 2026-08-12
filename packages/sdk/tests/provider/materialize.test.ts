@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vite-plus/test'
 import { materializePlugin } from '../../src/provider/materialize'
 import { scanRepo } from '../../src/repo-scan/scan'
@@ -99,6 +100,38 @@ describe('materializePlugin', () => {
         },
       })
     ).rejects.toThrow(/changed after scan/i)
+  })
+
+  it('rejects weak MCP shapes instead of coercing them into the canonical contract', async () => {
+    const content = JSON.stringify({
+      mcpServers: {
+        fs: { command: 'node', args: ['server.js'] },
+      },
+    })
+    const tree = createMemoryTree({ 'mcp.json': content })
+
+    await expect(materializePlugin({
+      tree,
+      pickedSignals: [{
+        kind: 'mcp',
+        id: 'mcp',
+        title: 'MCP',
+        sourcePath: 'mcp.json',
+        files: [{
+          path: 'mcp.json',
+          sha256: createHash('sha256').update(content).digest('hex'),
+          bytes: Buffer.byteLength(content),
+        }],
+        providerAffinity: { claude: 1, codex: 1, cursor: 1 },
+        providerCompat: { claude: 'native', codex: 'native', cursor: 'native' },
+        score: 1,
+      }],
+      manifest: {
+        name: 'community.review',
+        description: 'Review workflow.',
+        version: '1.0.0',
+      },
+    })).rejects.toThrow(/invalid canonical mcp configuration/i)
   })
 })
 
