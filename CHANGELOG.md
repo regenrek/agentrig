@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## [2.0.1] - 2026-08-12
+
+### Fixed
+
+- Kept the runtime-neutral `@agentrig/sdk` root free of Node filesystem imports so Convex, browser, and worker consumers can bundle the Agent Plugins inspector.
+- Exposed package-directory inspection through the explicit Node-only `@agentrig/sdk/agent-plugin-package-fs` subpath and updated the CLI to consume that boundary.
+
 ## [2.0.0] - 2026-08-12
 
 ### BREAKING: Agent Plugins 1.0.0
