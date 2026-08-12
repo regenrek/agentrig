@@ -14,6 +14,10 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
+    "./agent-plugin-package-fs": {
+      "types": "./dist/agent-plugin-package-fs.d.mts",
+      "import": "./dist/agent-plugin-package-fs.mjs"
+    },
     "./fs-adapters/local-fs": {
       "types": "./dist/fs-adapters/local-fs.d.mts",
       "import": "./dist/fs-adapters/local-fs.mjs"
