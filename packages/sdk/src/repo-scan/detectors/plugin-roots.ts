@@ -1,5 +1,6 @@
 import { normalizeVirtualPath, type VirtualTreeFile } from '../virtual-tree'
-import { PluginManifestSchema, type PluginManifest } from '../../agent-plugins'
+import type { PluginManifest } from '../../agent-plugins'
+import { inspectAgentPluginPackage, type AgentPluginDiagnostic } from '../../agent-plugin-package'
 import type { DetectorInput, PluginCandidate, PluginProviderId } from './common'
 
 const PLUGIN_MANIFEST_DIRS: Record<string, PluginProviderId> = {
@@ -61,6 +62,8 @@ function scanPluginCandidateFromManifest(
     manifestPath: candidate.manifestPath,
     manifest: manifest.manifest,
     manifestFile: manifest.manifestFile,
+    diagnostics: manifest.diagnostics,
+    conformance: manifest.conformance,
     files: files.map(({ file, relativePath }) => ({
       path: relativePath,
       digest: file.sha256,
@@ -75,6 +78,7 @@ async function candidateFromPluginManifest(input: Pick<DetectorInput, 'files' | 
 
   const manifestDir = parts.at(-2)
   const provider = manifestDir ? PLUGIN_MANIFEST_DIRS[manifestDir] : undefined
+  if (!provider && parts.slice(0, -1).some((part) => part.startsWith('.'))) return undefined
   const isPortableManifest = !provider
 
   const candidate = {
@@ -82,7 +86,9 @@ async function candidateFromPluginManifest(input: Pick<DetectorInput, 'files' | 
     manifestPath: path,
     rootPath: parts.slice(0, isPortableManifest ? -1 : -2).join('/'),
   }
-  const manifest = isPortableManifest ? await parseAgentrigPluginManifestCandidate(input, path) : undefined
+  const manifest = isPortableManifest
+    ? await parseAgentrigPluginManifestCandidate(input, path, candidate.rootPath)
+    : undefined
   if (isPortableManifest && !manifest) return undefined
   const scanCandidate = manifest ? scanPluginCandidateFromManifest(input, candidate, manifest) : undefined
   return {
@@ -135,6 +141,12 @@ function normalizeMarketplaceSource(source: string, rootPath: string) {
 
 type ParsedAgentrigPluginManifestCandidate = {
   manifest: PluginManifest
+  diagnostics: AgentPluginDiagnostic[]
+  conformance: {
+    loadable: boolean
+    portable: boolean
+    publishable: boolean
+  }
   manifestFile: {
     path: string
     digest: string
@@ -145,19 +157,21 @@ type ParsedAgentrigPluginManifestCandidate = {
 
 async function parseAgentrigPluginManifestCandidate(
   input: Pick<DetectorInput, 'files' | 'tree'>,
-  path: string
+  path: string,
+  rootPath: string,
 ): Promise<ParsedAgentrigPluginManifestCandidate | undefined> {
   const manifestFile = input.files.find((file) => normalizeVirtualPath(file.path) === path)
   if (!manifestFile) return undefined
-  return parseAgentrigPluginManifestText(input.tree.readText(path), path, manifestFile)
+  return parseAgentrigPluginManifestText(input, path, rootPath, manifestFile)
 }
 
 async function parseAgentrigPluginManifestText(
-  textPromise: Promise<string | null>,
+  input: Pick<DetectorInput, 'files' | 'tree'>,
   path: string,
+  rootPath: string,
   file: VirtualTreeFile
 ): Promise<ParsedAgentrigPluginManifestCandidate | undefined> {
-  const text = await textPromise
+  const text = await input.tree.readText(path)
   if (!text) return undefined
   let parsed: unknown
   try {
@@ -165,10 +179,28 @@ async function parseAgentrigPluginManifestText(
   } catch {
     return undefined
   }
-  const result = PluginManifestSchema.safeParse(parsed)
-  if (!result.success) return undefined
+  const prefix = rootPath ? `${normalizeVirtualPath(rootPath)}/` : ''
+  const skills = await Promise.all(input.files.flatMap((candidate) => {
+    const candidatePath = normalizeVirtualPath(candidate.path)
+    const relativePath = prefix && candidatePath.startsWith(prefix)
+      ? candidatePath.slice(prefix.length)
+      : prefix ? '' : candidatePath
+    if (!/^skills\/[^/]+\/SKILL\.md$/.test(relativePath)) return []
+    return [input.tree.readText(candidatePath).then((content) => content === null ? undefined : ({ path: relativePath, content }))]
+  }))
+  const mcpPath = prefix ? `${prefix}mcp.json` : 'mcp.json'
+  const hasMcp = input.files.some((candidate) => normalizeVirtualPath(candidate.path) === mcpPath)
+  const mcpContent = hasMcp ? await input.tree.readText(mcpPath) : null
+  const result = inspectAgentPluginPackage({
+    manifest: parsed,
+    skills: skills.filter((skill): skill is NonNullable<typeof skill> => Boolean(skill)),
+    ...(mcpContent === null ? {} : { mcp: { path: 'mcp.json', content: mcpContent } }),
+  })
+  if (!result.package) return undefined
   return {
-    manifest: result.data,
+    manifest: result.package.manifest,
+    diagnostics: result.diagnostics,
+    conformance: result.conformance,
     manifestFile: {
       path,
       digest: file.sha256,

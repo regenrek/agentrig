@@ -8,7 +8,7 @@ describe('materializePlugin golden fixture', () => {
     const tree = createFixtureTree('dots-like')
     const scan = await scanRepo({ source: { type: 'virtual', label: 'jxnl/dots-like' }, tree })
     const pickedSignals = scan.signals.filter((signal) =>
-      ['.mcp.json', '.claude/commands/review.md', 'prompts/debug.md', 'skills/review'].includes(signal.sourcePath)
+      ['mcp.json', '.claude/commands/review.md', 'prompts/debug.md', 'skills/review'].includes(signal.sourcePath)
     )
 
     const files = await materializePlugin({
@@ -19,15 +19,7 @@ describe('materializePlugin golden fixture', () => {
         displayName: 'Dots Like',
         description: 'Selected workflows from dots-like.',
         version: '1.0.0',
-        category: 'Development',
         keywords: ['review', 'debug'],
-        source: {
-          repoUrl: 'https://github.com/jxnl/dots',
-          owner: 'jxnl',
-          repo: 'dots',
-          commitSha: 'abc123',
-          scanDigest: scan.digest,
-        },
       },
     })
 
@@ -40,15 +32,7 @@ describe('materializePlugin golden fixture', () => {
     ])
 
     const manifest = JSON.parse(decode(files.find((file) => file.path === 'plugin.json')?.bytes))
-    expect(manifest.extensions['ai.agentrig'].source).toMatchObject({
-      kind: 'external-repo',
-      repoUrl: 'https://github.com/jxnl/dots',
-      owner: 'jxnl',
-      repo: 'dots',
-      commitSha: 'abc123',
-      scanDigest: scan.digest,
-      pickedSignalPaths: ['.claude/commands/review.md', '.mcp.json', 'prompts/debug.md', 'skills/review'],
-    })
+    expect(manifest.extensions['ai.agentrig']).toEqual({ displayName: 'Dots Like' })
   })
 })
 

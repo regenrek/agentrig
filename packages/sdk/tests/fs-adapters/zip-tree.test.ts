@@ -6,7 +6,7 @@ describe('zip fs adapter', () => {
   it('materializes a limited virtual tree from zip bytes', async () => {
     const zip = await makeZip({
       'repo/README.md': '# Repo\n',
-      'repo/skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\n',
+      'repo/skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\n',
       'repo/node_modules/pkg/index.js': 'ignored',
     })
 

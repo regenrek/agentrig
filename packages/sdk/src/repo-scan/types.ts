@@ -1,4 +1,5 @@
 import type { PluginManifest } from '../agent-plugins'
+import type { AgentPluginDiagnostic } from '../agent-plugin-package'
 
 export const SIGNAL_KINDS = [
   'skill',
@@ -114,6 +115,12 @@ export type RepoScanPluginCandidate = {
   manifest: PluginManifest
   manifestFile: RepoScanPluginManifestFile
   files: RepoScanPluginCandidateFile[]
+  diagnostics: AgentPluginDiagnostic[]
+  conformance: {
+    loadable: boolean
+    portable: boolean
+    publishable: boolean
+  }
 }
 
 export type RepoScanReport = {

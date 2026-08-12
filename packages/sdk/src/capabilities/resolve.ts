@@ -222,7 +222,7 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
       blockedYankedProviders,
     })
 
-    const verification = evaluateCapabilityProviderVerification(provider.manifest, resolvedAt)
+    const verification = evaluateCapabilityProviderVerification(provider.verification, resolvedAt)
     if (verification.stale) {
       const staleProvider: CapabilityStaleProvider = {
         capability: group.capability,
@@ -252,7 +252,7 @@ export async function resolveCapabilityGraph(input: CapabilityResolveInput): Pro
       trustTier: provider.trustTier,
       installability: provider.installability,
       providedCapability: providedCapability as AgentRigProvidedCapability,
-      verification: providerExtension?.verification,
+      verification: provider.verification,
       stale: verification.stale,
       staleReason: verification.stale ? verification.reason : undefined,
       compatibility,
@@ -531,27 +531,13 @@ function resolvedPluginSummary(record: CapabilityPluginRecord): CapabilityResolv
 }
 
 function compatibilityForProvider(record: CapabilityPluginRecord): CapabilityProviderCompatibility {
-  const compatibility = compatibilityFromExtension(record.manifest)
+  const compatibility = record.providerCompatibility ?? {}
 
   return Object.fromEntries(
     CAPABILITY_RESOLUTION_TARGETS.map((target) => {
       return [target, compatibility[target] ?? 'unknown']
     })
   ) as CapabilityProviderCompatibility
-}
-
-function compatibilityFromExtension(manifest: Pick<PluginManifest, 'extensions'>) {
-  const extension = agentRigPluginExtension(manifest)
-  const compatibility: Partial<Record<CapabilityTarget, CapabilityProviderCompatibilityState>> = {}
-  const providerTargets = extension?.providerTargets
-
-  if (Array.isArray(providerTargets)) {
-    for (const target of CAPABILITY_RESOLUTION_TARGETS) {
-      compatibility[target] = providerTargets.includes(target) ? 'native' : 'unsupported'
-    }
-  }
-
-  return compatibility
 }
 
 function installConstraintsForProvider(record: CapabilityPluginRecord): CapabilityProviderInstallConstraints {

@@ -18,7 +18,7 @@ describe('artifact extraction', () => {
         { path: 'plugin.json', digest: 'sha256:plugin' },
         { path: 'skills/review/SKILL.md', digest: 'sha256:skill' },
         { path: 'skills/review/references/rules.md', digest: 'sha256:rules' },
-        { path: '.mcp.json', digest: 'sha256:mcp' },
+        { path: 'mcp.json', digest: 'sha256:mcp' },
         { path: 'hooks/hooks.json', digest: 'sha256:hooks' },
         { path: 'commands/summarize.md', digest: 'sha256:command' },
         { path: 'agents/research.md', digest: 'sha256:agent' },
@@ -42,8 +42,11 @@ describe('artifact extraction', () => {
 
   it('extracts artifacts from repo scan signals', async () => {
     const tree = createMemoryTree({
-      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
-      '.mcp.json': JSON.stringify({ mcpServers: { fs: { command: 'node' } } }),
+      'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
+      'mcp.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: { fs: { type: 'stdio', command: 'node' } },
+      }),
       'hooks/hooks.json': JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo ok' }] }] } }),
       'README.md': '# Repo',
     })
@@ -57,14 +60,14 @@ describe('artifact extraction', () => {
     })
   })
 
-  it('preserves dotted skill names in canonical selectors', async () => {
+  it('rejects dotted skill names that violate the Agent Skills name contract', async () => {
     const tree = createMemoryTree({
       'skills/qa-single/SKILL.md': '---\nname: regenrek.qa-single\ndescription: QA skill.\n---\nBody',
     })
     const scan = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
     const artifacts = extractArtifactsFromRepoScan(scan)
 
-    expect(artifacts.map((artifact) => artifact.selector)).toEqual(['skill:regenrek.qa-single'])
+    expect(artifacts).toEqual([])
   })
 
   it('attaches only selector-scoped dependencies to bundled artifacts', () => {
@@ -105,7 +108,7 @@ describe('artifact extraction', () => {
 describe('artifact closure', () => {
   it('marks self-contained artifacts as closed', async () => {
     const tree = createMemoryTree({
-      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+      'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
     })
     const [artifact] = extractArtifactsFromPluginLock({
       plugin: 'agentrig.core',

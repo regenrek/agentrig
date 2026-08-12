@@ -19,6 +19,7 @@ import {
 } from './schemas'
 import {
   cleanEmptyAncestors,
+  compileProviderMcp,
   copyEntries,
   copyInstalledPlugin,
   detectPluginFeatures,
@@ -48,7 +49,6 @@ async function copyCursorPlugin(pluginSourceDir: string, pluginDir: string) {
     'assets',
     'scripts',
     'README.md',
-    'mcp.json',
   ])
 }
 
@@ -113,6 +113,7 @@ export const cursorProvider: PluginProviderAdapter = {
       const pluginName = providerPluginName(plugin, 'cursor', cfg.pluginPrefix)
       const pluginDir = path.join(pluginRoot, pluginName)
       await copyCursorPlugin(plugin.pluginSourceDir, pluginDir)
+      await compileProviderMcp(plugin, pluginDir, 'cursor', 'mcp.json')
       const features = await detectPluginFeatures(pluginDir)
       await writeCursorProviderFiles(pluginDir, plugin, features)
       await writeJsonFile(

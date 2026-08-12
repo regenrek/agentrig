@@ -43,11 +43,6 @@ describe('dots-like golden fixture', () => {
           "Claude LSP",
         ],
         [
-          "mcp",
-          ".mcp.json",
-          "MCP Servers",
-        ],
-        [
           "agent",
           "agents/research.md",
           "Research",
@@ -61,6 +56,11 @@ describe('dots-like golden fixture', () => {
           "hook",
           "hooks.json",
           "Hooks",
+        ],
+        [
+          "mcp",
+          "mcp.json",
+          "MCP Servers",
         ],
         [
           "prompt",
@@ -84,7 +84,7 @@ describe('dots-like golden fixture', () => {
         ],
       ]
     `)
-    expect(first.digest).toMatchInlineSnapshot(`"ba05d2cdec0d7f833f2912aec1a7269f12b4ee288ffdf34b195790527f602e2f"`)
+    expect(first.digest).toMatchInlineSnapshot(`"fba89a837b44e9513b41d3a0b8cac3f2d43506a89edd43d52ded0b3a1740a83d"`)
   })
 
   it('keeps enrichment prompt evidence bounded and versioned', async () => {
@@ -174,16 +174,6 @@ describe('dots-like golden fixture', () => {
           },
         ],
         [
-          "mcp",
-          "mcp",
-          ".mcp.json",
-          {
-            "claude": "native",
-            "codex": "native",
-            "cursor": "native",
-          },
-        ],
-        [
           "agent",
           "research",
           "agents/research.md",
@@ -210,6 +200,16 @@ describe('dots-like golden fixture', () => {
           {
             "claude": "native",
             "codex": "unsupported",
+            "cursor": "native",
+          },
+        ],
+        [
+          "mcp",
+          "mcp",
+          "mcp.json",
+          {
+            "claude": "native",
+            "codex": "native",
             "cursor": "native",
           },
         ],

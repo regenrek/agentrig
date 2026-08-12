@@ -6,15 +6,17 @@ import {
   type FileEntry,
 } from '@zip.js/zip.js'
 import {
+  inspectAgentPluginPackage,
+  type PluginManifest,
+} from '@agentrig/sdk'
+import {
   isAllowedExtension,
   isAllowedFilename,
   isBlockedExtension,
   isProbablyBinary,
   isSafeRelativePath,
-  validatePluginManifest,
 } from './plugin-validation'
 import type {
-  PluginManifest,
   PluginSubmissionValidationResult,
   PluginUploadPolicySnapshot,
 } from './types'
@@ -110,15 +112,42 @@ export async function validatePluginBundle(
     errors.push(...archiveValidation.errors)
 
     let manifest: PluginManifest | null = null
+    let rawManifest: unknown
     if (manifestEntry) {
       try {
         const rawBytes = await manifestEntry.getData(new Uint8ArrayWriter(), { useWebWorkers: false })
         const raw = new TextDecoder().decode(rawBytes)
-        manifest = validatePluginManifest(JSON.parse(raw), policy)
+        rawManifest = JSON.parse(raw)
       } catch (error) {
         errors.push(
           error instanceof Error ? error.message : 'Failed to parse plugin.json'
         )
+      }
+    }
+
+    if (rawManifest !== undefined) {
+      const skillSources = await Promise.all(entries.flatMap((entry) =>
+        /^skills\/[^/]+\/SKILL\.md$/.test(entry.filename)
+          ? [entry.getData(new Uint8ArrayWriter(), { useWebWorkers: false }).then((bytes) => ({
+              path: entry.filename,
+              content: new TextDecoder().decode(bytes),
+            }))]
+          : [],
+      ))
+      const mcpEntry = entryIndex.get('mcp.json')
+      const mcpContent = mcpEntry
+        ? new TextDecoder().decode(await mcpEntry.getData(new Uint8ArrayWriter(), { useWebWorkers: false }))
+        : undefined
+      const inspection = inspectAgentPluginPackage({
+        manifest: rawManifest,
+        skills: skillSources,
+        ...(mcpContent !== undefined ? { mcp: { path: 'mcp.json', content: mcpContent } } : {}),
+      })
+      manifest = inspection.package?.manifest ?? null
+      if (!inspection.conformance.publishable) {
+        errors.push(...inspection.diagnostics
+          .filter((diagnostic) => diagnostic.publishBlocking)
+          .map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`))
       }
     }
 

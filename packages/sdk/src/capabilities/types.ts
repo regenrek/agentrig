@@ -20,7 +20,12 @@ export type CapabilityProviderCompatibility = Record<CapabilityTarget, Capabilit
 
 export type AgentRigProvidedCapability = NonNullable<AgentRigPluginExtension['providesCapabilities']>[string]
 export type AgentRigRequiredCapability = NonNullable<AgentRigPluginExtension['requiredCapabilities']>[string]
-export type AgentRigVerification = NonNullable<AgentRigPluginExtension['verification']>
+export type CapabilityProviderVerification = {
+  lastVerified: string
+  cadence: string
+  smokeTest?: string
+  commandFingerprint?: string
+}
 
 export type CapabilityProviderInstallConstraints = Partial<Record<CapabilityTarget, string[]>> & {
   common?: string[]
@@ -35,6 +40,8 @@ export type CapabilityPluginRecord = {
   registryAlias?: string
   registryRef?: string
   snapshotDigest?: string
+  verification?: CapabilityProviderVerification
+  providerCompatibility?: Partial<CapabilityProviderCompatibility>
   installConstraints?: CapabilityProviderInstallConstraints
 }
 
@@ -120,7 +127,7 @@ export type CapabilityChosenProvider = {
   trustTier: TrustTier
   installability: RegistryInstallability
   providedCapability: AgentRigProvidedCapability
-  verification?: AgentRigVerification
+  verification?: CapabilityProviderVerification
   stale: boolean
   staleReason?: string
   compatibility: CapabilityProviderCompatibility

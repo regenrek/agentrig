@@ -15,10 +15,10 @@ describe('buildAgentrigUseCommand', () => {
     const cmd = buildAgentrigUseCommand({
       repoFullName: 'anthropics/skills',
       commitSha: 'abcdef1',
-      picks: ['skills/review', 'mcp/foo', '.mcp.json'],
+      picks: ['skills/review', 'mcp/foo', 'mcp.json'],
       provider: 'codex',
     })
-    expect(cmd).toBe('agentrig use anthropics/skills --ref abcdef1 --pick skills/review,mcp/foo,.mcp.json --install --provider codex')
+    expect(cmd).toBe('agentrig use anthropics/skills --ref abcdef1 --pick skills/review,mcp/foo,mcp.json --install --provider codex')
   })
 
   it('includes explicit refs when no commit sha is available', () => {

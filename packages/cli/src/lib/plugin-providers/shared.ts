@@ -6,14 +6,16 @@ import { promisify } from 'node:util'
 import {
   PluginManifestSchema as pluginManifestSchema,
   agentRigPluginExtension,
-  pluginManifestListingCategory,
+  compileAgentPluginMcpServers,
+  inspectAgentPluginPackage,
+  resolveContainedAgentPluginPath,
   sanitizeProviderPluginName,
   type PluginManifest,
   type PluginFeatures,
   type ProviderPluginNameTarget,
 } from '@agentrig/sdk'
 import { z } from 'zod'
-import { ensureDir, pathExists, readJsonFile } from '../fs'
+import { ensureDir, pathExists, readJsonFile, writeJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
 import { getAgentRigHome } from '../paths'
 import type {
@@ -376,7 +378,7 @@ export function pluginDisplayName(meta: PluginSourceManifest) {
 }
 
 export function pluginCategory(meta: PluginSourceManifest) {
-  return pluginManifestListingCategory(meta)
+  return 'Other'
 }
 
 export function providerPluginName(
@@ -388,7 +390,8 @@ export function providerPluginName(
 }
 
 export async function readPluginManifest(pluginSourceDir: string) {
-  const manifestPath = path.join(pluginSourceDir, 'plugin.json')
+  const manifestPath = await resolveContainedAgentPluginPath(pluginSourceDir, 'plugin.json', 'file')
+  if (!manifestPath) throw new Error(`Missing plugin.json in ${pluginSourceDir}`)
   const raw = await readJsonFile<unknown>(manifestPath)
   if (!raw) {
     throw new Error(`Missing plugin.json in ${pluginSourceDir}`)
@@ -417,7 +420,9 @@ export async function listPluginDirs(pluginsRoot: string, onlyPlugin?: string) {
 }
 
 export async function detectPluginFeatures(pluginSourceDir: string): Promise<PluginFeatures> {
-  const hasFile = (relativePath: string) => pathExists(path.join(pluginSourceDir, relativePath))
+  const hasFile = async (relativePath: string) => Boolean(
+    await resolveContainedAgentPluginPath(pluginSourceDir, relativePath, 'any', true),
+  )
 
   return {
     hasReadme: await hasFile('README.md'),
@@ -441,19 +446,22 @@ export async function copyEntry(
   sourceRel: string,
   destinationRel = sourceRel
 ) {
-  const sourcePath = path.join(pluginSourceDir, sourceRel)
-  if (!(await pathExists(sourcePath))) return false
+  const sourcePath = await resolveContainedAgentPluginPath(pluginSourceDir, sourceRel, 'any', true)
+  if (!sourcePath) return false
 
   const destinationPath = path.join(pluginDir, destinationRel)
   await ensureDir(path.dirname(destinationPath))
   await fs.cp(sourcePath, destinationPath, {
     recursive: true,
     force: true,
+    dereference: true,
   })
   return true
 }
 
 export async function copyEntries(pluginSourceDir: string, pluginDir: string, entries: CopyEntrySpec[]) {
+  await resolveContainedAgentPluginPath(pluginSourceDir, '.', 'directory')
+  await ensureDir(pluginDir)
   await Promise.all(
     entries.map((entry) =>
       typeof entry === 'string'
@@ -461,6 +469,38 @@ export async function copyEntries(pluginSourceDir: string, pluginDir: string, en
         : copyEntry(pluginSourceDir, pluginDir, entry.source, entry.destination)
     )
   )
+}
+
+export async function compileProviderMcp(
+  plugin: PluginEntry,
+  pluginDir: string,
+  provider: PluginProviderId,
+  destination: string,
+) {
+  const sourcePath = await resolveContainedAgentPluginPath(plugin.pluginSourceDir, 'mcp.json', 'file', true)
+  if (!sourcePath) return false
+  const content = await fs.readFile(sourcePath, 'utf-8')
+  const inspected = inspectAgentPluginPackage({
+    manifest: plugin.manifest,
+    mcp: { path: 'mcp.json', content },
+  })
+  if (!inspected.components.mcpServers.length) return false
+
+  const claude = provider === 'claude'
+  const compiled = compileAgentPluginMcpServers(inspected.components.mcpServers, {
+    provider,
+    pluginRoot: claude ? '${CLAUDE_PLUGIN_ROOT}' : '${PLUGIN_ROOT}',
+    pluginData: claude ? '${CLAUDE_PLUGIN_DATA}' : '${PLUGIN_DATA}',
+    ...(claude ? {
+      injectedEnv: {
+        CLAUDE_PLUGIN_ROOT: '${CLAUDE_PLUGIN_ROOT}',
+        CLAUDE_PLUGIN_DATA: '${CLAUDE_PLUGIN_DATA}',
+        CLAUDE_PROJECT_DIR: '${CLAUDE_PROJECT_DIR}',
+      },
+    } : {}),
+  })
+  await writeJsonFile(path.join(pluginDir, destination), compiled)
+  return true
 }
 
 export function resolveExportBaseOut(cwd: string, target: PluginProviderSelector, out?: string) {

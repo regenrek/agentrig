@@ -6,9 +6,12 @@ describe('tier 1 detectors', () => {
   it('detects structured provider-native files deterministically', async () => {
     const signals = await runTier1Detectors(
       createMemoryTree({
-        'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+        'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
         'packages/skills/lint.md': '---\nname: Lint\ndescription: Checks lint issues.\n---\nBody',
-        '.mcp.json': JSON.stringify({ mcpServers: { fs: { command: 'node', args: ['server.js'] } } }),
+        'mcp.json': JSON.stringify({
+          $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+          mcpServers: { fs: { type: 'stdio', command: 'node', args: ['server.js'] } },
+        }),
         'hooks/hooks.json': JSON.stringify({ hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo ok' }] }] } }),
         '.lsp.json': JSON.stringify({ languageServers: { typescript: { command: 'typescript-language-server', args: ['--stdio'] } } }),
         '.app.json': JSON.stringify({ entrypoint: './app.ts' }),
@@ -27,9 +30,8 @@ describe('tier 1 detectors', () => {
       ['command', '.cursor/commands/audit.md'],
       ['rule', '.cursor/rules/typescript.mdc'],
       ['lsp', '.lsp.json'],
-      ['mcp', '.mcp.json'],
       ['hook', 'hooks/hooks.json'],
-      ['skill', 'packages/skills/lint.md'],
+      ['mcp', 'mcp.json'],
       ['settings', 'settings.json'],
       ['skill', 'skills/review'],
     ])
@@ -85,7 +87,7 @@ describe('tier 1 detectors', () => {
         'plugins/compound/prompts/explain.md': '# Explain',
         'plugins/compound/docs/usage.md': '# Usage',
         'agents/root.md': '---\nname: Root Agent\ndescription: Root-level agent.\n---\nBody',
-        'skills/root/SKILL.md': '---\nname: Root Skill\ndescription: Root-level skill.\n---\nBody',
+        'skills/root/SKILL.md': '---\nname: root\ndescription: Root-level skill.\n---\nBody',
         'packages/random/prompts/loose.md': '# Loose',
       })
     )
@@ -105,13 +107,13 @@ describe('tier 1 detectors', () => {
     })
   })
 
-  it('uses SKILL.md path shape even when metadata is incomplete', async () => {
+  it('rejects SKILL.md files with incomplete metadata', async () => {
     const signals = await runTier1Detectors(
       createMemoryTree({
         'skills/bad/SKILL.md': '# Missing frontmatter\n\nStill a usable skill body.',
         'agents/no-frontmatter.md': '# Missing frontmatter',
         'packages/random/prompts/loose.md': '# Loose',
-        '.mcp.json': JSON.stringify({ nope: true }),
+        'mcp.json': JSON.stringify({ nope: true }),
         'hooks/hooks.json': JSON.stringify({ PreToolUse: [] }),
         '.lsp.json': JSON.stringify({ servers: {} }),
         'settings.json': JSON.stringify({ nope: true }),
@@ -119,15 +121,7 @@ describe('tier 1 detectors', () => {
       })
     )
 
-    expect(signals).toMatchObject([
-      {
-        kind: 'skill',
-        id: 'bad',
-        title: 'Bad',
-        sourcePath: 'skills/bad',
-        description: 'Still a usable skill body.',
-      },
-    ])
+    expect(signals).toEqual([])
   })
 
   it('ignores malformed deterministic inputs that have no canonical artifact path', async () => {
@@ -135,7 +129,7 @@ describe('tier 1 detectors', () => {
       createMemoryTree({
         'agents/no-frontmatter.md': '# Missing frontmatter',
         'packages/random/prompts/loose.md': '# Loose',
-        '.mcp.json': JSON.stringify({ nope: true }),
+        'mcp.json': JSON.stringify({ nope: true }),
         'hooks/hooks.json': JSON.stringify({ PreToolUse: [] }),
         '.lsp.json': JSON.stringify({ servers: {} }),
         'settings.json': JSON.stringify({ nope: true }),

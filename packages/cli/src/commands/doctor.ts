@@ -492,6 +492,8 @@ class RegistryCapabilityPluginLoader implements CapabilityPluginLoader {
         registryAlias: bundle.listing.registryAlias ?? parsed.registryAlias ?? DEFAULT_REGISTRY_ALIAS,
         registryRef: `${bundle.listing.registryAlias ?? parsed.registryAlias ?? DEFAULT_REGISTRY_ALIAS}/${bundle.listing.artifactId}@${bundle.listing.version}`,
         snapshotDigest: installBundleSnapshotDigest(bundle),
+        verification: bundle.controlPlane?.verification,
+        providerCompatibility: bundle.controlPlane?.providerCompatibility,
         bundle,
       }
       this.records.set(manifest.name, record)
@@ -663,7 +665,7 @@ function addCapabilityProviderChecks(
     status: unsupported.some((chosen) => chosen.required) ? 'fail' : unknown.length ? 'unknown' : 'pass',
     label: providerCompatibilityLabel(provider, supported, unknown, unsupported),
     message: unknown.length
-      ? 'Provider compatibility is unknown because extensions["ai.agentrig"].providerTargets did not declare this target.'
+      ? 'Provider compatibility is unknown because the registry control plane did not declare this target.'
       : unsupported.length
         ? `Unsupported provider(s): ${unsupported.map((chosen) => chosen.plugin).join(', ')}`
         : undefined,
@@ -1058,7 +1060,7 @@ async function addSmokeTestChecks(
       section: 'Provider',
       status: 'unknown',
       label: 'smoke tests',
-      message: 'No extensions["ai.agentrig"].verification.smokeTest metadata was declared by chosen providers.',
+      message: 'No control-plane verification smoke test was declared by chosen providers.',
     })
     return
   }
@@ -1317,10 +1319,7 @@ async function addInstallCommandFingerprintChecks(
 
   for (const provider of requiredProviders) {
     const extension = extensions.get(provider.plugin) ?? {}
-    const verification = toRecord(extension.verification)
-    const expected = typeof verification?.commandFingerprint === 'string'
-      ? verification.commandFingerprint.trim()
-      : undefined
+    const expected = provider.verification?.commandFingerprint?.trim()
     const sources = [
       extension,
       ...mcpConfigs
@@ -1333,7 +1332,7 @@ async function addInstallCommandFingerprintChecks(
       failures.push({
         plugin: provider.plugin,
         actual,
-        reason: 'missing extensions["ai.agentrig"].verification.commandFingerprint',
+        reason: 'missing control-plane verification command fingerprint',
       })
       continue
     }

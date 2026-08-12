@@ -1,6 +1,6 @@
 {
   "name": "@agentrig/sdk",
-  "version": "0.1.4",
+  "version": "2.0.0",
   "description": "Runtime-neutral AgentRig scanner, provider, and enrichment contracts.",
   "license": "MIT",
   "repository": {
@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.8.26",
+    "yaml": "^2.8.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {

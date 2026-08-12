@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { validateAgentSkill } from '../../agent-skills'
+import { inspectAgentPluginMcpDocument } from '../../agent-plugin-package'
 import type { Signal } from '../types'
 import { normalizeVirtualPath, virtualBasename, virtualDirname } from '../virtual-tree'
 import {
@@ -16,20 +18,6 @@ import {
 const jsonPrimitiveSchema = z.union([z.string(), z.number(), z.boolean(), z.null()])
 type JsonValue = z.infer<typeof jsonPrimitiveSchema> | JsonValue[] | { [key: string]: JsonValue }
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([jsonPrimitiveSchema, z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]))
-const mcpServerSchema = z
-  .object({
-    command: z.string().optional(),
-    args: z.array(z.string()).optional(),
-    env: z.record(z.string(), z.string()).optional(),
-    url: z.string().url().optional(),
-  })
-  .passthrough()
-  .refine((server) => Boolean(server.command || server.url), 'MCP server must declare command or url')
-const mcpConfigSchema = z
-  .object({
-    mcpServers: z.record(z.string(), mcpServerSchema).refine((servers) => Object.keys(servers).length > 0),
-  })
-  .passthrough()
 const hookCommandSchema = z.object({ type: z.string(), command: z.string().optional() }).passthrough()
 const hookMatcherSchema = z
   .object({
@@ -89,40 +77,24 @@ export async function detectSkills(input: DetectorInput): Promise<Signal[]> {
   const signals: Signal[] = []
   for (const file of input.files) {
     const path = normalizeVirtualPath(file.path)
-    if (virtualBasename(path) === 'SKILL.md') {
-      const text = await input.tree.readText(path)
-      const frontmatter = parseFrontmatter(text ?? '')
-      const sourcePath = virtualDirname(path)
-      if (!sourcePath) continue
-
-      const title = frontmatter?.name ?? titleFromPath(sourcePath)
-      const description = frontmatter?.description ?? markdownDescription(text)
-      signals.push(
-        createSignal({
-          kind: 'skill',
-          id: slugifySignalId(title),
-          title,
-          ...(description ? { description } : {}),
-          sourcePath,
-          files: filesForPrefix(input.files, sourcePath),
-          score: frontmatter?.name && frontmatter.description ? 1 : 0.85,
-        })
-      )
-      continue
-    }
-
-    if (!isStandaloneMarkdownSkillPath(path)) continue
-    const frontmatter = parseFrontmatter(await input.tree.readText(path))
-    if (!frontmatter?.name || !frontmatter.description) continue
+    if (virtualBasename(path) !== 'SKILL.md') continue
+    const relativePath = rootRelativePaths(input, path).find((candidate) => /^skills\/[^/]+\/SKILL\.md$/.test(candidate))
+    if (!relativePath) continue
+    const content = await input.tree.readText(path)
+    if (content === null) continue
+    const validation = validateAgentSkill({ path: relativePath, content })
+    if (!validation.skill) continue
+    const sourcePath = virtualDirname(path)
+    if (!sourcePath) continue
     signals.push(
       createSignal({
         kind: 'skill',
-        id: slugifySignalId(frontmatter.name),
-        title: frontmatter.name,
-        description: frontmatter.description,
-        sourcePath: path,
-        files: filesForExact(input.files, path),
-        score: 0.9,
+        id: validation.skill.frontmatter.name,
+        title: titleFromPath(sourcePath),
+        description: validation.skill.frontmatter.description,
+        sourcePath,
+        files: filesForPrefix(input.files, sourcePath),
+        score: 1,
       })
     )
   }
@@ -234,10 +206,10 @@ export async function detectJsonConfigs(input: DetectorInput): Promise<Signal[]>
     if (!raw) continue
 
     const relatives = rootRelativePaths(input, path)
-    if (
-      relatives.some((relativePath) => relativePath === '.mcp.json' || relativePath === 'mcp.json') &&
-      mcpConfigSchema.safeParse(raw).success
-    ) {
+    if (relatives.some((relativePath) => relativePath === 'mcp.json') && inspectAgentPluginMcpDocument({
+      path: 'mcp.json',
+      content: JSON.stringify(raw),
+    }).servers.length > 0) {
       signals.push(jsonSignal(input, path, 'mcp', 'MCP Servers', 1))
       continue
     }
@@ -313,27 +285,6 @@ function parseFrontmatter(text: string | null): Frontmatter | undefined {
     if (value) fields[key] = value
   }
   return Object.keys(fields).length > 0 ? fields : undefined
-}
-
-function isStandaloneMarkdownSkillPath(path: string) {
-  if (!path.endsWith('.md') && !path.endsWith('.mdx')) return false
-  const basename = virtualBasename(path)
-  if (basename === 'README.md' || basename === 'SKILL.md') return false
-  return path.split('/').includes('skills')
-}
-
-function markdownDescription(text: string | null) {
-  const body = stripFrontmatter(text ?? '')
-  const paragraph = body
-    .split(/\n{2,}/)
-    .map((block) => block
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#') && !line.startsWith('```'))
-      .join(' ')
-      .trim())
-    .find(Boolean)
-  return paragraph ? paragraph.replace(/\s+/g, ' ').slice(0, 240) : undefined
 }
 
 function stripFrontmatter(text: string) {

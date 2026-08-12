@@ -6,7 +6,7 @@ import { createMemoryTree } from './memory-tree'
 describe('scanRepo', () => {
   it('returns stable reports and digest over tier 1 signals only', async () => {
     const tree = createMemoryTree({
-      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+      'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
       'prompts/explain.md': '# Explain',
       'README.md': '# Repo',
     })
@@ -30,7 +30,7 @@ describe('scanRepo', () => {
 
   it('keeps filtering separate from canonical scan digest', async () => {
     const tree = createMemoryTree({
-      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+      'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
       'prompts/explain.md': '# Explain',
     })
 
@@ -53,13 +53,12 @@ describe('scanRepo', () => {
         extensions: {
           'ai.agentrig': {
             displayName: 'Test Submission',
-            kind: 'plugin',
             configSchema: {},
             pluginDependencies: [],
           },
         },
       }),
-      'skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
+      'skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
     })
 
     const report = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
@@ -79,12 +78,13 @@ describe('scanRepo', () => {
           extensions: {
             'ai.agentrig': {
               displayName: 'Test Submission',
-              kind: 'plugin',
               configSchema: {},
               pluginDependencies: [],
             },
           },
         },
+        diagnostics: [],
+        conformance: { loadable: true, portable: true, publishable: true },
         manifestFile: {
           path: 'plugin.json',
           digest: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -111,14 +111,13 @@ describe('scanRepo', () => {
         extensions: {
           'ai.agentrig': {
             displayName: 'Agentic Engineer Core',
-            kind: 'plugin',
             configSchema: {},
             pluginDependencies: [],
           },
         },
       }),
-      'plugins/regenrek.agentic-engineer-core/skills/review/SKILL.md': '---\nname: Review\ndescription: Reviews code.\n---\nBody',
-      'skills/standalone/SKILL.md': '---\nname: Standalone\ndescription: Outside the plugin root.\n---\nBody',
+      'plugins/regenrek.agentic-engineer-core/skills/review/SKILL.md': '---\nname: review\ndescription: Reviews code.\n---\nBody',
+      'skills/standalone/SKILL.md': '---\nname: standalone\ndescription: Outside the plugin root.\n---\nBody',
     })
 
     const report = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
@@ -129,6 +128,8 @@ describe('scanRepo', () => {
         version: '0.3.0',
         sourcePath: 'plugins/regenrek.agentic-engineer-core',
         manifestPath: 'plugins/regenrek.agentic-engineer-core/plugin.json',
+        diagnostics: [],
+        conformance: { loadable: true, portable: true, publishable: true },
         manifest: expect.objectContaining({
           name: 'regenrek.agentic-engineer-core',
           description: 'Agentic engineer core workflow skills.',
@@ -151,15 +152,53 @@ describe('scanRepo', () => {
     expect(report.pluginCandidates[0].files.map((file) => file.path)).not.toContain('skills/standalone/SKILL.md')
   })
 
-  it('does not treat unrelated or legacy plugin.json files as plugin candidates', async () => {
+  it('isolates invalid ai.agentrig metadata while retaining the portable scan candidate', async () => {
+    const tree = createMemoryTree({
+      'plugin.json': JSON.stringify({
+        $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+        name: 'acme.tools',
+        extensions: {
+          'ai.agentrig': {
+            displayName: 'Acme Tools',
+            listing: { category: 'Development' },
+          },
+        },
+      }),
+    })
+
+    const report = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
+
+    expect(report.pluginCandidates).toHaveLength(1)
+    expect(report.pluginCandidates[0]).toMatchObject({
+      artifactId: 'acme.tools',
+      manifest: { name: 'acme.tools', extensions: undefined },
+      conformance: { loadable: true, portable: true, publishable: false },
+      diagnostics: [expect.objectContaining({ code: 'extension.ai-agentrig.invalid', publishBlocking: true })],
+    })
+  })
+
+  it('does not treat manifests under hidden metadata directories as portable package roots', async () => {
     const tree = createMemoryTree({
       'vendor/plugin.json': JSON.stringify({ name: 'grafana-panel-plugin' }),
-      'vendor/skills/noise/SKILL.md': '---\nname: Noise\ndescription: Not an Agent Plugin.\n---\nBody',
+      'vendor/skills/noise/SKILL.md': '---\nname: noise\ndescription: Not an Agent Plugin.\n---\nBody',
       '.plugin/plugin.json': JSON.stringify({
-        $schema: 'https://agentrig.ai/schema/plugin.v1.json',
-        name: 'legacy.plugin',
+        $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+        name: 'hidden.plugin',
       }),
-      '.plugin/skills/legacy/SKILL.md': '---\nname: Legacy\ndescription: Legacy package.\n---\nBody',
+      '.plugin/skills/legacy/SKILL.md': '---\nname: legacy\ndescription: Legacy package.\n---\nBody',
+    })
+
+    const report = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
+
+    expect(report.pluginCandidates).toEqual([])
+  })
+
+  it('does not treat manifests below hidden metadata ancestors as portable package roots', async () => {
+    const tree = createMemoryTree({
+      '.metadata/packages/plugin.json': JSON.stringify({
+        $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+        name: 'hidden.nested',
+      }),
     })
 
     const report = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })

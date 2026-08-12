@@ -40,7 +40,7 @@ export async function detectPluginFeatures(tree: VirtualTree): Promise<PluginFea
     hasAssets: hasPath('assets'),
     hasScripts: hasPath('scripts'),
     hasSettings: hasPath('settings.json'),
-    hasClaudeMcp: hasPath('.mcp.json') || hasPath('mcp.json'),
+    hasClaudeMcp: hasPath('mcp.json'),
     hasClaudeLsp: hasPath('.lsp.json'),
     hasCodexApp: hasPath('.app.json'),
   }
