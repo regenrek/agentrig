@@ -14,7 +14,7 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - **Important**: The section header must match the exact version format: `## [X.Y.Z] - YYYY-MM-DD`
   - Include detailed descriptions of changes (Added/Changed/Fixed sections) so users can easily see what's included in the release
   - The release script extracts this section automatically for the GitHub Release description
-  - Keep historical breaking notes in `CHANGELOG.md`; the current release notes must call out the Agent Plugins v1 hard cut. Do not pre-bump `packages/cli/package.json` outside the release script.
+  - Keep historical breaking notes in `CHANGELOG.md`; the current release notes must call out the Agent Plugins v1 hard cut. Normally the release script owns the version bump. For a coordinated release whose package already declares the explicit target version, the script validates and tags the current committed release state without creating an empty commit.
 - Ensure any user-facing docs (README, templates) are committed.
 - Confirm the repo-local Vite+ toolchain is available:
   - `pnpm exec vp --version`
@@ -34,54 +34,19 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
 - The script will:
   - Bump `packages/cli/package.json#version`
   - Build the CLI through `vp pack`
-  - Commit `chore: release vX.Y.Z`, tag `vX.Y.Z`, push (refuses non-`main` unless `ALLOW_NON_MAIN=1`; `ALLOW_NON_MAIN=true` is rejected)
+  - Commit `chore: release vX.Y.Z` when release files changed; when an explicit target version is already committed, tag that current commit instead
+  - Tag `vX.Y.Z` and push (refuses non-`main` unless `ALLOW_NON_MAIN=1`; `ALLOW_NON_MAIN=true` is rejected)
   - Create/Update a GitHub Release with notes from `CHANGELOG.md`
 
 ## Production Migration Runbook
-Run these only from an approved prod release window, after confirming the deployed Convex target is prod. The zero-delta verification means mutation-specific write counters return zero on re-run; scan, unchanged, or already-materialized counters may remain nonzero.
+AgentRig 2.0 is a contract hard cut, not a legacy rematerialization release. Do not run the deleted 20260509/20260510 listing materialization or remirroring migrations. New approvals rebuild listings only from freshly inspected package bytes, while the registry retains a read-only decoder for the two explicitly allowlisted immutable `0.1.0` snapshots.
 
-1. `20260509_backfill_listing_installability`
-   - Command: `pnpm exec convex run --prod migrations/20260509_backfill_listing_installability:backfillListingInstallability`
-   - Confirm token literal: **known gap, none currently enforced**. TODO(C-FS-1/Worker α): add a literal confirm token before the next prod run.
-   - Expected first-run delta: `listingsTouched`, `listingDigestsTouched`, and/or `orphanDigestsTouched` may be nonzero for legacy rows missing `installability`.
-   - Verification: re-run the same command and require `listingsTouched=0`, `listingDigestsTouched=0`, and `orphanDigestsTouched=0`.
-   - Idempotency: re-runs return zero write delta.
-2. `20260509_backfill_listings_digest`
-   - Command: `pnpm exec convex run --prod migrations/20260509_backfill_listings_digest:run`
-   - Confirm token literal: **known gap, none currently enforced**. TODO(C-FS-1/Worker α): add a literal confirm token before the next prod run.
-   - Expected first-run delta: `created` and/or `updated` may be nonzero while digest rows are materialized.
-   - Verification: re-run the same command and require `created=0`, `updated=0`, and `skipped=0`.
-   - Idempotency: re-runs return zero write delta.
-3. `20260509_collapse_sibling_listings`
-   - Command: `pnpm exec convex run --prod migrations/20260509_collapse_sibling_listings:run`
-   - Confirm token literal: **known gap, none currently enforced**. TODO(C-FS-1/Worker α): add a literal confirm token before the next prod run.
-   - Expected first-run delta: `groupsCollapsed`, `versionsCreated`, `listingsDeleted`, `digestsDeleted`, `headsPatched`, and/or `parentLinksRepaired` may be nonzero while sibling heads collapse.
-   - Verification: re-run the same command and require destructive/write deltas (`groupsCollapsed`, `versionsCreated`, `listingsDeleted`, `digestsDeleted`, `parentLinksRepaired`) to be zero.
-   - Idempotency: re-runs must return zero write delta; current `headsPatched` may still report scanned heads until Worker α tightens the return contract.
-4. `20260509_backfill_marketplace_readmes`
-   - Command: `pnpm exec convex run --prod migrations/20260509_backfill_marketplace_readmes:backfillMarketplaceReadmes '{"confirm":"BACKFILL_MARKETPLACE_READMES_DEV_CONFIRM"}'`
-   - Confirm token literal: `BACKFILL_MARKETPLACE_READMES_DEV_CONFIRM` (known naming gap for a prod run; TODO(C-FS-1/Worker α): replace with a prod-specific literal if they update the migration).
-   - Expected first-run delta: `stored` may be nonzero for listings whose current version snapshot lacks a stored README.
-   - Verification: re-run the same command and require `stored=0`; `scanned` may also fall to zero once no candidates remain.
-   - Idempotency: re-runs return zero write delta.
-5. `20260510_materialize_listings_prod`
-   - Command: `pnpm exec convex run --prod migrations/20260510_materialize_listings_prod:run '{"confirm":"MATERIALIZE_LISTINGS_PROD_CONFIRM"}'`
-   - Confirm token literal: `MATERIALIZE_LISTINGS_PROD_CONFIRM`
-   - Expected first-run delta: `listingsCreated` and/or `versionsCreated` may be nonzero for approved submissions not yet materialized into marketplace listings.
-   - Verification: re-run the same command and require `listingsCreated=0`, `versionsCreated=0`, and empty `conflicts`/`skipped`.
-   - Idempotency: re-runs return zero write delta.
-6. `20260510_remirror_listing_versions_prod`
-   - Command: `pnpm exec convex run --prod migrations/20260510_remirror_listing_versions_prod:run '{"confirm":"REMIRROR_LISTING_VERSIONS_PROD_CONFIRM","artifactIds":["regenrek.agent-skills"]}'`
-   - Confirm token literal: `REMIRROR_LISTING_VERSIONS_PROD_CONFIRM`
-   - Expected first-run delta: `rewritten` contains each targeted stale listing version regenerated with the synthesized root `plugin.json`. Historical `.plugin/plugin.json` bytes remain readable only for explicitly allowlisted immutable snapshots.
-   - Verification: re-run with the same `artifactIds` and require no stale rewrites and empty `skipped`.
-   - Idempotency: re-runs should return zero write delta; coordinate with Worker α if the current mutation still reports rewrites for already re-mirrored targets.
-7. `20260510_drop_listing_install_bundle`
-   - Command: pending Worker α B2 migration landing.
-   - Confirm token literal: **TODO(Worker α/B2)**. Do not run until the migration exists with a literal prod confirm token.
-   - Expected first-run delta: drops duplicated listing-head `installBundle` data after all version snapshots are verified.
-   - Verification: pending Worker α B2; expected verification is a prod Convex run proving no listing heads retain the dropped field.
-   - Idempotency: re-runs must return zero write delta.
+For production:
+
+1. Run the complete SDK, CLI, web, and registry release gates on the exact commits to be deployed.
+2. Deploy Convex and the Cloudflare application through `agentrig-web`'s guarded `pnpm deploy:prod` command under Node 24.
+3. Verify the public package install, inspect, search, and registry endpoints against the deployed version.
+4. Do not invoke historical one-shot migrations merely because they remain in an older release log or operator transcript.
 
 ## Manual npm Publish
 - Publish only after `pnpm test:release:local` passes and the GitHub Release is correct.

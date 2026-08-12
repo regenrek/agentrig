@@ -131,7 +131,12 @@ function stageReleaseFiles(repoRoot: string) {
 
 function createGitCommitTagAndPush(repoRoot: string, version: string) {
   const tag = `v${version}`;
-  run("git", ["commit", "-m", `chore: release ${tag}`], repoRoot);
+  const stagedFiles = runCapture("git", ["diff", "--cached", "--name-only"], repoRoot);
+  if (stagedFiles) {
+    run("git", ["commit", "-m", `chore: release ${tag}`], repoRoot);
+  } else {
+    console.log(`Release files already declare ${tag}; tagging the current commit.`);
+  }
   run("git", ["tag", "-a", tag, "-m", `Release ${tag}`], repoRoot);
 
   run("git", ["push", "origin", "HEAD"], repoRoot);
