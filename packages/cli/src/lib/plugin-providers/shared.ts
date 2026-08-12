@@ -8,12 +8,12 @@ import {
   agentRigPluginExtension,
   compileAgentPluginMcpServers,
   inspectAgentPluginPackage,
-  resolveContainedAgentPluginPath,
   sanitizeProviderPluginName,
   type PluginManifest,
   type PluginFeatures,
   type ProviderPluginNameTarget,
 } from '@agentrig/sdk'
+import { resolveContainedAgentPluginPath } from '@agentrig/sdk/agent-plugin-package-fs'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile, writeJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
