@@ -1,6 +1,6 @@
 {
   "name": "@agentrig/sdk",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Runtime-neutral AgentRig scanner, provider, and enrichment contracts.",
   "license": "MIT",
   "repository": {
@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
+    },
+    "./agent-plugin-package-fs": {
+      "types": "./dist/agent-plugin-package-fs.d.mts",
+      "import": "./dist/agent-plugin-package-fs.mjs"
     },
     "./fs-adapters/local-fs": {
       "types": "./dist/fs-adapters/local-fs.d.mts",

@@ -4,6 +4,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: '@agentrig/sdk/agent-plugin-package-fs',
+        replacement: '../../packages/sdk/src/agent-plugin-package-fs.ts',
+      },
+      {
         find: '@agentrig/sdk/fs-adapters/local-fs',
         replacement: '../../packages/sdk/src/fs-adapters/local-fs.ts',
       },

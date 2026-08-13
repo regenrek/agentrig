@@ -6,14 +6,16 @@ import { promisify } from 'node:util'
 import {
   agentRigPluginExtension,
   compileAgentPluginMcpServers,
-  inspectAgentPluginPackageDirectory,
-  resolveContainedAgentPluginPath,
   sanitizeProviderPluginName,
   type AgentPluginPackageInspection,
   type PluginManifest,
   type PluginFeatures,
   type ProviderPluginNameTarget,
 } from '@agentrig/sdk'
+import {
+  inspectAgentPluginPackageDirectory,
+  resolveContainedAgentPluginPath,
+} from '@agentrig/sdk/agent-plugin-package-fs'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile, writeJsonFile } from '../fs'
 import { sha256Hex } from '../hash'

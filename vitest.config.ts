@@ -12,6 +12,10 @@ export default defineConfig({
         replacement: 'vitest',
       },
       {
+        find: '@agentrig/sdk/agent-plugin-package-fs',
+        replacement: path.join(rootDir, 'packages/sdk/src/agent-plugin-package-fs.ts'),
+      },
+      {
         find: '@agentrig/sdk/fs-adapters/local-fs',
         replacement: path.join(rootDir, 'packages/sdk/src/fs-adapters/local-fs.ts'),
       },
