@@ -1,6 +1,6 @@
 ---
 title: Plugin schema
-description: JSON schema for plugin plugin.json.
+description: JSON schema for root plugin.json.
 icon: FileBraces
 ---
 
@@ -14,16 +14,31 @@ https://agent-plugins.org/schemas/1.0.0/plugin.schema.json
 
 AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
-It validates:
+The v1 manifest requires both `$schema` and `name`. It validates:
 
 - `name` as the canonical Agent Plugins machine identifier
 - optional Agent Plugins metadata such as `version`, `description`, `author`, `license`, `keywords`, `homepage`, and `repository`
-- optional AgentRig-specific metadata under `extensions["ai.agentrig"]`
+- reverse-domain extension objects; AgentRig validates its implemented
+  `extensions["ai.agentrig"]` namespace with the SDK-owned extension schema
 
 Portable components are discovered from `skills/*/SKILL.md` and root `mcp.json`; they are not declared as manifest fields.
 
-Use `$schema` in your `plugin.json` for editor hints:
+Use the canonical `$schema` identifier in every `plugin.json`; it selects the
+supported package contract and is not only an editor hint:
 
 ```json
-{ "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json" }
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "acme.my-plugin"
+}
+```
+
+When a plugin has portable MCP servers, root `mcp.json` must use the matching
+schema identifier:
+
+```json
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {}
+}
 ```

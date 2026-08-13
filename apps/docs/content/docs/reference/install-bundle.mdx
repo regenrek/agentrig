@@ -1,0 +1,70 @@
+---
+title: InstallBundle
+description: Canonical marketplace delivery and file-fetch contract.
+icon: PackageCheck
+---
+
+# InstallBundle
+
+`InstallBundle` is the SDK-owned delivery contract between an approved catalog
+listing and the AgentRig CLI. It is not part of the portable Agent Plugins
+package and must not be embedded in `plugin.json` or `ai.agentrig/`.
+
+An abbreviated bundle contains:
+
+```json
+{
+  "schemaVersion": 1,
+  "listing": {
+    "kind": "plugin",
+    "origin": "standalone",
+    "artifactId": "acme.review-tools",
+    "version": "2.0.0",
+    "category": "Developer Tools",
+    "installability": "available"
+  },
+  "source": {
+    "type": "github",
+    "url": "https://github.com/acme/review-tools",
+    "ref": "v2.0.0",
+    "commitSha": "...",
+    "subdir": "plugins/review-tools"
+  },
+  "file_list": [
+    {
+      "path": "plugin.json",
+      "sha256": "...",
+      "size": 512
+    }
+  ]
+}
+```
+
+## Canonical path basis
+
+`source.subdir` identifies the package root inside the source snapshot.
+`file_list[].sourcePath`, when present, is relative to that root. Consumers
+join `source.subdir` and `sourcePath` exactly once when fetching source bytes.
+A `sourcePath` that repeats the subdirectory prefix is nonconforming.
+
+`file_list[].path` is the package-relative materialization path. Inline files
+carry their exact bytes in `inline` and are consumed without a network fetch.
+Every file carries its expected size and SHA-256 digest; the CLI verifies all
+bytes before provider materialization or ledger writes.
+
+## Ownership and failure behavior
+
+`@agentrig/sdk` owns the schema. The catalog promotion producer constructs and
+validates the bundle before it is stored with the immutable listing-version
+record. The public endpoint only validates and projects that canonical value;
+it does not rewrite paths, infer missing category data, or retry another shape.
+
+A plugin listing requires a category. Parent plugin listings use
+`origin: "standalone"`; artifacts bundled inside a parent use
+`origin: "bundled"`. Invalid stored bundles are not installable and fail
+closed. Fix the producer and publish a new conforming version; never rewrite an
+immutable published snapshot or add a client-side compatibility path.
+
+Time-dependent verification and provider-compatibility observations may appear
+under the bundle's `controlPlane` field. They remain external to the portable
+package and cannot be self-asserted by its author.

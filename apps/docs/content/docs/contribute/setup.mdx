@@ -10,8 +10,8 @@ Use this guide if you want to contribute to the repo or run the official registr
 
 ## Requirements
 
-- Node.js 18+ (recommended: latest LTS)
-- pnpm 9+
+- Node.js 24 (matches repository CI)
+- pnpm 11.1.1 (the version pinned by the workspace)
 
 ## Install dependencies
 
@@ -32,7 +32,7 @@ separate `agentrig-registry` repo.
 
 ```bash
 pnpm dev:cli -- init --registry https://agentrig.ai/registry
-pnpm dev:cli -- list --available
+pnpm dev:cli -- search review
 pnpm dev:cli -- plugin install codex agentrig/agentrig.core-committer
 ```
 

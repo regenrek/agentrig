@@ -28,6 +28,19 @@ The public directory and the verified mirror are browseable surfaces. Directory
 presence can help discovery; mirror presence can help audit; neither one changes
 whether the CLI can install a listing.
 
+## Canonical bundle projection
+
+Catalog promotion validates each SDK `InstallBundle` before storing it on the
+immutable listing-version record. `source.subdir` identifies the package root;
+every file fetch path is relative to that root and the CLI joins the two exactly
+once. Plugin listings retain their required category, top-level artifacts use
+`origin: "standalone"`, and child artifacts use `origin: "bundled"`.
+
+The HTTP endpoint validates and serializes this stored value. It does not
+normalize it a second time, guess missing metadata, or fall back to an older
+shape. A nonconforming bundle is not installable; its author must publish a new
+conforming version. See the [`InstallBundle` reference](/reference/install-bundle).
+
 ## Verified mirror source
 
 Verified mirror PRs are created only when an AgentRig admin explicitly starts the
@@ -58,6 +71,8 @@ The mirror serializes verified listings into this layout:
 - `plugins/<namespace>/<plugin>/versions/<version>/LICENSE`
 - `skills/<namespace>/<skill>/skill.json` for standalone skill artifacts
 - `skills/<namespace>/<skill>/versions/<version>/`
+- `mcps/<namespace>/<mcp>/mcp.json` and `mcps/<namespace>/<mcp>/versions/<version>/`
+- `hooks/<namespace>/<hook>/hook.json` and `hooks/<namespace>/<hook>/versions/<version>/`
 - `advisories.json`
 
 Mirrored plugin ids use:

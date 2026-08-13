@@ -12,6 +12,9 @@ A registry is a static folder that contains:
 registry.json
 plugins/<namespace>/<plugin>/plugin.json
 plugins/<namespace>/<plugin>/versions/<version>/**
+skills/<namespace>/<skill>/skill.json
+mcps/<namespace>/<mcp>/mcp.json
+hooks/<namespace>/<hook>/hook.json
 advisories.json
 ```
 
@@ -20,8 +23,9 @@ AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/sp
 ## Minimum requirements
 
 - `registry.json` at the registry root.
-- One canonical history file per plugin at `plugins/<namespace>/<plugin>/plugin.json`.
-- One version tree per published release under `plugins/<namespace>/<plugin>/versions/<version>/`.
+- One canonical history file per artifact under its kind root.
+- One immutable version tree per published release under
+  `<kind-root>/<namespace>/<artifact>/versions/<version>/`.
 - Signed `registry.json` plus canonical `AGENTRIG_SOURCE.json`, `AGENTRIG_LOCK.json`, and `AGENTRIG_REVIEW.json` artifacts for each published version.
 
 ## Example
@@ -41,6 +45,11 @@ https://example.com/registry/
             AGENTRIG_LOCK.json
             AGENTRIG_REVIEW.json
             skills/infra-safety/SKILL.md
+  skills/
+    acme/
+      review/
+        skill.json
+        versions/1.0.0/.skill/skill.json
 ```
 
 ## Test locally

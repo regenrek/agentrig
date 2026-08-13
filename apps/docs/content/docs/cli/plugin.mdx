@@ -7,15 +7,17 @@ icon: PackagePlus
 # `agentrig plugin`
 
 `agentrig plugin` is the plugin workflow. Plugins are the primary AgentRig
-distribution unit: a plugin can bundle skills, MCPs, hooks, commands, assets,
-and provider metadata.
+distribution unit. Agent Plugins v1 makes skills and MCP servers portable;
+AgentRig can additionally carry hooks, commands, agents, rules, assets, and
+supporting files under its `ai.agentrig` extension and emit native provider
+layouts.
 
 AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
 If you are consuming plugins from registries, use the top-level commands instead:
 
 ```bash
-agentrig list --available
+agentrig search <query>
 agentrig view <plugin-spec>
 agentrig plugin install <provider> <plugin-spec>
 ```
@@ -100,10 +102,11 @@ agentrig use jxnl/dots --install --provider codex --pick prompts/review
 `inspect` and `use` scan third-party repos deterministically. The scan digest is
 computed from detector output only; AI output never changes it.
 
-`use --as-plugin <name>` writes a local plugin directory with `extensions["ai.agentrig"].source`
-provenance. `use --install` stages the same external-repo plugin shape and installs
-it through the provider installer. Both paths record external-repo provenance, not
-registry trust.
+`use --as-plugin <name>` writes a canonical local Agent Plugins package.
+`use --install` stages the same package and installs it through the provider
+installer. Both paths record external-repository provenance in AgentRig's local
+ledger and scan records, not in `plugin.json`, and never convert it into registry
+trust.
 
 ## Local BYOK enrichment
 
@@ -136,7 +139,7 @@ raise `AGENTRIG_AI_MAX_TOKENS` if the provider reports a token-limit truncation.
 The response must pass the shared `AiEnrichmentDraft` schema. Suggested description,
 keywords, and manifest `name` fields are draft metadata only.
 
-Hosted AI enrichment is disabled for AgentRig 1.0. AI-assisted CLI metadata is
+Hosted AI enrichment is disabled for AgentRig 2.0. AI-assisted CLI metadata is
 local BYOK only.
 
 ## init

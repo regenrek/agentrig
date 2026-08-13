@@ -1,0 +1,56 @@
+---
+title: mcp.json
+description: Portable Agent Plugins v1 MCP server configuration.
+icon: ServerCog
+---
+
+# mcp.json
+
+Portable MCP servers live in `mcp.json` at the plugin root. They are not
+declared inline in `plugin.json` or discovered from an alternative core path.
+The file must use the same Agent Plugins version as the manifest:
+
+```json
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "local-reviewer": {
+      "type": "stdio",
+      "command": "./bin/reviewer",
+      "args": ["--config", "${PLUGIN_ROOT}/config.json"],
+      "cwd": "${PLUGIN_ROOT}",
+      "env": { "CACHE_DIR": "${PLUGIN_DATA}/cache" }
+    },
+    "hosted-reviewer": {
+      "type": "streamable-http",
+      "url": "https://mcp.example.com/reviewer",
+      "headers": { "X-Client": "acme-plugin" }
+    }
+  }
+}
+```
+
+## Supported transports
+
+- `stdio` requires one executable `command` token. Optional `args`, `env`, and
+  `cwd` must use the closed v1 shape.
+- `streamable-http` requires an absolute endpoint URL and may include fixed
+  headers.
+- `sse` represents the legacy HTTP+SSE MCP transport. Agent Plugins v1 accepts
+  it, but new remote integrations should prefer `streamable-http`.
+
+## Validation and safety
+
+- A bundled executable uses a contained `./path`; `../` escapes are rejected.
+- Non-loopback remote endpoints must use HTTPS. HTTP is allowed only for exact
+  loopback hosts.
+- URLs cannot contain credentials or fragments. Fixed headers and `env` values
+  are visible package data and must not contain secrets.
+- `${PLUGIN_ROOT}` and `${PLUGIN_DATA}` are expanded only in stdio `args`, `env`
+  values, and `cwd`. The client owns both variables.
+- One invalid server is skipped without disabling valid sibling servers. An
+  invalid top-level `mcp.json` disables MCP for that plugin but does not disable
+  its valid skills.
+
+AgentRig validates this contract in `@agentrig/sdk`, then maps accepted servers
+to each provider's native configuration during export or install.

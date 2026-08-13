@@ -2,5 +2,5 @@
   "title": "Contribute",
   "description": "Set up the repo and contribute to the official registry",
   "icon": "GitPullRequest",
-  "pages": ["index", "setup", "official-registry"]
+  "pages": ["index", "setup", "official-registry", "production-deployment"]
 }

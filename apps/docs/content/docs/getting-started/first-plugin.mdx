@@ -40,7 +40,7 @@ The scaffolded manifest uses the Agent Plugins shape:
   "extensions": {
     "ai.agentrig": {
       "displayName": "Hello Skills",
-      "kind": "plugin",
+      "publicSkills": ["hello-skills"],
       "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
       "pluginDependencies": []
     }
@@ -49,10 +49,22 @@ The scaffolded manifest uses the Agent Plugins shape:
 ```
 
 AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
+The extension is optional. Marketplace category, source provenance, scan data,
+verification, approval, risk, support, ownership, and advisories are listing
+control-plane metadata and do not belong in the published package.
+
+<Callout title="Agent Plugins v1 hard cut">
+New packages must use root `plugin.json` and `extensions["ai.agentrig"]`.
+The previous `.plugin/plugin.json` and `x-agentrig` authoring shape is rejected.
+Only exact immutable registry snapshots published before the cut remain readable
+for pinned historical installs; publish the next version in the v1 layout.
+</Callout>
 
 ## Add files
 
-Add skills, scripts, hooks, agents, or MCP config under the plugin directory.
+Add portable skills under `skills/<name>/SKILL.md` and optional portable MCP
+configuration at root `mcp.json`. Put AgentRig-specific hooks, commands, agents,
+rules, or other extension files under `ai.agentrig/`.
 The scaffold already creates `plugin.json`. Update it after you add your real files:
 
 ```bash

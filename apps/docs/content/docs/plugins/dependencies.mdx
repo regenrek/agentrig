@@ -13,10 +13,10 @@ AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/sp
 
 ```json
 {
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "agentrig.core-committer",
   "extensions": {
     "ai.agentrig": {
-      "kind": "plugin",
       "pluginDependencies": ["agentrig.security-check"]
     }
   }

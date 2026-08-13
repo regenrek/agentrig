@@ -25,7 +25,9 @@ exact reproducibility or rollback pin.
 
 ![How AgentRig converts plugins into native plugins and tracks installs safely](/agentrig_plugin.jpeg)
 
-- Start with an AgentRig plugin as the portable source of truth for prompts, assets, scripts, MCP config, and other workflow files.
+- Start with an Agent Plugins v1 package: root `plugin.json`, portable
+  `skills/` and `mcp.json`, plus optional AgentRig-owned files under
+  `ai.agentrig/`.
 - `agentrig plugin export` converts that plugin into each provider's native plugin marketplace layout for Claude, Codex, or Cursor.
 
 ```bash

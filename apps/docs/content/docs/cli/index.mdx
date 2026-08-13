@@ -13,7 +13,8 @@ Run `agentrig --help` for global help.
 ## Common commands
 
 - `agentrig init` - create config file.
-- `agentrig list --available` - browse available plugins.
+- `agentrig search <query>` - search marketplace plugins, skills, MCPs, and hooks.
+- `agentrig list` - inspect AgentRig-managed local installs.
 - `agentrig view <registryAlias>/<namespace.plugin>` - inspect the latest plugin version before installing.
 - `agentrig plugin install <provider> <registryAlias>/<namespace.plugin>` - install the full latest plugin bundle.
 - `agentrig install <provider> <registryAlias>/<namespace.plugin> --pick skill:<name>` - install selected skills, MCPs, or hooks from a plugin as a Selection Bundle.
@@ -23,6 +24,8 @@ Run `agentrig --help` for global help.
 - `agentrig rig apply <provider> <rig>` - apply an advanced rig.
 - `agentrig registry add` - add a registry.
 - `agentrig plugin init` - scaffold a new plugin.
+- `agentrig doctor [plugin-ref] --provider <provider>` - verify package,
+  capability, provider, and install health.
 
 Public installs use latest-first registry refs:
 `<registryAlias>/<namespace.plugin>` for plugins and

@@ -19,9 +19,12 @@ AgentRig assigns trust at the registry artifact level. Discovery metadata and au
 ## How trust is determined
 
 - Trust applies to published registry artifacts, not to arbitrary sources.
-- Only static signed registries can publish installable `official` or `reviewed` entries.
+- The official AgentRig catalog can publish an approved SDK `InstallBundle`;
+  explicitly configured third-party sources must be static signed registries.
 - Directory presence can at most produce `listed`, which is discovery-only.
-- Direct URLs, ZIPs, author repos, and Convex-hosted bytes are outside the install contract.
+- Direct URLs, ZIPs, author repos, and raw Convex storage bytes are outside the
+  install contract. An approved listing served by the official install-bundle
+  endpoint is inside it.
 
 ## Identity is orthogonal
 
@@ -33,7 +36,8 @@ It is identity or ownership metadata only and must never be used to imply instal
 
 - Discovery may show `listed` projects, external repos, and submit-for-review flows.
 - Discovery must not present the same install CTA as `official` or `reviewed`.
-- Install trust comes from signed registry state plus digest verification, not from directory or profile metadata.
+- Install trust comes from approved catalog or signed registry state plus digest
+  verification, not from directory or profile metadata.
 
 ## Selection installs
 

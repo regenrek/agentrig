@@ -1,13 +1,16 @@
 ---
 title: plugin.json
-description: Plugin metadata and install plan.
+description: Agent Plugins v1 identity, metadata, and AgentRig extensions.
 icon: FileBraces
 ---
 
 # plugin.json
 
-`plugin.json` defines a plugin's identity and metadata. It also powers
-registry indexing and trust validation.
+`plugin.json` defines a plugin's identity and metadata. Portable component
+locations are fixed by Agent Plugins v1 and are not declared in this file.
+AgentRig consumes the manifest for catalog metadata, dependency and capability
+resolution, and provider-native materialization; registry trust remains a
+property of the reviewed listing or signed registry artifact.
 
 AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
@@ -42,8 +45,7 @@ AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/sp
       "consolidate-test-suites": "test-ownership",
       "stage-review": "ship-gate",
       "no-mistakes": "ship-gate"
-    },
-      "providerTargets": ["codex", "claude-code", "cursor"]
+      }
     }
   }
 }
@@ -53,6 +55,7 @@ AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/sp
 
 | Field | Required | Description |
 | --- | --- | --- |
+| `$schema` | Yes | Must be `https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`. |
 | `name` | Yes | Canonical Agent Plugins machine identifier (`namespace.plugin`). |
 | `version` | No | Semver version (`1.2.3`). |
 | `description` | No | Short summary for registry listings. |
@@ -62,10 +65,7 @@ AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/sp
 | `homepage`, `repository` | No | Standard Agent Plugins metadata. |
 | `extensions` | No | Reverse-domain extension metadata; AgentRig owns `ai.agentrig`. |
 | `extensions["ai.agentrig"].displayName` | No | AgentRig display label. |
-| `extensions["ai.agentrig"].kind` | No | AgentRig artifact kind, usually `plugin`. |
 | `extensions["ai.agentrig"].profile` | No | AgentRig plugin profile: `kit-entry`, `base`, `core`, `project`, `third-party`, or `other`. Omit it when no profile applies. |
-| `extensions["ai.agentrig"].owner` | No | AgentRig ownership classification, for example `external` for curated third-party providers. |
-| `extensions["ai.agentrig"].supportLevel` | No | AgentRig support classification, for example `curated`. |
 | `extensions["ai.agentrig"].configSchema` | No | AgentRig-specific plugin configuration schema. |
 | `extensions["ai.agentrig"].pluginDependencies` | No | AgentRig plugin dependencies installed before this plugin. |
 | `extensions["ai.agentrig"].publicSkills` | No | Public workflow skills exposed by a core or project plugin. |
@@ -73,25 +73,35 @@ AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/sp
 | `extensions["ai.agentrig"].optionalCapabilities` | No | Array of canonical capability ids this plugin can use when available. |
 | `extensions["ai.agentrig"].requiredCapabilities` | No | Map of canonical capability id to requirement metadata. Used by base and project plugins. |
 | `extensions["ai.agentrig"].aliases` | No | Map from old local skill names to canonical skill names. |
-| `extensions["ai.agentrig"].providerTargets` | No | Export targets: `codex`, `claude-code`, or `cursor`. |
 | `extensions["ai.agentrig"].providesCapabilities` | No | Map of canonical capability id to provider metadata. Used by third-party provider plugins. |
-| `extensions["ai.agentrig"].verification` | No | Provider verification metadata: `lastVerified`, `cadence`, and `smokeTest`. |
 | `extensions["ai.agentrig"].security` | No | Provider safety metadata such as consent and required env vars. |
-| `extensions["ai.agentrig"].replacementPolicy` | No | Replacement metadata for course-stable provider swaps across one or more capabilities. |
-| `extensions["ai.agentrig"].risk` | No | Top-level provider risk metadata with a `level` of `low`, `medium`, `high`, or `critical`. |
+| `extensions["ai.agentrig"].permissions` | No | AgentRig-owned permission metadata consumed by policy tooling. |
+
+Every declared `publicSkills`, `supportSkills`, or alias target must resolve to
+an actual valid `skills/<name>/SKILL.md` component. Invalid AgentRig extension
+metadata is isolated when loading the portable package and blocks publication.
+
+## What does not belong in the extension
+
+`ai.agentrig` contains stable author-declared metadata only. Catalog category,
+repository scan coordinates, refs and commits, scan digests, selected paths,
+verification results, risk assessment, approval state, registry ownership,
+support level, and advisories are time-dependent AgentRig control-plane data.
+They are stored on listings, version records, and install bundles outside the
+published package.
 
 ## Capability metadata
 
 Capabilities are metadata, not installable artifacts. They stay under
 `extensions["ai.agentrig"]` so the manifest remains Agent Plugins 1.0.0 compatible.
 
-Project plugins declare what they need:
+Project plugins declare what they need. The following snippets show the
+`extensions` fragment; a complete manifest still requires `$schema` and `name`:
 
 ```json
 {
   "extensions": {
     "ai.agentrig": {
-      "kind": "plugin",
       "profile": "project",
       "pluginDependencies": [
       "agentrig/instructa.base@^1.0.0",
@@ -112,9 +122,8 @@ Project plugins declare what they need:
         "required": true,
         "provider": "third-party.playwright-mcp"
       }
-    },
-      "optionalCapabilities": ["repo.remote"],
-      "providerTargets": ["codex", "claude-code", "cursor"]
+      },
+      "optionalCapabilities": ["repo.remote"]
     }
   }
 }
@@ -126,44 +135,32 @@ Third-party provider plugins declare what they provide:
 {
   "extensions": {
     "ai.agentrig": {
-      "kind": "plugin",
+      "displayName": "Plan ledger provider",
       "profile": "third-party",
-      "owner": "external",
-      "supportLevel": "curated",
       "providesCapabilities": {
-      "plan.ledger": {
-        "type": "ledger",
-        "requiredByCore": false,
-        "riskLevel": "medium",
-        "fallback": "docs/plan-ledger/events.jsonl"
-      }
-    },
-      "providerTargets": ["codex", "claude-code", "cursor"],
-      "verification": {
-      "lastVerified": "2026-06-04",
-      "cadence": "30d",
-      "smokeTest": "verify/plandb-smoke.md"
-    },
+        "plan.ledger": {
+          "type": "ledger",
+          "requiredByCore": false,
+          "fallback": "docs/plan-ledger/events.jsonl"
+        }
+      },
       "security": {
-      "requiresConsent": true,
-      "showsExactCommands": true,
-      "requiresEnvVars": [],
-      "notes": "Provider manifest only. Does not own PlanDB upstream code."
-    },
-      "replacementPolicy": {
-      "capabilities": ["plan.ledger"],
-      "replaceWithoutCourseChange": true
-    },
-      "risk": {
-      "level": "medium"
+        "requiresConsent": true,
+        "showsExactCommands": true,
+        "requiresEnvVars": [],
+        "notes": "Provider manifest only. Does not own PlanDB upstream code."
       }
     }
   }
 }
 ```
 
+Provider verification cadence, compatibility observations, support level, and
+risk are attached by AgentRig's control plane after inspection. Authors cannot
+self-assert those states through `plugin.json`.
+
 Capability ids follow the AgentRig package schema pattern
-`^[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)*$`. Known AgentRig 1.0 ids include:
+`^[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)*$`. Implemented capability ids include:
 
 ```txt
 plan.ledger

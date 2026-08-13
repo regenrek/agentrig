@@ -17,7 +17,10 @@ agentrig rig list
 ## Apply a rig
 
 ```bash
-agentrig rig apply core
+agentrig rig apply codex core
 ```
 
-See the Rigs section for details on `extends`, `plugins`, and `--prune`.
+The provider is required and must be `claude`, `codex`, or `cursor`. The rig name
+may be omitted when `defaultRig` is configured.
+
+See the Rigs section for details on `extends`, `plugins`, scopes, and `--prune`.

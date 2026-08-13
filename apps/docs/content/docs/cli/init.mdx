@@ -43,5 +43,8 @@ agentrig registry add <alias> <baseUrl>
 agentrig plugin install <provider> <registryAlias>/<namespace.plugin>
 ```
 
+`list --available` is retained as migration guidance and directs discovery to
+`agentrig search <query>`; it does not read a local registry index.
+
 Append `@<version>` to a registry ref only when you need an exact
 reproducibility or rollback pin.

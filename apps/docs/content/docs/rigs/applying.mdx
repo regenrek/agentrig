@@ -9,14 +9,16 @@ icon: Play
 Use `agentrig rig apply` to install all plugins for a rig.
 
 ```bash
-agentrig rig apply core
+agentrig rig apply codex core
 ```
 
 ## Flags
 
-- `--registry <name|url>` - override registry for this apply.
-- `--skillsDir <path>` - override install directory.
-- `--force` - overwrite existing files.
+- `--scope <auto|personal|workspace>` - select the provider install scope.
+- `--force` - overwrite an existing AgentRig-managed provider plugin when safe.
 - `--prune` - remove plugins not in the rig (default: true).
+- `--dry-run` - print the provider-native install and prune plan without writing.
 
-The CLI prints a summary and updates `.agentrig/manifest.json`.
+The provider is required. The rig name is optional only when `defaultRig` is
+configured. The CLI resolves all plugin graphs, emits one provider-native
+install plan, and updates the applicable v4 install ledger.
