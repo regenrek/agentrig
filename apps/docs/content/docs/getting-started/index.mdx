@@ -37,7 +37,7 @@ AgentRig starts with a simple consumer flow:
     <p>See what plugins are available before you install anything.</p>
 
     ```bash
-    agentrig list --available
+    agentrig search review
     ```
   </Step>
   <Step>
@@ -70,7 +70,7 @@ only when you need an exact reproducibility or rollback pin.
 
 ```bash
 agentrig registry add georg https://georg.dev/agentrig
-agentrig list --available --registry georg
+agentrig search typescript --registry georg
 agentrig plugin install cursor georg/georg.ts-master-plugin
 ```
 

@@ -6,7 +6,9 @@ icon: Package
 
 # Plugins overview
 
-A plugin is a portable unit of workflow logic. Each plugin ships files plus a `plugin.json` file that describes how to install them.
+A plugin is a self-contained Agent Plugins v1 package. Root `plugin.json`
+declares identity and metadata; portable components are discovered from fixed
+locations rather than from an AgentRig file-to-target map.
 
 AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
@@ -19,17 +21,23 @@ AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/sp
         <File name="commit.sh" />
       </Folder>
     </Folder>
-    <Folder name="scripts">
-      <File name="lint.sh" />
+    <File name="mcp.json" />
+    <Folder name="ai.agentrig">
+      <Folder name="hooks">
+        <File name="hooks.json" />
+      </Folder>
     </Folder>
   </Folder>
 </Files>
 
 ## What the CLI does
 
-- Reads the plugin `plugin.json`.
-- Validates target paths and hashes.
-- Writes files to the target directory (`{{skillsDir}}` by default).
-- Records the install in `.agentrig/manifest.json`.
+- Validates root `plugin.json`, package containment, `skills/*/SKILL.md`, and
+  optional root `mcp.json` through `@agentrig/sdk`.
+- Resolves plugin dependencies and AgentRig capability requirements.
+- Emits Claude, Codex, or Cursor native layouts without changing the source
+  package contract.
+- Records exact source identity, resolved version, snapshot digest, generated
+  paths, and owned hashes in `.agentrig/plugin-installs.json`.
 
 Next, explore the full plugin structure and metadata options.

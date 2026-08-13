@@ -2,5 +2,5 @@
   "title": "Registry",
   "description": "Official plugins, community-submitted content, and trust tiers",
   "icon": "Globe",
-  "pages": ["index", "official", "hosting", "namespaces", "trust"]
+  "pages": ["index", "official", "hosting", "trust"]
 }

@@ -30,7 +30,7 @@ agentrig registry add georg https://georg.dev/agentrig
 After adding a registry:
 
 ```bash
-agentrig list --available --registry georg
+agentrig search typescript --registry georg
 agentrig plugin install codex georg/georg.ts-master-plugin
 ```
 
@@ -56,7 +56,7 @@ registry alias such as `agentrig-staging` or `agentrig-dev`:
 
 ```bash
 agentrig registry add agentrig-staging https://raw.githubusercontent.com/agentrig/agentrig-registry-staging/main
-agentrig list --available --registry agentrig-staging
+agentrig search test --registry agentrig-staging
 agentrig plugin install codex agentrig-staging/regenrek.test-submission
 ```
 

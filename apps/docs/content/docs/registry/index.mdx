@@ -16,11 +16,14 @@ The registry answers **what may be installed**.
 - **Official registry** - hosted at `https://agentrig.ai/registry`.
 - **Third-party registries** - static signed registries that implement the same contract.
 - **Directory** - a curated discovery index at `https://agentrig.ai/directory/index.json`.
-- **Submissions** - review and discovery inputs that can later be mirrored into an installable registry.
+- **Submissions** - review inputs that can become approved catalog listings and
+  can separately be mirrored for audit when an admin starts that workflow.
 
 ## Install contract
 
-Public installation is allowed only from static signed registries.
+Public installation is allowed from an approved AgentRig catalog listing or an
+explicitly configured static signed third-party registry. In both cases the CLI
+consumes a validated `InstallBundle`; discovery metadata is never enough.
 
 Canonical install refs use:
 
@@ -37,7 +40,10 @@ Canonical ids use:
 namespace.plugin
 ```
 
-Direct URLs, local files, ZIP uploads, author repos, and Convex-hosted bytes are **not** installable public sources.
+Direct URLs, local files, ZIP uploads, author repos, and raw Convex storage bytes
+are **not** installable public sources. The official `agentrig.ai` endpoint may
+serve an approved listing's SDK-produced `InstallBundle`; that reviewed contract
+is distinct from arbitrary Convex-hosted payloads.
 
 ## Version and integrity records
 

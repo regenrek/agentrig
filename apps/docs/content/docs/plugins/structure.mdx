@@ -31,8 +31,18 @@ plugin-name/
 
 ## Notes
 
-- **skills/** and root **mcp.json** are the portable Agent Plugins v1 components.
+- **skills/** and root **mcp.json** are the only portable Agent Plugins v1
+  component locations. Each skill is an immediate child directory containing
+  `SKILL.md`; clients do not recursively discover deeper skills.
+- **mcp.json** uses
+  `https://agent-plugins.org/schemas/1.0.0/mcp.schema.json`. Missing portable
+  component locations are valid; malformed component locations do not redefine
+  the package layout.
 - **ai.agentrig/** contains AgentRig-specific components such as commands, hooks, agents, rules, and LSP settings.
 - Provider emitters translate AgentRig-specific components into each provider's native layout.
+
+The SDK rejects package paths that escape the resolved plugin root. New source
+packages cannot use `.plugin/plugin.json`, inline component paths, or
+`x-agentrig`; those belong to the pre-v1 contract only.
 
 Use `agentrig plugin create` to scan a directory and generate a matching `plugin.json`.

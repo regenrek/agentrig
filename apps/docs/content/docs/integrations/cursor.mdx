@@ -41,14 +41,13 @@ Uninstall is safe by default:
 - personal installs are removed from `~/.cursor/plugins/local/`
 - install records include the concrete resolved version and registry snapshot digest
 
-## Example
+## Generated provider files
 
-```json
-{
-  "path": "cursor/rules.json",
-  "target": ".cursor/rules.json"
-}
-```
+AgentRig copies portable skills, translates `mcp.json`, and maps supported
+`ai.agentrig` components into Cursor's native plugin layout. It also generates
+`CURSOR.md` and `rules/agentrig-provider.mdc` pointers back to canonical
+`plugin.json` metadata and `skills/*/SKILL.md` instructions. Generated provider
+files are outputs; do not add Cursor target mappings to the source manifest.
 
 ## Best practices
 

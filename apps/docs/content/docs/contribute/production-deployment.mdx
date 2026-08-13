@@ -1,0 +1,52 @@
+---
+title: Production deployment
+description: Registry publication and website rollout order for maintainers.
+icon: Rocket
+---
+
+# Production deployment
+
+AgentRig has two separate production mechanisms. Do not treat a merged website
+PR as an automatic deployment.
+
+## 1. Publish the registry contract
+
+The `agentrig-registry` repository publishes its checked-in static mirror from
+`main`. Pull requests must pass the canonical contract, production-policy, and
+deterministic registry checks before merge. The `main` workflows validate the
+same checked-in output; they do not rewrite an invalid tree into a valid one.
+
+For Agent Plugins v1, new plugin versions must contain root `plugin.json`, fixed
+portable component locations, and AgentRig data under the `ai.agentrig`
+extension. Only the explicitly allowlisted immutable legacy snapshots may keep
+the previous manifest bytes.
+
+## 2. Deploy the website locally
+
+From the checked-out `agentrig-web` repository, with the intended production
+commit and `.env.prod` selected, run:
+
+```bash
+pnpm deploy:prod
+```
+
+This script is the production entrypoint. It prepares the linked SDK, validates
+the AI Gateway and production target, deploys Convex first, then deploys the
+Cloudflare application with Alchemy, and finally performs the live AI Gateway
+check.
+
+The ordering is intentional: Cloudflare code may depend on the newly deployed
+Convex schema and functions. Do not deploy Cloudflare first, and do not replace
+the chained command with separate ad-hoc production steps.
+
+## Release gate
+
+Before running the local website deployment:
+
+1. Merge only PRs whose required CI checks are green.
+2. Confirm the SDK/CLI, registry, and web branches agree on the same Agent
+   Plugins v1 contract.
+3. Confirm the registry `main` state validates and exposes only the intended
+   contract version.
+4. Run `pnpm deploy:prod` once from the reviewed website commit and retain its
+   Convex, Cloudflare, and live-verification output as rollout evidence.

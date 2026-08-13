@@ -65,6 +65,11 @@ files outside the selected artifact root. MCP and hook JSON writes are
 hash-owned; uninstall removes only AgentRig-written values that still match the
 ledger.
 
+Marketplace delivery uses one SDK `InstallBundle` contract. Source file paths
+are relative to the bundle's `source.subdir`, fetched from that root exactly
+once, and verified by size and SHA-256 before materialization. Invalid bundles
+fail closed; the CLI does not coerce legacy or duplicated path shapes.
+
 ## Inspect or reuse a repo
 
 ```bash

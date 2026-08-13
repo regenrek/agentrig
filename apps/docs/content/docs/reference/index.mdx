@@ -9,6 +9,7 @@ icon: BookOpen
 This section includes the schemas and data formats used by agentrig.
 
 - Plugin schema (`https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`) - Agent Plugins 1.0.0 conformant with AgentRig-specific fields under `extensions["ai.agentrig"]`
+- [`InstallBundle`](/reference/install-bundle) - canonical marketplace delivery, path, and integrity contract
 - Registry schema (`https://agentrig.ai/schema/registry.json`)
 - Plugin history schema (`https://agentrig.ai/schema/plugin-history.json`)
 - Source artifact schema (`https://agentrig.ai/schema/agentrig-source.json`)
@@ -17,5 +18,5 @@ This section includes the schemas and data formats used by agentrig.
 - Advisories schema (`https://agentrig.ai/schema/advisories.json`)
 - Directory schema (`https://agentrig.ai/schema/directory.json`) - discovery metadata only; identity fields there do not imply install trust
 - Config schema (`https://agentrig.ai/schema/config.json`)
-- Manifest format (`.agentrig/manifest.json`)
-- Placeholder rules
+- Install ledger format (`.agentrig/plugin-installs.json`, schema version 4)
+- Agent Plugins MCP runtime-variable rules

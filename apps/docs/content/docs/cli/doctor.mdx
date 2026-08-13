@@ -1,0 +1,37 @@
+---
+title: doctor
+description: Verify registry, capability, provider, and install health.
+icon: Stethoscope
+---
+
+# `agentrig doctor`
+
+Run Doctor after installing or exporting plugins, or before relying on a
+capability provider:
+
+```bash
+agentrig doctor
+agentrig doctor agentrig/instructa.core --provider codex
+agentrig doctor agentrig/instructa.core --provider claude-code --json
+```
+
+With no plugin ref, Doctor checks CLI/SDK versions, readable personal and
+workspace install ledgers, and AgentRig-owned provider configuration. With a
+canonical registry ref it additionally resolves and validates:
+
+- registry availability and Agent Plugins v1 manifest validity
+- plugin dependency and required/optional capability closure
+- trust and installability of selected capability providers
+- stale provider verification metadata and provider compatibility
+- provider-native export paths, MCP configuration, required environment
+  variables, and installed target ownership
+
+## Options and status
+
+- `--provider <codex|claude-code|cursor>` - check one provider target.
+- `--cwd <path>` - working directory and workspace-ledger root.
+- `--json` - emit the stable Doctor JSON report.
+
+Doctor exits non-zero when a required check fails. Warnings, including stale
+verification or unresolved optional capabilities, remain visible without being
+reported as successful checks.

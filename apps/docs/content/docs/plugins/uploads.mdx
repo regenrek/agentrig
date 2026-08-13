@@ -6,7 +6,7 @@ icon: Upload
 
 # Submission contract
 
-Public uploads are disabled for AgentRig 1.0. Maintainers can submit one pinned
+Public uploads are disabled for AgentRig 2.0. Maintainers can submit one pinned
 upstream snapshot for registry/catalog review through trusted publishing:
 
 ```bash
@@ -29,7 +29,7 @@ If the plugin lives below the repo root, pass its repo-relative path:
 agentrig plugin submit owner/repo@v1.2.3 --path plugin --trustedPublish
 ```
 
-Standalone public Skill, MCP, and Hook upload flows are not part of AgentRig 1.0.
+Standalone public Skill, MCP, and Hook upload flows are not part of AgentRig 2.0.
 MCPs and hooks should ship through plugin artifacts; selection bundles from
 trusted plugin artifacts remain allowed.
 
@@ -45,7 +45,7 @@ You can also pass a submission id directly:
 agentrig plugin status <submission-id>
 ```
 
-The hosted web submission UI at `/submit` is disabled for 1.0.
+The hosted web submission UI at `/submit` is disabled for 2.0.
 
 AgentRig plugin manifests are [Agent Plugins 1.0.0](https://agent-plugins.org/specification) conformant. AgentRig-specific fields live under `extensions["ai.agentrig"]`.
 
@@ -74,7 +74,9 @@ A submission can support:
 - catalog listing review
 - optional verified mirroring after approval
 
-It does **not** make author repos, ZIPs, arbitrary URLs, or Convex-hosted payloads installable.
+It does **not** make author repos, ZIPs, arbitrary URLs, or raw Convex storage
+payloads installable. Only the approved listing's SDK-produced `InstallBundle`
+is exposed through the official install endpoint.
 
 ## Source rules
 

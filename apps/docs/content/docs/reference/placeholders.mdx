@@ -1,15 +1,18 @@
 ---
-title: Placeholder reference
-description: Template variables supported by the installer.
+title: Runtime variable reference
+description: Agent Plugins v1 MCP runtime variables.
 icon: Brackets
 ---
 
-# Placeholder reference
+# Runtime variable reference
 
-Placeholders are resolved in `files[].target` during install.
+Clients that launch a portable stdio MCP server provide these values:
 
-| Placeholder | Description |
+| Variable | Description |
 | --- | --- |
-| `{{skillsDir}}` | Path to the skills directory (default `.codex/skills`). |
+| `${PLUGIN_ROOT}` | Absolute, resolved root of the installed plugin package. |
+| `${PLUGIN_DATA}` | Writable persistent data directory for the installed plugin instance. |
 
-Unrecognized placeholders are left in place to avoid accidental path rewrites.
+Expansion is single-pass in MCP `args`, `env` values, and `cwd`. Unknown
+placeholder-like text remains literal. `command`, `url`, and HTTP headers are
+not expanded.

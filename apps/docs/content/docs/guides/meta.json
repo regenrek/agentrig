@@ -2,5 +2,5 @@
   "title": "Guides",
   "description": "Practical workflows and team rollouts",
   "icon": "Map",
-  "pages": ["index", "create-skill-plugin", "team-registry", "multi-project"]
+  "pages": ["index", "create-skill-plugin", "team-registry"]
 }

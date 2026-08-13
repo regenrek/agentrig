@@ -23,13 +23,17 @@ Required fields:
 
 Each item defines:
 
+- `kind`
+- `artifact`
 - `name`
 - `description`
-- `plugin`
 - `latest_version`
 - `history`
 - `active_version`
 - `trust_tier`
 - `installability`
+
+Plugin rows may additionally expose `plugin` as a compatibility alias for the
+canonical `artifact` id. Skill, MCP, and hook rows do not use that alias.
 
 The registry index links to per-plugin history manifests, which in turn link to version artifacts such as `AGENTRIG_SOURCE.json`, `AGENTRIG_LOCK.json`, and `AGENTRIG_REVIEW.json`.

@@ -1,32 +1,48 @@
 ---
-title: Manifest format
-description: .agentrig/manifest.json structure.
+title: Install ledger format
+description: .agentrig/plugin-installs.json structure and ownership records.
 icon: FileSpreadsheet
 ---
 
-# Manifest format
+# Install ledger format
 
-The CLI tracks installed plugins in `.agentrig/manifest.json`:
+AgentRig keeps separate personal and workspace ledgers:
+
+- personal: `~/.agentrig/plugin-installs.json`
+- workspace: `<repo>/.agentrig/plugin-installs.json`
+
+The current ledger schema is version 4. The abbreviated shape is:
 
 ```json
 {
-  "schemaVersion": 1,
-  "installed": {
-    "core-committer": {
-      "name": "core-committer",
-      "version": "0.1.0",
-      "source": "registry:default",
-      "installedAt": "2025-01-01T00:00:00.000Z",
-      "files": [
-        {
-          "target": ".codex/skills/committer/SKILL.md",
-          "sha256": "...",
-          "mode": "755"
-        }
-      ]
+  "schemaVersion": 4,
+  "installs": {
+    "cursor:personal:agentrig-core-committer": {
+      "id": "cursor:personal:agentrig-core-committer",
+      "provider": "cursor",
+      "requestedScope": "personal",
+      "scope": "personal",
+      "pluginId": "agentrig.core-committer",
+      "pluginVersion": "1.2.3",
+      "snapshotDigest": "sha256:...",
+      "pluginName": "agentrig-core-committer",
+      "targetPaths": ["..."],
+      "installedAt": "2026-08-08T00:00:00.000Z",
+      "specIdentity": { "kind": "registry", "registryAlias": "agentrig", "pluginId": "agentrig.core-committer", "version": "1.2.3", "registryUrl": "https://agentrig.ai/registry" },
+      "registry": { "contractVersion": "...", "generatedAt": "...", "registryAlias": "agentrig", "registryUrl": "https://agentrig.ai/registry", "sourceRepository": "...", "signature": { "algorithm": "...", "keyId": "...", "signedDigest": "..." } },
+      "files": [{ "path": ".../SKILL.md", "sha256": "sha256:..." }],
+      "metadata": { "pluginPath": ".../.cursor/plugins/local/agentrig-core-committer" }
     }
-  }
+  },
+  "selections": {}
 }
 ```
 
-The manifest enables safe removal by verifying file hashes.
+Provider records add provider-specific metadata. Selection records also track
+selected artifact selectors, copied file hashes, and hash-owned JSON writes.
+Uninstall removes only data that still matches recorded ownership; modified
+user files or JSON entries are kept and reported.
+
+When AgentRig encounters an older ledger during the Agent Plugins v1 hard cut,
+it archives the old file as `plugin-installs.pre-openplugins-backup.json`, resets
+the active ledger to v4, and requires affected plugins to be reinstalled.

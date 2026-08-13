@@ -1,0 +1,27 @@
+---
+title: search
+description: Search the AgentRig marketplace catalog.
+icon: Search
+---
+
+# `agentrig search`
+
+Search the configured marketplace by name, description, keywords, or source
+repository:
+
+```bash
+agentrig search "code review"
+agentrig search context --kind skill --limit 10
+agentrig search security --registry agentrig --json
+```
+
+## Options
+
+- `--registry <alias>` - marketplace alias to search (default: `agentrig`).
+- `--kind <kind>` - restrict results to `plugin`, `skill`, `mcp`, or `hook`.
+- `--limit <1-100>` - maximum result count (default: 25).
+- `--json` - print the `{ "results": [...] }` response.
+- `--cwd <path>` - working directory used to load registry configuration.
+
+Search is the discovery command. `agentrig list` reports local installs; the
+legacy `list --available` path only points users back to `search`.
