@@ -1,4 +1,4 @@
-import type { ProviderAffinity, ProviderCompat, ProviderCompatState, ProviderId, Signal } from '../repo-scan/types'
+import type { ProviderAffinity, ProviderCompat, ProviderCompatState, ProviderId, RepoScanPluginCandidate, Signal } from '../repo-scan/types'
 import type { VirtualTree } from '../repo-scan/virtual-tree'
 
 export type {
@@ -33,4 +33,5 @@ export type MaterializePluginOptions = {
   tree: VirtualTree
   manifest: MaterializedPluginManifestInput
   pickedSignals: Signal[]
+  sourcePackage?: RepoScanPluginCandidate
 }

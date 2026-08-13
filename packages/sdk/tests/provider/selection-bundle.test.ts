@@ -47,7 +47,9 @@ describe('Selection Bundle construction', () => {
     })
 
     expect(left.selectionId).toBe(right.selectionId)
-    expect(left.targetPaths).toEqual(['.mcp.json', 'skills/review/SKILL.md'])
+    const privateRoot = `.agentrig/selections/${left.selectionId.slice('sha256:'.length)}/plugins/github`
+    const privateData = `.agentrig/selections/${left.selectionId.slice('sha256:'.length)}/data/github`
+    expect(left.targetPaths).toEqual([`${privateRoot}/mcp.json`, '.mcp.json', 'skills/review/SKILL.md'])
     expect(left.materialization.jsonWrites).toEqual([
       {
         artifactSelector: 'mcp:github',
@@ -55,6 +57,10 @@ describe('Selection Bundle construction', () => {
         path: '.mcp.json',
         sourceDigest: 'sha256:mcp',
         sourcePath: 'mcp.json',
+        compileMcp: {
+          pluginRoot: privateRoot,
+          pluginData: privateData,
+        },
       },
     ])
   })

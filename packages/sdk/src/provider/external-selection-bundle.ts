@@ -9,12 +9,13 @@ import {
 } from './selection-bundle'
 import type { RepoScanReport } from '../repo-scan/types'
 import type { VirtualTree } from '../repo-scan/virtual-tree'
+import { isAgentPluginPackagePayloadPath } from '../agent-plugin-package'
 
 export type ExternalRepoSelectionSource = Extract<SelectionSource, { kind: 'external-repo-scan' }>
 
 export type BuildExternalSelectionBundleInput = {
   tree: VirtualTree
-  report: Pick<RepoScanReport, 'digest' | 'signals'>
+  report: Pick<RepoScanReport, 'digest' | 'signals' | 'pluginCandidates'>
   selectedSourcePaths: readonly string[]
   provider: SelectionProviderId
   scope: SelectionInstallScope
@@ -52,8 +53,19 @@ export async function buildExternalSelectionBundle(
   const selectedSelectors = selectedArtifacts.map((artifact) => artifact.selector)
   const closedArtifacts = await Promise.all(
     selectedArtifacts.map(async (artifact) => {
+      const packageCandidate = artifact.kind === 'mcp'
+        ? containingPluginCandidate(input.report.pluginCandidates, artifact.sourcePath)
+        : undefined
+      const packagePayload = packageCandidate?.files
+        .filter((file) => isAgentPluginPackagePayloadPath(file.path))
+        .map((file) => ({
+          sourcePath: joinCandidatePath(packageCandidate.sourcePath, file.path),
+          packagePath: file.path,
+          digest: file.digest,
+        }))
       const closure = await detectArtifactClosure(input.tree, artifact, {
         selectedSelectors,
+        ...(packagePayload ? { packagePayload } : {}),
       })
       return {
         kind: artifact.kind,
@@ -64,6 +76,7 @@ export async function buildExternalSelectionBundle(
         dependencies: artifact.dependencies,
         closureStatus: closure.status,
         ...(closure.reason ? { closureReason: closure.reason } : {}),
+        ...(packagePayload ? { packagePayload } : {}),
       } satisfies SelectedArtifactForBundle
     })
   )
@@ -77,4 +90,21 @@ export async function buildExternalSelectionBundle(
     bundle,
     selectedArtifacts: closedArtifacts,
   }
+}
+
+function containingPluginCandidate(
+  candidates: RepoScanReport['pluginCandidates'],
+  artifactSourcePath: string,
+) {
+  return candidates
+    .filter((candidate) => candidate.conformance.loadable)
+    .filter((candidate) => {
+      const root = candidate.sourcePath === '.' ? '' : candidate.sourcePath.replace(/\/+$/g, '')
+      return !root || artifactSourcePath === root || artifactSourcePath.startsWith(`${root}/`)
+    })
+    .sort((left, right) => right.sourcePath.length - left.sourcePath.length)[0]
+}
+
+function joinCandidatePath(rootPath: string, packagePath: string) {
+  return rootPath === '.' ? packagePath : `${rootPath.replace(/\/+$/g, '')}/${packagePath}`
 }

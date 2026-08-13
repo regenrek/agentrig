@@ -2,10 +2,14 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import {
   assertSelectionBundleInstallable,
+  buildPortablePluginManifest,
   buildSelectionBundle,
+  compileAgentPluginMcpServers,
   detectArtifactClosure,
   extractArtifactsFromPluginLock,
   formatArtifactSelector,
+  inspectAgentPluginPackage,
+  isAgentPluginPackagePayloadPath,
   normalizeSelectionPick,
   type ExtractedArtifact,
   type InstallBundle,
@@ -149,7 +153,7 @@ export async function installArtifactSelection(input: ArtifactSelectionInstallIn
       ...artifact,
       closureStatus: 'closed' as const,
     }))
-    : await resolveSelectedArtifacts(input.pluginDir, artifacts, selectedSelectors)
+    : await resolveSelectedArtifacts(input.pluginDir, artifacts, selectedSelectors, input.resolved.file_list)
   const bundle = await buildSelectionBundle({
     provider: input.provider,
     scope: input.scope,
@@ -318,7 +322,12 @@ function standaloneArtifactSourcePath(bundle: InstallBundle) {
   return '.'
 }
 
-async function resolveSelectedArtifacts(pluginDir: string, artifacts: ExtractedArtifact[], selectedSelectors: string[]) {
+async function resolveSelectedArtifacts(
+  pluginDir: string,
+  artifacts: ExtractedArtifact[],
+  selectedSelectors: string[],
+  packageFiles: InstallBundle['file_list'],
+) {
   const bySelector = new Map(artifacts.map((artifact) => [artifact.selector, artifact]))
   const missing = selectedSelectors.filter((selector) => !bySelector.has(selector))
   if (missing.length) {
@@ -331,13 +340,22 @@ async function resolveSelectedArtifacts(pluginDir: string, artifacts: ExtractedA
     selectedSelectors.map(async (selector) => {
       const artifact = bySelector.get(selector)
       if (!artifact) throw new Error(`Selected artifact not found in plugin lock: ${selector}`)
+      const completePluginPayload = artifact.kind === 'mcp'
+        ? packageFiles.filter((file) => isAgentPluginPackagePayloadPath(file.path)).map((file) => ({
+          sourcePath: file.path,
+          packagePath: file.path,
+          digest: file.sha256,
+        }))
+        : undefined
       const closure = await detectArtifactClosure(tree, artifact, {
         selectedSelectors: [...selectedSet],
+        ...(completePluginPayload ? { packagePayload: completePluginPayload } : {}),
       })
       return {
         ...artifact,
         closureStatus: closure.status,
-        closureReason: closure.reason,
+        ...(closure.reason ? { closureReason: closure.reason } : {}),
+        ...(completePluginPayload ? { packagePayload: completePluginPayload } : {}),
       }
     })
   )
@@ -398,7 +416,9 @@ async function installSelectionJson(
     const artifact = bySelector.get(write.artifactSelector)
     if (!artifact) throw new Error(`Missing selected artifact for JSON write: ${write.artifactSelector}`)
     const sourceJson = await readArtifactJson(source, artifact)
-    const value = selectJsonWriteValue(sourceJson, write.keyPath)
+    const value = write.compileMcp
+      ? compileSelectedMcp(sourceJson, bundle.provider, rootDir, write.compileMcp)
+      : selectJsonWriteValue(sourceJson, write.keyPath)
     const targetPath = resolveTargetPath(rootDir, write.path)
     const existing = (await readJsonFile<unknown>(targetPath)) ?? {}
     const existingRecord = toRecord(existing) ?? {}
@@ -406,6 +426,7 @@ async function installSelectionJson(
     const next = mergeJsonWrite(existingRecord, write.keyPath, value, force, targetPath)
     if (!dryRun) {
       await ensureDir(path.dirname(targetPath))
+      if (write.compileMcp) await ensureDir(resolveTargetPath(rootDir, write.compileMcp.pluginData))
       await writeJsonFile(targetPath, next)
     }
     writes.push(createProviderJsonWrite({
@@ -417,6 +438,26 @@ async function installSelectionJson(
     }))
   }
   return writes
+}
+
+function compileSelectedMcp(
+  sourceJson: Record<string, unknown>,
+  provider: SelectionProviderId,
+  rootDir: string,
+  locations: NonNullable<SelectionBundle['materialization']['jsonWrites'][number]['compileMcp']>,
+) {
+  const inspection = inspectAgentPluginPackage({
+    manifest: buildPortablePluginManifest({ name: 'selection.mcp' }),
+    mcp: { path: 'mcp.json', content: JSON.stringify(sourceJson) },
+  })
+  if (inspection.components.mcpServers.length === 0) {
+    throw new Error('Selected MCP configuration has no valid servers.')
+  }
+  return compileAgentPluginMcpServers(inspection.components.mcpServers, {
+    provider,
+    pluginRoot: resolveTargetPath(rootDir, locations.pluginRoot),
+    pluginData: resolveTargetPath(rootDir, locations.pluginData),
+  }).mcpServers
 }
 
 export async function uninstallArtifactSelection(input: ArtifactSelectionUninstallInput): Promise<ArtifactSelectionUninstallResult> {
@@ -495,6 +536,14 @@ export async function uninstallSelectionInstallRecords(
             await cleanEmptyAncestors(parent, ancestorRoot, false)
           }
         }
+        const selectionRoot = resolveTargetPath(
+          rootDir,
+          `.agentrig/selections/${record.selectionId.replace(/^sha256:/, '')}`,
+        )
+        for (const selector of record.selectedSelectors.filter((value) => value.startsWith('mcp:'))) {
+          const artifactName = selector.slice('mcp:'.length)
+          await cleanEmptyAncestors(path.join(selectionRoot, 'data', artifactName), selectionRoot, false)
+        }
       }
       clearedRecordIds.push(record.id)
     }
@@ -535,6 +584,9 @@ function resolveSelectionCleanupRoot(rootDir: string, startDir: string) {
   const relative = path.relative(rootDir, startDir)
   if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) return null
   const segments = relative.split(path.sep).filter(Boolean)
+  if (segments[0] === '.agentrig' && segments[1] === 'selections' && segments[2]) {
+    return path.join(rootDir, '.agentrig', 'selections', segments[2])
+  }
   const rootSegments = segments[0] === '.cursor' && segments[1]
     ? ['.cursor', segments[1]]
     : [segments[0]]

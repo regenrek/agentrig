@@ -1,10 +1,11 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vite-plus/test'
 import {
   installArtifactSelection,
   uninstallArtifactSelection,
+  uninstallSelectionInstallRecords,
 } from '../../src/lib/artifact-selection-install'
 import { ensureDir, pathExists, writeJsonFile } from '../../src/lib/fs'
 import { sha256Hex } from '../../src/lib/hash'
@@ -79,6 +80,92 @@ describe('installArtifactSelection', () => {
       path.join(cwd, '.codex', 'skills', 'review', '.skill', 'skill.json'),
       path.join(cwd, '.codex', 'skills', 'review', 'SKILL.md'),
     ])
+  })
+
+  it('installs and compiles selected MCP servers with their complete private package payload', async () => {
+    const cwd = await mkdtemp(path.join(tmpdir(), 'agentrig-selection-test-'))
+    const pluginDir = await mkdtemp(path.join(tmpdir(), 'agentrig-selection-plugin-'))
+    tempDirs.push(cwd, pluginDir)
+    const files = {
+      'plugin.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+        name: 'demo.local-mcp',
+      }, null, 2) + '\n',
+      'mcp.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: {
+          local: {
+            type: 'stdio',
+            command: './scripts/server.mjs',
+            args: ['--config', '${PLUGIN_ROOT}/config.json'],
+          },
+        },
+      }, null, 2) + '\n',
+      'scripts/server.mjs': 'process.stdin.resume()\n',
+      'config.json': '{"enabled":true}\n',
+    }
+    for (const [relativePath, content] of Object.entries(files)) {
+      await ensureDir(path.dirname(path.join(pluginDir, relativePath)))
+      await writeFile(path.join(pluginDir, relativePath), content)
+    }
+    const resolved: InstallBundle = {
+      schemaVersion: 1,
+      listing: {
+        kind: 'plugin',
+        origin: 'standalone',
+        artifactId: 'demo.local-mcp',
+        name: 'Local MCP',
+        description: 'Local MCP package.',
+        version: '1.0.0',
+        category: 'Development',
+        source: 'registry',
+        registryAlias: 'agentrig',
+        registrySnapshotDigest: 'a'.repeat(64),
+        registrySourceRepository: 'https://github.com/agentrig/agentrig-registry',
+        installability: 'available',
+        publishedAt: 1,
+        updatedAt: 1,
+      },
+      source: { type: 'registry', url: 'https://agentrig.ai' },
+      file_list: Object.entries(files).map(([filePath, content]) => ({
+        path: filePath,
+        sha256: sha256Hex(new TextEncoder().encode(content)),
+        size: Buffer.byteLength(content),
+      })),
+    }
+
+    const result = await installArtifactSelection({
+      cwd,
+      provider: 'codex',
+      requestedScope: 'workspace',
+      scope: 'workspace',
+      registryRef: 'agentrig/demo.local-mcp@1.0.0',
+      resolved,
+      pluginDir,
+      picks: ['mcp:mcp'],
+    })
+
+    const compiled = JSON.parse(await readFile(path.join(cwd, '.codex', '.mcp.json'), 'utf-8'))
+    const privateRoot = path.join(
+      cwd,
+      '.codex',
+      '.agentrig',
+      'selections',
+      result.bundle.selectionId.slice('sha256:'.length),
+      'plugins',
+      'mcp',
+    )
+    expect(compiled.mcpServers.local).toMatchObject({
+      command: path.join(privateRoot, 'scripts', 'server.mjs'),
+      args: ['--config', path.join(privateRoot, 'config.json')],
+    })
+    expect(compiled.mcpServers.local).not.toHaveProperty('cwd')
+    await expect(pathExists(path.join(privateRoot, 'config.json'))).resolves.toBe(true)
+    await expect(pathExists(path.join(privateRoot, 'scripts', 'server.mjs'))).resolves.toBe(true)
+
+    const uninstalled = await uninstallSelectionInstallRecords({ cwd, records: [result.record] })
+    expect(uninstalled.kept).toEqual([])
+    await expect(pathExists(path.dirname(path.dirname(privateRoot)))).resolves.toBe(false)
   })
 })
 

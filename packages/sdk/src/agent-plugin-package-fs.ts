@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import {
+  isAgentPluginSupportPath,
   inspectAgentPluginPackage,
   type AgentPluginDiagnostic,
   type AgentPluginPackageInspection,
@@ -59,7 +60,45 @@ export async function inspectAgentPluginPackageDirectory(
     skills,
     ...(mcpRead.content !== undefined ? { mcp: { path: 'mcp.json', content: mcpRead.content } } : {}),
   })
-  return appendDiagnostics(inspected, filesystemDiagnostics)
+  const supportFiles = await listContainedSupportFiles(root)
+  return appendDiagnostics({
+    ...inspected,
+    components: { ...inspected.components, supportFiles },
+  }, filesystemDiagnostics)
+}
+
+async function listContainedSupportFiles(root: string) {
+  const files: string[] = []
+  await walkContainedSupportFiles(root, root, '', files, new Set())
+  return files.sort()
+}
+
+async function walkContainedSupportFiles(
+  root: string,
+  currentDir: string,
+  relativeDir: string,
+  files: string[],
+  visitedDirectories: Set<string>,
+) {
+  const resolvedDirectory = await fs.realpath(currentDir)
+  if (!isInside(root, resolvedDirectory) || visitedDirectories.has(resolvedDirectory)) return
+  visitedDirectories.add(resolvedDirectory)
+
+  const entries = await fs.readdir(resolvedDirectory, { withFileTypes: true })
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name
+    if (!isAgentPluginSupportPath(relativePath)) continue
+    const resolved = await resolveContainedPath(root, relativePath, 'any', false)
+    if (!resolved) continue
+    const stat = await fs.stat(resolved)
+    if (stat.isFile()) {
+      files.push(relativePath)
+      continue
+    }
+    if (stat.isDirectory()) {
+      await walkContainedSupportFiles(root, resolved, relativePath, files, visitedDirectories)
+    }
+  }
 }
 
 export async function resolveContainedAgentPluginPath(
@@ -204,7 +243,7 @@ function fatalFilesystemInspection(code: string, pathName: string, message: stri
     package: null,
     diagnostics: [{ code, severity: 'fatal', path: pathName, message, publishBlocking: true }],
     conformance: { loadable: false, portable: false, publishable: false },
-    components: { skills: [], mcpServers: [] },
+    components: { skills: [], mcpServers: [], supportFiles: [] },
   }
 }
 

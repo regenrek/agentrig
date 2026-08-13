@@ -21,6 +21,7 @@ import {
   cleanEmptyAncestors,
   compileProviderMcp,
   copyEntries,
+  copyPortablePluginPayload,
   copyInstalledPlugin,
   detectPluginFeatures,
   assertContainedPath,
@@ -39,16 +40,13 @@ function resolveCursorInstallRoot(cwd: string, scope: 'personal' | 'workspace') 
   return path.join(getAgentRigHome(), '.cursor', 'plugins', 'local')
 }
 
-async function copyCursorPlugin(pluginSourceDir: string, pluginDir: string) {
-  await copyEntries(pluginSourceDir, pluginDir, [
+async function copyCursorPlugin(plugin: PluginEntry, pluginDir: string) {
+  await copyPortablePluginPayload(plugin, pluginDir)
+  await copyEntries(plugin.pluginSourceDir, pluginDir, [
     { source: 'ai.agentrig/rules', destination: 'rules' },
-    'skills',
     { source: 'ai.agentrig/agents', destination: 'agents' },
     { source: 'ai.agentrig/commands', destination: 'commands' },
     { source: 'ai.agentrig/hooks', destination: 'hooks' },
-    'assets',
-    'scripts',
-    'README.md',
   ])
 }
 
@@ -112,7 +110,7 @@ export const cursorProvider: PluginProviderAdapter = {
     for (const plugin of plugins) {
       const pluginName = providerPluginName(plugin, 'cursor', cfg.pluginPrefix)
       const pluginDir = path.join(pluginRoot, pluginName)
-      await copyCursorPlugin(plugin.pluginSourceDir, pluginDir)
+      await copyCursorPlugin(plugin, pluginDir)
       await compileProviderMcp(plugin, pluginDir, 'cursor', 'mcp.json')
       const features = await detectPluginFeatures(pluginDir)
       await writeCursorProviderFiles(pluginDir, plugin, features)

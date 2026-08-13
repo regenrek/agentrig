@@ -4,16 +4,18 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import {
-  PluginManifestSchema as pluginManifestSchema,
   agentRigPluginExtension,
   compileAgentPluginMcpServers,
-  inspectAgentPluginPackage,
   sanitizeProviderPluginName,
+  type AgentPluginPackageInspection,
   type PluginManifest,
   type PluginFeatures,
   type ProviderPluginNameTarget,
 } from '@agentrig/sdk'
-import { resolveContainedAgentPluginPath } from '@agentrig/sdk/agent-plugin-package-fs'
+import {
+  inspectAgentPluginPackageDirectory,
+  resolveContainedAgentPluginPath,
+} from '@agentrig/sdk/agent-plugin-package-fs'
 import { z } from 'zod'
 import { ensureDir, pathExists, readJsonFile, writeJsonFile } from '../fs'
 import { sha256Hex } from '../hash'
@@ -92,6 +94,7 @@ export type PluginSourceManifest = PluginManifest
 
 export type PluginEntry = {
   manifest: PluginSourceManifest
+  inspection: AgentPluginPackageInspection
   pluginSourceDir: string
   pluginName: string
 }
@@ -389,21 +392,6 @@ export function providerPluginName(
   return `${pluginPrefix}${sanitizeProviderPluginName(plugin.manifest.name, target)}`
 }
 
-export async function readPluginManifest(pluginSourceDir: string) {
-  const manifestPath = await resolveContainedAgentPluginPath(pluginSourceDir, 'plugin.json', 'file')
-  if (!manifestPath) throw new Error(`Missing plugin.json in ${pluginSourceDir}`)
-  const raw = await readJsonFile<unknown>(manifestPath)
-  if (!raw) {
-    throw new Error(`Missing plugin.json in ${pluginSourceDir}`)
-  }
-  const meta = pluginManifestSchema.safeParse(raw)
-  if (!meta.success) {
-    const issue = meta.error.issues[0]
-    throw new Error(`Invalid plugin.json in ${pluginSourceDir}: ${issue?.message ?? 'invalid data'}`)
-  }
-  return meta.data
-}
-
 export async function listPluginDirs(pluginsRoot: string, onlyPlugin?: string) {
   const explicitPluginDir = onlyPlugin ? path.join(pluginsRoot, onlyPlugin) : null
   if (explicitPluginDir) {
@@ -460,7 +448,6 @@ export async function copyEntry(
 }
 
 export async function copyEntries(pluginSourceDir: string, pluginDir: string, entries: CopyEntrySpec[]) {
-  await resolveContainedAgentPluginPath(pluginSourceDir, '.', 'directory')
   await ensureDir(pluginDir)
   await Promise.all(
     entries.map((entry) =>
@@ -471,23 +458,37 @@ export async function copyEntries(pluginSourceDir: string, pluginDir: string, en
   )
 }
 
+/**
+ * Copy package-owned support bytes while provider adapters retain ownership of
+ * generated manifests, fixed components, and AgentRig extension mappings.
+ * Agent Plugins arguments and environment values are opaque strings, so a
+ * provider export preserves the contained package payload instead of guessing
+ * which support files might be referenced at runtime.
+ */
+export async function copyPortablePluginPayload(plugin: PluginEntry, pluginDir: string) {
+  await copyEntries(plugin.pluginSourceDir, pluginDir, plugin.inspection.components.supportFiles)
+
+  for (const skill of plugin.inspection.components.skills) {
+    await copyEntry(
+      plugin.pluginSourceDir,
+      pluginDir,
+      `skills/${skill.directoryName}`,
+      `skills/${skill.directoryName}`,
+    )
+  }
+}
+
 export async function compileProviderMcp(
   plugin: PluginEntry,
   pluginDir: string,
   provider: PluginProviderId,
   destination: string,
 ) {
-  const sourcePath = await resolveContainedAgentPluginPath(plugin.pluginSourceDir, 'mcp.json', 'file', true)
-  if (!sourcePath) return false
-  const content = await fs.readFile(sourcePath, 'utf-8')
-  const inspected = inspectAgentPluginPackage({
-    manifest: plugin.manifest,
-    mcp: { path: 'mcp.json', content },
-  })
-  if (!inspected.components.mcpServers.length) return false
+  const servers = plugin.inspection.components.mcpServers
+  if (!servers.length) return false
 
   const claude = provider === 'claude'
-  const compiled = compileAgentPluginMcpServers(inspected.components.mcpServers, {
+  const compiled = compileAgentPluginMcpServers(servers, {
     provider,
     pluginRoot: claude ? '${CLAUDE_PLUGIN_ROOT}' : '${PLUGIN_ROOT}',
     pluginData: claude ? '${CLAUDE_PLUGIN_DATA}' : '${PLUGIN_DATA}',
@@ -612,9 +613,17 @@ export async function buildPluginEntries(
   const pluginDirs = await listPluginDirs(pluginsRoot, onlyPlugin)
   const plugins = await Promise.all(
     pluginDirs.map(async (pluginSourceDir) => {
-      const manifest = await readPluginManifest(pluginSourceDir)
+      const inspection = await inspectAgentPluginPackageDirectory(pluginSourceDir)
+      const manifest = inspection.package?.manifest
+      if (!manifest) {
+        const diagnostic = inspection.diagnostics[0]
+        throw new Error(
+          `Invalid plugin package in ${pluginSourceDir}: ${diagnostic?.message ?? 'plugin.json is not loadable'}`,
+        )
+      }
       return {
         manifest,
+        inspection,
         pluginSourceDir,
         pluginName: `${pluginPrefix}${manifest.name}`,
       } satisfies PluginEntry
@@ -853,4 +862,10 @@ export function parsePluginInstallScope(value?: string): PluginInstallScope {
 
 export function formatProviderSummary(result: ProviderExportResult) {
   return `${result.provider}: ${result.plugins.length} plugin(s) -> ${toPosixPath(result.outRoot)}`
+}
+
+export function formatPluginInspectionDiagnostics(result: ProviderExportResult) {
+  return result.plugins.flatMap((plugin) => plugin.inspection.diagnostics.map((diagnostic) =>
+    `${plugin.manifest.name}: ${diagnostic.severity} ${diagnostic.code} at ${diagnostic.path}: ${diagnostic.message}`
+  ))
 }

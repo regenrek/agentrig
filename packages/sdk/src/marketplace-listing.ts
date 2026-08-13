@@ -7,6 +7,12 @@ import {
 import { inspectAgentPluginPackage } from './agent-plugin-package'
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/
+const SAFE_RELATIVE_PATH_RE = /^(?!\/)(?!.*\\)(?!.*(?:^|\/)\.\.?(?:\/|$)).+$/
+
+const SafeRelativePathSchema = z.string().trim().min(1).regex(
+  SAFE_RELATIVE_PATH_RE,
+  'Expected a safe package-relative path',
+)
 
 export const SUBMISSION_STATUSES = ['pending_review', 'approved', 'rejected', 'blocked'] as const
 export const REGISTRY_MIRROR_STATUSES = ['queued', 'opened', 'merged', 'failed'] as const
@@ -109,10 +115,10 @@ export const MarketplaceListingSchema = MarketplaceListingInternalSchema
 export type MarketplaceListing = MarketplaceListingInternal
 
 export const InstallBundleFileSchema = z.object({
-  path: z.string().trim().min(1),
+  path: SafeRelativePathSchema,
   sha256: z.string().regex(SHA256_HEX_RE, 'Expected lowercase SHA-256 hex digest'),
   size: z.number().int().nonnegative(),
-  sourcePath: z.string().trim().min(1).optional(),
+  sourcePath: SafeRelativePathSchema.optional(),
   storageId: z.string().trim().min(1).optional(),
   contentType: z.string().trim().min(1).optional(),
   // Pre-signed download URL for files that cannot be reconstructed from
@@ -141,7 +147,7 @@ export const InstallBundleSourceSchema = z.object({
   url: z.string().trim().min(1).optional(),
   ref: z.string().trim().min(1).optional(),
   commitSha: z.string().trim().min(1).optional(),
-  subdir: z.string().trim().min(1).optional(),
+  subdir: SafeRelativePathSchema.optional(),
 })
 
 export type InstallBundleSource = z.infer<typeof InstallBundleSourceSchema>
@@ -168,6 +174,19 @@ export const InstallBundleSchema = z.object({
   controlPlane: AgentRigControlPlaneSchema.optional(),
   readmeFile: InstallBundleReadmeFileSchema.optional(),
   file_list: z.array(InstallBundleFileSchema).min(1),
+}).superRefine((bundle, ctx) => {
+  const subdir = bundle.source.subdir
+  if (!subdir) return
+  for (const [index, file] of bundle.file_list.entries()) {
+    const fetchPath = file.sourcePath ?? file.path
+    if (fetchPath === subdir || fetchPath.startsWith(`${subdir}/`)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['file_list', index, file.sourcePath ? 'sourcePath' : 'path'],
+        message: 'Install bundle source paths must be relative to source.subdir',
+      })
+    }
+  }
 })
 
 export type InstallBundle = z.infer<typeof InstallBundleSchema>

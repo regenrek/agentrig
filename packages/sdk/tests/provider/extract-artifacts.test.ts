@@ -166,6 +166,25 @@ describe('artifact closure', () => {
     })
   })
 
+  it('keeps remote-only MCP configuration independently closed', async () => {
+    const tree = createMemoryTree({
+      'mcp.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: {
+          docs: { type: 'streamable-http', url: 'https://example.com/mcp' },
+        },
+      }),
+    })
+    const scan = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
+    const artifact = extractArtifactsFromRepoScan(scan).find((candidate) => candidate.selector === 'mcp:mcp')
+
+    await expect(detectArtifactClosure(tree, artifact!)).resolves.toMatchObject({
+      selector: 'mcp:mcp',
+      status: 'closed',
+      requiredPaths: [],
+    })
+  })
+
   it('requires declared dependencies when selected artifacts are not closed over the bundle', async () => {
     const tree = createMemoryTree({
       'skills/review/SKILL.md': 'Use the GitHub MCP.',

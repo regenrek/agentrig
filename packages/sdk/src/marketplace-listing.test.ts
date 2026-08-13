@@ -116,6 +116,40 @@ describe('marketplace listing contracts', () => {
     ).toThrow()
   })
 
+  it('requires safe paths and subdir-relative source paths', () => {
+    expect(() => InstallBundleSchema.parse({
+      ...bundle,
+      source: { ...bundle.source, subdir: 'skills/review' },
+      file_list: [{
+        path: 'skills/review/SKILL.md',
+        sourcePath: 'skills/review/SKILL.md',
+        sha256: 'a'.repeat(64),
+        size: 1,
+      }],
+    })).toThrow(/relative to source\.subdir/i)
+
+    expect(InstallBundleSchema.parse({
+      ...bundle,
+      source: { ...bundle.source, subdir: 'skills/review' },
+      file_list: [{
+        path: 'skills/review/SKILL.md',
+        sourcePath: 'SKILL.md',
+        sha256: 'a'.repeat(64),
+        size: 1,
+      }],
+    }).file_list[0]).toMatchObject({
+      path: 'skills/review/SKILL.md',
+      sourcePath: 'SKILL.md',
+    })
+
+    for (const unsafePath of ['/absolute', '../escape', 'skills/../escape', 'skills\\escape']) {
+      expect(() => InstallBundleSchema.parse({
+        ...bundle,
+        file_list: [{ path: unsafePath, sha256: 'a'.repeat(64), size: 1 }],
+      })).toThrow(/safe package-relative path/i)
+    }
+  })
+
   it('accepts a canonical README storage reference on install bundles', () => {
     expect(
       InstallBundleSchema.parse({

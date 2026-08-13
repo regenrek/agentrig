@@ -23,6 +23,7 @@ import {
 } from './schemas'
 import {
   copyEntries,
+  copyPortablePluginPayload,
   compileProviderMcp,
   detectPluginFeatures,
   normalizeManifestDescription,
@@ -34,12 +35,9 @@ import {
 } from './shared'
 import { writeCodexProviderPointer } from './provider-pointers'
 
-async function copyCodexPlugin(pluginSourceDir: string, pluginDir: string) {
-  await copyEntries(pluginSourceDir, pluginDir, [
-    'skills',
-    'assets',
-    'scripts',
-    'README.md',
+async function copyCodexPlugin(plugin: PluginEntry, pluginDir: string) {
+  await copyPortablePluginPayload(plugin, pluginDir)
+  await copyEntries(plugin.pluginSourceDir, pluginDir, [
     { source: 'ai.agentrig/app.json', destination: '.app.json' },
   ])
 }
@@ -185,7 +183,7 @@ export const codexProvider: PluginProviderAdapter = {
     for (const plugin of plugins) {
       const pluginName = providerPluginName(plugin, 'codex', cfg.pluginPrefix)
       const pluginDir = path.join(pluginRoot, pluginName)
-      await copyCodexPlugin(plugin.pluginSourceDir, pluginDir)
+      await copyCodexPlugin(plugin, pluginDir)
       await compileProviderMcp(plugin, pluginDir, 'codex', '.mcp.json')
       const features = await detectPluginFeatures(pluginDir)
       await writeJsonFile(

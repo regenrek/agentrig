@@ -537,7 +537,7 @@ describe('plugin provider command runner', () => {
     expect(ledgers.personal.installs[record.id]).toBeDefined()
   })
 
-  it('exports ADR-0006 provider compatibility pointer files', async () => {
+  it('exports provider-native compatibility files without an unsupported Claude root pointer', async () => {
     const root = await tempRoot()
     const cwd = path.join(root, 'workspace')
     const pluginsRoot = path.join(root, 'plugins')
@@ -570,8 +570,7 @@ describe('plugin provider command runner', () => {
     })
     await expect(fs.access(path.join(codexRoot, 'scripts', 'server.mjs'))).resolves.toBeUndefined()
 
-    await expect(fs.readFile(path.join(claudeRoot, 'CLAUDE.md'), 'utf-8')).resolves.toContain('/mcp')
-    await expect(fs.readFile(path.join(claudeRoot, 'CLAUDE.md'), 'utf-8')).resolves.toContain('CLAUDE_PLUGIN_ROOT')
+    await expect(fs.access(path.join(claudeRoot, 'CLAUDE.md'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(fs.access(path.join(claudeRoot, '.mcp.json'))).resolves.toBeUndefined()
     await expect(fs.access(path.join(claudeRoot, 'commands', 'review.md'))).resolves.toBeUndefined()
     await expect(fs.access(path.join(claudeRoot, 'agents', 'reviewer.md'))).resolves.toBeUndefined()
@@ -608,7 +607,54 @@ describe('plugin provider command runner', () => {
     await expect(fs.access(path.join(cursorRoot, 'mcp.json'))).resolves.toBeUndefined()
   })
 
-  it('rejects nested source symlinks that escape the plugin root before provider copy', async () => {
+  it('uses the tolerant SDK inspection result and preserves package support payloads', async () => {
+    const root = await tempRoot()
+    const cwd = path.join(root, 'workspace')
+    const pluginsRoot = path.join(root, 'plugins')
+    const out = path.join(root, 'out')
+    const pluginId = 'community.tolerant-package'
+    const pluginRoot = path.join(pluginsRoot, pluginId)
+    await writePluginSource(pluginsRoot, pluginId, { skill: true, mcp: true })
+    await fs.writeFile(path.join(pluginRoot, 'config.json'), '{"mode":"portable"}\n')
+    await fs.writeFile(path.join(pluginRoot, 'README.md'), '# Portable support\n')
+    await fs.mkdir(path.join(pluginRoot, 'assets'), { recursive: true })
+    await fs.writeFile(path.join(pluginRoot, 'assets', 'logo.txt'), 'portable asset\n')
+    await fs.writeFile(path.join(pluginRoot, '.env'), 'SECRET=do-not-export\n')
+    await fs.writeFile(path.join(pluginRoot, 'CLAUDE.md'), 'do-not-export\n')
+    await fs.mkdir(path.join(pluginRoot, 'commands'), { recursive: true })
+    await fs.writeFile(path.join(pluginRoot, 'commands', 'legacy.md'), 'do-not-export\n')
+    await fs.mkdir(path.join(pluginRoot, 'node_modules', 'private-package'), { recursive: true })
+    await fs.writeFile(path.join(pluginRoot, 'node_modules', 'private-package', 'secret.txt'), 'do-not-export\n')
+    await fs.mkdir(path.join(pluginRoot, 'skills', 'invalid'), { recursive: true })
+    await fs.writeFile(path.join(pluginRoot, 'skills', 'invalid', 'SKILL.md'), '# Missing frontmatter\n')
+    const manifest = await readJson(path.join(pluginRoot, 'plugin.json')) as Record<string, unknown>
+    manifest.extensions = 'invalid-extension-container'
+    await fs.writeFile(path.join(pluginRoot, 'plugin.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+
+    const results = await exportPluginProviders({
+      cwd,
+      agent: 'all',
+      pluginsDir: pluginsRoot,
+      out,
+    })
+
+    for (const result of results) {
+      expect(result.plugins[0]?.inspection.conformance.loadable).toBe(true)
+      expect(result.plugins[0]?.inspection.diagnostics.length).toBeGreaterThan(0)
+      const providerRoot = path.join(out, result.provider, 'plugins', 'agentrig-community-tolerant-package')
+      await expect(fs.readFile(path.join(providerRoot, 'config.json'), 'utf-8')).resolves.toBe('{"mode":"portable"}\n')
+      await expect(fs.readFile(path.join(providerRoot, 'README.md'), 'utf-8')).resolves.toBe('# Portable support\n')
+      await expect(fs.readFile(path.join(providerRoot, 'assets', 'logo.txt'), 'utf-8')).resolves.toBe('portable asset\n')
+      await expect(fs.access(path.join(providerRoot, '.env'))).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(fs.access(path.join(providerRoot, 'CLAUDE.md'))).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(fs.access(path.join(providerRoot, 'commands', 'legacy.md'))).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(fs.access(path.join(providerRoot, 'node_modules'))).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(fs.access(path.join(providerRoot, 'skills', 'project-spec-packager', 'SKILL.md'))).resolves.toBeUndefined()
+      await expect(fs.access(path.join(providerRoot, 'skills', 'invalid'))).rejects.toMatchObject({ code: 'ENOENT' })
+    }
+  })
+
+  it('isolates a nested skill symlink that escapes the plugin root', async () => {
     const root = await tempRoot()
     const cwd = path.join(root, 'workspace')
     const pluginsRoot = path.join(root, 'plugins')
@@ -619,15 +665,22 @@ describe('plugin provider command runner', () => {
     await fs.writeFile(path.join(outside, 'SKILL.md'), 'outside\n')
     await fs.symlink(outside, path.join(pluginsRoot, pluginId, 'skills', 'escape'))
 
-    await expect(exportPluginProviders({
+    const [result] = await exportPluginProviders({
       cwd,
       agent: 'cursor',
       pluginsDir: pluginsRoot,
       out: path.join(root, 'out'),
-    })).rejects.toThrow(/escapes plugin root/i)
+    })
+
+    expect(result?.plugins[0]?.inspection.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'filesystem.path-escape',
+      path: 'skills/escape/SKILL.md',
+    }))
+    await expect(fs.access(path.join(root, 'out', 'plugins', 'agentrig-community-escape-skill', 'skills', 'escape')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('rejects an MCP source symlink that escapes the plugin root before compilation', async () => {
+  it('isolates an MCP source symlink that escapes the plugin root', async () => {
     const root = await tempRoot()
     const cwd = path.join(root, 'workspace')
     const pluginsRoot = path.join(root, 'plugins')
@@ -640,12 +693,19 @@ describe('plugin provider command runner', () => {
     }))
     await fs.symlink(outsideMcp, path.join(pluginsRoot, pluginId, 'mcp.json'))
 
-    await expect(exportPluginProviders({
+    const [result] = await exportPluginProviders({
       cwd,
       agent: 'cursor',
       pluginsDir: pluginsRoot,
       out: path.join(root, 'out'),
-    })).rejects.toThrow(/escapes plugin root/i)
+    })
+
+    expect(result?.plugins[0]?.inspection.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'filesystem.path-escape',
+      path: 'mcp.json',
+    }))
+    await expect(fs.access(path.join(root, 'out', 'plugins', 'agentrig-community-escape-mcp', 'mcp.json')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
   })
 })
 

@@ -42,6 +42,11 @@ export type SelectedArtifactForBundle = Pick<
 > & {
   closureStatus: ArtifactClosureStatus
   closureReason?: string
+  packagePayload?: Array<{
+    sourcePath: string
+    packagePath: string
+    digest: string
+  }>
 }
 
 export type SelectionJsonWrite = {
@@ -50,6 +55,10 @@ export type SelectionJsonWrite = {
   keyPath: string
   sourcePath: string
   sourceDigest: string
+  compileMcp?: {
+    pluginRoot: string
+    pluginData: string
+  }
 }
 
 export type SelectionFileCopy = {
@@ -94,10 +103,11 @@ export async function buildSelectionBundle(input: BuildSelectionBundleInput): Pr
     throw new Error('Selection Bundle requires at least one selected artifact.')
   }
   const selectedArtifacts = dedupeArtifacts(input.selectedArtifacts)
-  const materialization = buildProviderMaterialization(input.provider, selectedArtifacts)
+  const selectionId = await selectionIdFor(input.provider, input.scope, input.source, selectedArtifacts)
+  const materialization = buildProviderMaterialization(input.provider, selectedArtifacts, selectionId)
   return {
     schemaVersion: 1,
-    selectionId: await selectionIdFor(input.provider, input.scope, input.source, selectedArtifacts),
+    selectionId,
     provider: input.provider,
     scope: input.scope,
     source: input.source,
@@ -119,7 +129,8 @@ export function assertSelectionBundleInstallable(bundle: SelectionBundle): void 
 
 export function buildProviderMaterialization(
   provider: SelectionProviderId,
-  selectedArtifacts: readonly SelectedArtifactForBundle[]
+  selectedArtifacts: readonly SelectedArtifactForBundle[],
+  selectionId = 'unidentified-selection',
 ): SelectionProviderMaterialization {
   const fileCopies: SelectionFileCopy[] = []
   const jsonWrites: SelectionJsonWrite[] = []
@@ -128,12 +139,26 @@ export function buildProviderMaterialization(
 
   for (const artifact of selectedArtifacts) {
     if (artifact.kind === 'mcp') {
+      const privateRoot = `.agentrig/selections/${selectionId.replace(/^sha256:/, '')}/plugins/${artifact.name}`
+      const privateData = `.agentrig/selections/${selectionId.replace(/^sha256:/, '')}/data/${artifact.name}`
+      for (const file of artifact.packagePayload ?? defaultMcpPayload(artifact)) {
+        fileCopies.push({
+          artifactSelector: artifact.selector,
+          sourcePath: file.sourcePath,
+          targetPath: `${privateRoot}/${file.packagePath}`,
+          digest: file.digest,
+        })
+      }
       jsonWrites.push({
         artifactSelector: artifact.selector,
         path: provider === 'cursor' ? 'mcp.json' : '.mcp.json',
         keyPath: 'mcpServers',
         sourcePath: artifact.sourcePath,
         sourceDigest: digestForArtifact(artifact),
+        compileMcp: {
+          pluginRoot: privateRoot,
+          pluginData: privateData,
+        },
       })
       continue
     }
@@ -187,6 +212,19 @@ export function buildProviderMaterialization(
     skipped: skipped.sort((left, right) => left.artifactSelector.localeCompare(right.artifactSelector)),
     warnings: warnings.sort(),
   }
+}
+
+function defaultMcpPayload(artifact: SelectedArtifactForBundle) {
+  return artifact.fileDigests.map((file) => ({
+    sourcePath: file.path,
+    packagePath: relativeArtifactPath(file.path, artifact.sourcePath),
+    digest: file.digest,
+  }))
+}
+
+function relativeArtifactPath(filePath: string, sourcePath: string) {
+  if (filePath === sourcePath) return filePath.split('/').pop() ?? filePath
+  return filePath.startsWith(`${sourcePath}/`) ? filePath.slice(sourcePath.length + 1) : filePath
 }
 
 export function normalizeSelectionPick(input: string, defaultKind?: SelectableArtifactKind) {

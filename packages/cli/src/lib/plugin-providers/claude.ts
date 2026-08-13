@@ -21,13 +21,13 @@ import {
   cleanEmptyAncestors,
   compileProviderMcp,
   copyEntries,
+  copyPortablePluginPayload,
   detectPluginFeatures,
   normalizeManifestDescription,
   normalizeManifestVersion,
   pluginAuthor,
   providerPluginName,
 } from './shared'
-import { writeClaudeProviderPointer } from './provider-pointers'
 
 /**
  * Stage the rendered Claude marketplace into a persistent directory under
@@ -80,15 +80,12 @@ function scopeToClaudeArg(scope: 'personal' | 'workspace') {
   return scope === 'workspace' ? 'project' : 'user'
 }
 
-async function copyClaudePlugin(pluginSourceDir: string, pluginDir: string) {
-  await copyEntries(pluginSourceDir, pluginDir, [
-    'skills',
+async function copyClaudePlugin(plugin: PluginEntry, pluginDir: string) {
+  await copyPortablePluginPayload(plugin, pluginDir)
+  await copyEntries(plugin.pluginSourceDir, pluginDir, [
     { source: 'ai.agentrig/commands', destination: 'commands' },
     { source: 'ai.agentrig/agents', destination: 'agents' },
     { source: 'ai.agentrig/hooks', destination: 'hooks' },
-    'assets',
-    'scripts',
-    'README.md',
     { source: 'ai.agentrig/settings.json', destination: 'settings.json' },
     { source: 'ai.agentrig/lsp.json', destination: '.lsp.json' },
   ])
@@ -144,14 +141,13 @@ export const claudeProvider: PluginProviderAdapter = {
     for (const plugin of plugins) {
       const pluginName = providerPluginName(plugin, 'claude', cfg.pluginPrefix)
       const pluginDir = path.join(pluginRoot, pluginName)
-      await copyClaudePlugin(plugin.pluginSourceDir, pluginDir)
+      await copyClaudePlugin(plugin, pluginDir)
       await compileProviderMcp(plugin, pluginDir, 'claude', '.mcp.json')
       const features = await detectPluginFeatures(pluginDir)
       await writeJsonFile(
         path.join(pluginDir, '.claude-plugin', 'plugin.json'),
         buildClaudePluginManifest(plugin, cfg.owner, features, pluginName)
       )
-      await writeClaudeProviderPointer(pluginDir, plugin, features)
     }
 
     await writeJsonFile(

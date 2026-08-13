@@ -3,6 +3,7 @@ import process from 'node:process'
 import { defineCommand, showUsage } from 'citty'
 import {
   exportPluginProviders,
+  formatPluginInspectionDiagnostics,
   formatProviderSummary,
   parsePluginProviderSelector,
 } from '../../lib/plugin-providers'
@@ -76,6 +77,10 @@ const command = defineCommand({
       clean: args.clean,
       plugin: args.plugin,
     })
+
+    for (const diagnostic of results[0] ? formatPluginInspectionDiagnostics(results[0]) : []) {
+      console.warn(`Diagnostic: ${diagnostic}`)
+    }
 
     for (const result of results) {
       console.log(formatProviderSummary(result))

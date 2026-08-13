@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## [2.0.2] - 2026-08-12
+
+### Fixed
+
+- Provider exports now consume the tolerant SDK package inspector, isolate invalid Skills and MCP servers, and preserve containment-checked package support payloads.
+- MCP materialization now carries complete inspected package payloads, compiles portable roots into provider-native paths, and safely owns selective-install data roots.
+- Public install bundles now retain required listing categories and enforce one `source.subdir`-relative fetch-path contract without CLI retries or coercion.
+- Claude exports no longer generate an unsupported root `CLAUDE.md` pointer.
+- Added regression coverage for malformed extensions, invalid component isolation, MCP support files, symlink escapes, public listing projection, and duplicated GitHub source paths.
+
 ## [2.0.1] - 2026-08-12
 
 ### Fixed
