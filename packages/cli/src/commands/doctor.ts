@@ -854,30 +854,20 @@ async function addClaudeGeneratedFileChecks(
     const summary = summaries.get(plugin.name)
     return [
       ...missingWhen(!summary?.files.has('.claude-plugin/plugin.json'), `${plugin.name}:.claude-plugin/plugin.json`),
-      ...missingWhen(!summary?.files.has('CLAUDE.md'), `${plugin.name}:CLAUDE.md`),
       ...missingWhen(plugin.expectsSkills && !hasGeneratedSkills(summary), `${plugin.name}:skills/`),
       ...missingWhen(plugin.expectsMcp && !summary?.files.has('.mcp.json'), `${plugin.name}:.mcp.json`),
       ...missingWhen(plugin.expectsMcp && !mcpConfigHasServers(summary?.mcpJson.get('.mcp.json')), `${plugin.name}:.mcp.json valid MCP config`),
       ...missingWhen(plugin.expectsMcp && !claudeMcpUsesRequiredVariables(summary?.text.get('.mcp.json')), `${plugin.name}:.mcp.json Claude path variables`),
     ]
   })
-  const badPointers = expectations
-    .filter((plugin) => {
-      const pointer = summaries.get(plugin.name)?.text.get('CLAUDE.md') ?? ''
-      return !/agentrig doctor --provider claude-code/.test(pointer)
-        || (plugin.expectsMcp && !/\/mcp/.test(pointer))
-        || !/reload/i.test(pointer)
-        || !/settings/i.test(pointer)
-    })
-    .map((plugin) => `${plugin.name}:CLAUDE.md`)
   addCheck({
     id: 'claude-generated-files',
     section: 'Provider',
-    status: missing.length || badPointers.length ? 'fail' : 'pass',
-    label: missing.length || badPointers.length
+    status: missing.length ? 'fail' : 'pass',
+    label: missing.length
       ? 'Claude Code generated files incomplete'
       : 'Claude Code generated files verified',
-    message: [...missing, ...badPointers].join('; ') || undefined,
+    message: missing.join('; ') || undefined,
   })
 }
 
@@ -1659,7 +1649,7 @@ function providerCompatibilityLabel(
 
 function providerExportSurfaceMessage(provider: CapabilityTarget) {
   if (provider === 'codex') return 'Codex plugin export preview includes marketplace locations and install actions; AGENTS.md pointer presence is tracked by provider adapter output.'
-  if (provider === 'claude-code') return 'Claude Code plugin export preview includes marketplace locations and install actions; CLAUDE.md pointer and reload visibility remain host-state checks.'
+  if (provider === 'claude-code') return 'Claude Code plugin export preview includes marketplace locations and install actions; provider-native manifest, skills, MCP, and reload visibility remain host-state checks.'
   return 'Cursor plugin export preview includes plugin/rules locations and copy actions.'
 }
 

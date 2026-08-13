@@ -15,6 +15,7 @@ import {
   buildPluginEntries,
   defaultCommandRunner,
   formatProviderSummary,
+  formatPluginInspectionDiagnostics,
   loadPluginConfig,
   parsePluginInstallScope,
   parsePluginInstallScopeSelector,
@@ -49,6 +50,7 @@ const PROVIDER_ADAPTERS: Record<PluginProviderId, PluginProviderAdapter> = {
 export {
   PLUGIN_PROVIDER_IDS,
   formatProviderSummary,
+  formatPluginInspectionDiagnostics,
   parsePluginInstallScope,
   parsePluginInstallScopeSelector,
   parsePluginProviderSelector,

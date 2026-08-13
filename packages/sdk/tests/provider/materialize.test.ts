@@ -79,6 +79,48 @@ describe('materializePlugin', () => {
     ).rejects.toThrow(/materialized path conflict/i)
   })
 
+  it('preserves the complete inspected package support payload for selected MCP servers', async () => {
+    const tree = createMemoryTree({
+      'plugins/demo/plugin.json': JSON.stringify({
+        $schema: AGENT_PLUGIN_MANIFEST_SCHEMA_URL,
+        name: 'acme.demo',
+      }),
+      'plugins/demo/mcp.json': JSON.stringify({
+        $schema: AGENT_PLUGIN_MCP_SCHEMA_URL,
+        mcpServers: {
+          local: {
+            type: 'stdio',
+            command: './scripts/server.mjs',
+            args: ['--config', '${PLUGIN_ROOT}/config.json'],
+          },
+        },
+      }),
+      'plugins/demo/scripts/server.mjs': 'process.stdin.resume()\n',
+      'plugins/demo/config.json': '{"enabled":true}\n',
+      'plugins/demo/skills/unselected/SKILL.md': '---\nname: unselected\ndescription: Not selected.\n---\nBody',
+    })
+    const scan = await scanRepo({ source: { type: 'virtual', label: 'fixture' }, tree })
+    const pickedSignals = scan.signals.filter((signal) => signal.kind === 'mcp')
+
+    const files = await materializePlugin({
+      tree,
+      pickedSignals,
+      sourcePackage: scan.pluginCandidates[0],
+      manifest: {
+        name: 'community.demo',
+        description: 'Demo MCP.',
+        version: '1.0.0',
+      },
+    })
+
+    expect(files.map((file) => file.path)).toEqual([
+      'config.json',
+      'mcp.json',
+      'plugin.json',
+      'scripts/server.mjs',
+    ])
+  })
+
   it('fails when picked file bytes no longer match the scan digest', async () => {
     const scannedTree = createMemoryTree({
       '.claude/commands/review.md': '# Original',

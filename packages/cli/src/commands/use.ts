@@ -10,6 +10,7 @@ import {
   scanRepo,
   type ExternalRepoSelectionSource,
   type RepoScanSource,
+  type RepoScanPluginCandidate,
   type Signal,
 } from '@agentrig/sdk'
 import { enrichWithLocalAi } from '../lib/enrich/local'
@@ -187,6 +188,9 @@ const command = defineCommand({
       const files = await materializePlugin({
         tree: resolved.tree,
         pickedSignals,
+        ...(sourcePackageForSignals(report.pluginCandidates, pickedSignals) ? {
+          sourcePackage: sourcePackageForSignals(report.pluginCandidates, pickedSignals),
+        } : {}),
         manifest: {
           name: pluginId,
           displayName: titleFromPluginId(pluginId),
@@ -219,6 +223,21 @@ const command = defineCommand({
     }
   },
 })
+
+function sourcePackageForSignals(
+  candidates: readonly RepoScanPluginCandidate[],
+  pickedSignals: readonly Signal[],
+) {
+  const mcpSignals = pickedSignals.filter((signal) => signal.kind === 'mcp')
+  if (mcpSignals.length === 0) return undefined
+  return candidates
+    .filter((candidate) => candidate.conformance.loadable)
+    .filter((candidate) => mcpSignals.every((signal) => {
+      const root = candidate.sourcePath === '.' ? '' : candidate.sourcePath.replace(/\/+$/g, '')
+      return !root || signal.sourcePath === root || signal.sourcePath.startsWith(`${root}/`)
+    }))
+    .sort((left, right) => right.sourcePath.length - left.sourcePath.length)[0]
+}
 
 async function pickSignals(signals: Signal[], pick: string | undefined, pickAll: boolean) {
   if (!pick) {

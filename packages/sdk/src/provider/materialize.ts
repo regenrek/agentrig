@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isAgentPluginSupportPath } from '../agent-plugin-package'
 import {
   AGENTRIG_EXTENSION_NAMESPACE,
   AgentPluginMcpConfigSchema,
@@ -37,6 +38,15 @@ export async function materializePlugin(options: MaterializePluginOptions): Prom
   const files = new Map<string, MaterializedPluginFile>()
 
   addMaterializedFile(files, 'plugin.json', encodeJson(manifest))
+  if (options.sourcePackage) {
+    for (const file of options.sourcePackage.files) {
+      if (!isAgentPluginSupportPath(file.path)) continue
+      const sourcePath = sourcePackageFilePath(options.sourcePackage.sourcePath, file.path)
+      const sourceBytes = await readVirtualFileBytes(options.tree, sourcePath)
+      await assertFileDigest(sourcePath, sourceBytes, file.digest)
+      addMaterializedFile(files, file.path, sourceBytes, file.digest)
+    }
+  }
   for (const signal of options.pickedSignals) {
     for (const file of signal.files) {
       const destinationPath = destinationPathForSignalFile(signal.kind, signal.id, signal.sourcePath, file.path)
@@ -48,6 +58,10 @@ export async function materializePlugin(options: MaterializePluginOptions): Prom
   }
 
   return [...files.values()].sort((left, right) => left.path.localeCompare(right.path))
+}
+
+function sourcePackageFilePath(packageRoot: string, packagePath: string) {
+  return packageRoot === '.' ? packagePath : joinVirtualPath(packageRoot, packagePath)
 }
 
 export function buildPluginManifest(input: MaterializedPluginManifestInput) {

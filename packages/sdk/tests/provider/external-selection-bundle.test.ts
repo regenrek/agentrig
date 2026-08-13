@@ -51,4 +51,92 @@ describe('buildExternalSelectionBundle', () => {
       },
     })).rejects.toThrow(/not an installable artifact/i)
   })
+
+  it('closes a selected MCP over its complete inspected plugin package payload', async () => {
+    const tree = createMemoryTree({
+      'plugin.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+        name: 'acme.local-mcp',
+      }),
+      'mcp.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: {
+          local: {
+            type: 'stdio',
+            command: './scripts/server.mjs',
+            args: ['--config', '${PLUGIN_ROOT}/config.json'],
+          },
+        },
+      }),
+      'scripts/server.mjs': 'process.stdin.resume()\n',
+      'config.json': '{"enabled":true}\n',
+    })
+    const report = await scanRepo({ source: { type: 'virtual', label: 'owner/repo' }, tree })
+    const result = await buildExternalSelectionBundle({
+      tree,
+      report,
+      selectedSourcePaths: ['mcp.json'],
+      provider: 'cursor',
+      scope: 'workspace',
+      source: {
+        kind: 'external-repo-scan',
+        sourceLabel: 'owner/repo',
+        scanDigest: report.digest,
+      },
+    })
+
+    expect(result.bundle.selectedArtifacts[0]).toMatchObject({ closureStatus: 'closed' })
+    expect(result.bundle.materialization.fileCopies.map((copy) => copy.sourcePath)).toEqual([
+      'config.json',
+      'mcp.json',
+      'plugin.json',
+      'scripts/server.mjs',
+    ])
+    expect(result.bundle.materialization.jsonWrites[0]).toMatchObject({
+      compileMcp: {
+        pluginRoot: expect.stringContaining('/plugins/mcp'),
+        pluginData: expect.stringContaining('/data/mcp'),
+      },
+    })
+    expect(() => assertSelectionBundleInstallable(result.bundle)).not.toThrow()
+  })
+
+  it('keeps a local MCP blocked when its inspected package omits a referenced file', async () => {
+    const tree = createMemoryTree({
+      'plugin.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+        name: 'acme.incomplete-mcp',
+      }),
+      'mcp.json': JSON.stringify({
+        $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+        mcpServers: {
+          local: {
+            type: 'stdio',
+            command: 'node',
+            args: ['--config', '${PLUGIN_ROOT}/missing-config.json'],
+          },
+        },
+      }),
+    })
+    const report = await scanRepo({ source: { type: 'virtual', label: 'owner/repo' }, tree })
+    const result = await buildExternalSelectionBundle({
+      tree,
+      report,
+      selectedSourcePaths: ['mcp.json'],
+      provider: 'cursor',
+      scope: 'workspace',
+      source: {
+        kind: 'external-repo-scan',
+        sourceLabel: 'owner/repo',
+        scanDigest: report.digest,
+      },
+    })
+
+    expect(result.bundle.selectedArtifacts[0]).toMatchObject({
+      closureStatus: 'requires-full-source',
+      closureReason: expect.stringMatching(/missing referenced paths/i),
+    })
+    expect(result.bundle.selectedArtifacts[0]?.closureReason).toContain('missing-config.json')
+    expect(() => assertSelectionBundleInstallable(result.bundle)).toThrow(/not closed/i)
+  })
 })

@@ -79,6 +79,10 @@ export type ArtifactClosure = {
 
 export type ArtifactClosureOptions = {
   selectedSelectors?: readonly string[]
+  packagePayload?: readonly {
+    sourcePath: string
+    packagePath: string
+  }[]
 }
 
 export function extractArtifactsFromPluginLock(lock: RegistryLockArtifact): ExtractedArtifact[] {
@@ -138,7 +142,7 @@ export function extractArtifactsFromRepoScan(report: Pick<RepoScanReport, 'signa
 
 export async function detectArtifactClosure(
   tree: VirtualTree,
-  artifact: Pick<ExtractedArtifact, 'selector' | 'sourcePath' | 'fileDigests' | 'dependencies'>,
+  artifact: Pick<ExtractedArtifact, 'kind' | 'selector' | 'sourcePath' | 'fileDigests' | 'dependencies'>,
   options: ArtifactClosureOptions = {}
 ): Promise<ArtifactClosure> {
   const selected = new Set(options.selectedSelectors ?? [])
@@ -170,7 +174,7 @@ export async function detectArtifactClosure(
     }
   }
 
-  const externalReferences = await findExternalPathReferences(
+  const externalReferences = artifact.kind === 'mcp' ? [] : await findExternalPathReferences(
     tree,
     artifact.sourcePath,
     artifact.fileDigests.map((file) => file.path),
@@ -182,6 +186,35 @@ export async function detectArtifactClosure(
       requiredSelectors: [],
       requiredPaths: externalReferences,
       reason: 'Selected artifact references paths outside its artifact root.',
+    }
+  }
+
+  if (artifact.kind === 'mcp') {
+    const localReferences = await localMcpPackageReferences(
+      tree,
+      artifact.fileDigests.map((file) => file.path),
+    )
+    if (localReferences !== null) {
+      if (!options.packagePayload) {
+        return {
+          selector: artifact.selector,
+          status: 'requires-full-source',
+          requiredSelectors: [],
+          requiredPaths: artifact.fileDigests.map((file) => normalizeVirtualPath(file.path)).sort(),
+          reason: 'Local MCP processes require a complete inspected plugin package payload.',
+        }
+      }
+      const payloadPaths = new Set(options.packagePayload.map((file) => normalizeVirtualPath(file.packagePath)))
+      const missingPaths = localReferences.filter((requiredPath) => !payloadContains(payloadPaths, requiredPath))
+      if (missingPaths.length) {
+        return {
+          selector: artifact.selector,
+          status: 'requires-full-source',
+          requiredSelectors: [],
+          requiredPaths: missingPaths,
+          reason: `Local MCP package payload is missing referenced paths: ${missingPaths.join(', ')}`,
+        }
+      }
     }
   }
 
@@ -350,19 +383,79 @@ function isWithinSourcePath(path: string, sourcePath: string) {
 
 async function findExternalPathReferences(tree: VirtualTree, sourcePath: string, paths: string[]) {
   const matches = new Set<string>()
-  const portableMcpConfig = sourcePath === 'mcp.json'
   for (const path of paths) {
     const text = await tree.readText(normalizeVirtualPath(path))
     if (!text) continue
     if (
       /(^|["'\s])\.\.\/[A-Za-z0-9_.\-/]+/.test(text)
       || /\$\{(?:PLUGIN_ROOT|CLAUDE_PLUGIN_ROOT)\}\/[A-Za-z0-9_.\-/]+/.test(text)
-      || (portableMcpConfig && /(^|["'\s:[,])\.\/[A-Za-z0-9_.\-/]+/.test(text))
     ) {
       matches.add(path)
     }
   }
   return [...matches].sort()
+}
+
+async function localMcpPackageReferences(tree: VirtualTree, paths: string[]): Promise<string[] | null> {
+  const references = new Set<string>()
+  let hasLocalProcess = false
+  for (const path of paths) {
+    const text = await tree.readText(normalizeVirtualPath(path))
+    if (!text) continue
+    try {
+      const raw = JSON.parse(text) as {
+        mcpServers?: Record<string, {
+          type?: unknown
+          command?: unknown
+          args?: unknown
+          env?: unknown
+          cwd?: unknown
+        }>
+      }
+      for (const server of Object.values(raw.mcpServers ?? {})) {
+        if (server?.type !== 'stdio') continue
+        hasLocalProcess = true
+        if (typeof server.command === 'string' && server.command.startsWith('./')) {
+          references.add(normalizeVirtualPath(server.command.slice(2)))
+        }
+        const values = [
+          ...(Array.isArray(server.args) ? server.args : []),
+          ...(server.env && typeof server.env === 'object' ? Object.values(server.env) : []),
+          server.cwd,
+        ]
+        for (const value of values) {
+          if (typeof value !== 'string') continue
+          for (const match of value.matchAll(/\$\{PLUGIN_ROOT\}\/([A-Za-z0-9_.\-/]+)/g)) {
+            if (match[1]) references.add(normalizeVirtualPath(match[1]))
+          }
+        }
+        const cwdRoot = packageRelativeCwd(server.cwd)
+        if (cwdRoot !== null && Array.isArray(server.args)) {
+          for (const value of server.args) {
+            if (typeof value !== 'string' || !value.startsWith('./')) continue
+            references.add(normalizeVirtualPath(cwdRoot ? `${cwdRoot}/${value.slice(2)}` : value.slice(2)))
+          }
+        }
+      }
+    } catch {
+      // Invalid MCP documents are isolated by package inspection and cannot
+      // establish a closed local-process artifact here.
+    }
+  }
+  return hasLocalProcess ? [...references].sort() : null
+}
+
+function packageRelativeCwd(cwd: unknown) {
+  if (cwd === '${PLUGIN_ROOT}') return ''
+  if (typeof cwd !== 'string') return null
+  if (cwd.startsWith('${PLUGIN_ROOT}/')) return normalizeVirtualPath(cwd.slice('${PLUGIN_ROOT}/'.length))
+  if (cwd.startsWith('./')) return normalizeVirtualPath(cwd.slice(2))
+  return null
+}
+
+function payloadContains(payloadPaths: ReadonlySet<string>, requiredPath: string) {
+  return payloadPaths.has(requiredPath)
+    || [...payloadPaths].some((candidate) => candidate.startsWith(`${requiredPath}/`))
 }
 
 function fileDigestSort(left: { path: string }, right: { path: string }) {

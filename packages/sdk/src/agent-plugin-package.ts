@@ -12,6 +12,7 @@ import {
   type PortablePluginManifest,
 } from './agent-plugins'
 import { validateAgentSkill, type AgentSkill, type AgentSkillSource } from './agent-skills'
+import { shouldIncludeRepoScanPath } from './repo-scan/source-policy'
 
 const PORTABLE_MANIFEST_FIELDS = new Set([
   '$schema',
@@ -24,6 +25,18 @@ const PORTABLE_MANIFEST_FIELDS = new Set([
   'license',
   'keywords',
   'extensions',
+])
+
+const PROVIDER_OWNED_ROOT_ENTRIES = new Set([
+  'AGENTS.md',
+  'CLAUDE.md',
+  'CURSOR.md',
+  'agents',
+  'commands',
+  'hooks',
+  'hooks.json',
+  'rules',
+  'settings.json',
 ])
 
 export type AgentPluginDiagnosticSeverity = 'warning' | 'error' | 'fatal'
@@ -52,7 +65,31 @@ export type AgentPluginPackageInspection = {
   components: {
     skills: AgentSkill[]
     mcpServers: Array<{ name: string; server: AgentPluginMcpServer }>
+    supportFiles: string[]
   }
+}
+
+export function isAgentPluginSupportPath(filePath: string) {
+  const normalized = filePath.replaceAll('\\', '/').replace(/^\/+|\/+$/g, '')
+  if (!normalized || !shouldIncludeRepoScanPath(normalized)) return false
+  const topLevel = normalized.split('/')[0]
+  return topLevel !== 'plugin.json'
+    && topLevel !== 'mcp.json'
+    && topLevel !== 'skills'
+    && topLevel !== AGENTRIG_EXTENSION_NAMESPACE
+    && !PROVIDER_OWNED_ROOT_ENTRIES.has(topLevel)
+    && !topLevel.startsWith('.')
+}
+
+export function isAgentPluginPackagePayloadPath(filePath: string) {
+  const normalized = filePath.replaceAll('\\', '/').replace(/^\/+|\/+$/g, '')
+  if (!normalized || !shouldIncludeRepoScanPath(normalized)) return false
+  const topLevel = normalized.split('/')[0]
+  return topLevel === 'plugin.json'
+    || topLevel === 'mcp.json'
+    || topLevel === 'skills'
+    || topLevel === AGENTRIG_EXTENSION_NAMESPACE
+    || isAgentPluginSupportPath(normalized)
 }
 
 export class AgentPluginPackageError extends Error {
@@ -160,7 +197,11 @@ export function inspectAgentPluginPackage(input: AgentPluginPackageInput): Agent
   const mcpServers = inspectMcp(input.mcp, diagnostics)
   if (agentRig && input.skills) validateAgentRigSkillReferences(agentRig, skills, diagnostics)
 
-  return inspection({ manifest, ...(agentRig ? { agentRig } : {}) }, diagnostics, { skills, mcpServers })
+  return inspection({ manifest, ...(agentRig ? { agentRig } : {}) }, diagnostics, {
+    skills,
+    mcpServers,
+    supportFiles: [],
+  })
 }
 
 export function loadAgentPluginPackage(input: AgentPluginPackageInput): InspectedAgentPluginPackage {
@@ -190,7 +231,7 @@ function rejectedInspection(
 function inspection(
   loadedPackage: InspectedAgentPluginPackage | null,
   diagnostics: AgentPluginDiagnostic[],
-  components: AgentPluginPackageInspection['components'] = { skills: [], mcpServers: [] },
+  components: AgentPluginPackageInspection['components'] = { skills: [], mcpServers: [], supportFiles: [] },
 ): AgentPluginPackageInspection {
   const loadable = loadedPackage !== null
   const publishBlocking = diagnostics.some((diagnostic) => diagnostic.publishBlocking)
