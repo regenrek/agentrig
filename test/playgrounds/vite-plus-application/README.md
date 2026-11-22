@@ -4,7 +4,7 @@ This fixture is the canonical Vite+ consumer-project playground for AgentRig CLI
 
 It is derived from a real `vp create vite:application` scaffold and then normalized so tests can copy it into temporary directories quickly.
 
-Current scaffold baseline: `vite-plus latest` with `npm:@voidzero-dev/vite-plus-core@latest`.
+Current scaffold baseline: `vite-plus 0.1.24` with `npm:@voidzero-dev/vite-plus-core@0.1.24`.
 
 Use the refresh/check script to compare this fixture against the latest normalized Vite+ scaffold:
 

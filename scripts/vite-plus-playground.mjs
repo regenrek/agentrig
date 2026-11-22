@@ -109,6 +109,12 @@ async function scaffoldLatestVitePlusFixture() {
     const packageJson = JSON.parse(await fs.readFile(path.join(appDir, 'package.json'), 'utf-8'))
     packageJson.name = 'agentrig-vite-plus-fixture'
     packageJson.packageManager = packageManager
+    // Keep the copied fixture standalone when the scaffold uses the workspace catalog.
+    for (const dependency of ['vite', 'vite-plus']) {
+      if (packageJson.devDependencies?.[dependency] === 'catalog:') {
+        packageJson.devDependencies[dependency] = rootPackageJson.devDependencies[dependency]
+      }
+    }
     if (packageJson.pnpm?.overrides?.vitest) {
       delete packageJson.pnpm.overrides.vitest
       if (Object.keys(packageJson.pnpm.overrides).length === 0) {

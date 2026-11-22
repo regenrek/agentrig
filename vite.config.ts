@@ -41,7 +41,7 @@ export default defineConfig({
         cwd: 'apps/docs',
       },
       'repo:docs:build': {
-        command: 'vite build',
+        command: 'vp build',
         cwd: 'apps/docs',
       },
       'repo:playground:vite-plus:check': {

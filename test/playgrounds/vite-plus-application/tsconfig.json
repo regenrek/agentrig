@@ -7,7 +7,7 @@
       "DOM"
     ],
     "types": [
-      "vite/client"
+      "vite-plus/client"
     ],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
