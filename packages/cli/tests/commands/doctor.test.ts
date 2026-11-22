@@ -457,7 +457,7 @@ async function createDoctorFixture(options: {
       controlPlane: {
         providerCompatibility: { codex: 'native', 'claude-code': 'native', cursor: 'native' },
         verification: {
-          lastVerified: options.context7?.lastVerified ?? '2026-08-01',
+          lastVerified: options.context7?.lastVerified ?? new Date().toISOString().slice(0, 10),
           cadence: '30d',
           smokeTest: 'verify/context7-smoke.md',
           ...(context7CommandFingerprint ? { commandFingerprint: context7CommandFingerprint } : {}),
