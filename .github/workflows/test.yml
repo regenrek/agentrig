@@ -11,8 +11,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: voidzero-dev/setup-vp@ee6805d1c428a397d5c7d3fa4111f8a7e5af2136
         with:
           node-version: 24
           cache: true
@@ -22,8 +22,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: voidzero-dev/setup-vp@ee6805d1c428a397d5c7d3fa4111f8a7e5af2136
         with:
           node-version: 24
           cache: true
@@ -38,8 +38,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: voidzero-dev/setup-vp@ee6805d1c428a397d5c7d3fa4111f8a7e5af2136
         with:
           node-version: 24
           cache: true
@@ -51,8 +51,8 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: voidzero-dev/setup-vp@ee6805d1c428a397d5c7d3fa4111f8a7e5af2136
         with:
           node-version: 25
           cache: true
